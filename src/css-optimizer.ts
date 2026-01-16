@@ -30,11 +30,11 @@ export class CSSOptimizer {
 
     let optimized = content;
 
-    // 如果配置了自动前缀或压缩，使用 postcss
-    if (this.config.autoprefix || this.config.minify) {
+    // 如果配置了自动前缀，必须使用 postcss
+    if (this.config.autoprefix) {
       optimized = await this.processWithPostCSS(optimized, filePath);
     } else if (this.config.minify) {
-      // 只压缩，不使用 postcss
+      // 只压缩，不使用 postcss（使用简单的压缩实现）
       optimized = this.minifyCSS(optimized);
     }
 

@@ -22,6 +22,7 @@ import {
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import type { AssetsConfig } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * 静态资源处理器
@@ -253,10 +254,10 @@ export class AssetsProcessor {
       }
     } catch (error) {
       // 图片处理失败，记录警告但不中断构建
-      console.warn(
-        `图片处理失败: ${filePath}`,
-        error instanceof Error ? error.message : String(error),
-      );
+      logger.warn("图片处理失败", {
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

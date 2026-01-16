@@ -36,6 +36,7 @@ import type {
   LogLevel,
   OptimizationSuggestion,
 } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * 构建器类
@@ -178,7 +179,7 @@ export class Builder implements IBuilder {
 
     // 输出性能报告
     if (performance.total > 0) {
-      console.log(this.generatePerformanceReport(performance, buildOptions));
+      logger.info(this.generatePerformanceReport(performance, buildOptions));
     }
 
     return finalResult;
@@ -242,6 +243,16 @@ export class Builder implements IBuilder {
     }
 
     // 构建客户端
+    // 检查是否是多入口构建
+    if (this.config.client!.entries) {
+      return await this.buildMultipleEntries(
+        buildOptions,
+        mode,
+        performance,
+        buildStartTime,
+      );
+    }
+
     const buildStart = Date.now();
     const result = await this.clientBuilder.build(mode);
     performance.stages.build = Date.now() - buildStart;
@@ -270,7 +281,7 @@ export class Builder implements IBuilder {
         // 可以将分析结果附加到 result 中，或者输出到控制台
         // 这里暂时只分析，不修改 result
         if (mode === "dev") {
-          console.log(this.buildAnalyzer.generateReport(analysis));
+          logger.info(this.buildAnalyzer.generateReport(analysis));
 
           // 生成优化建议
           const suggestions = this.buildAnalyzer
@@ -301,7 +312,7 @@ export class Builder implements IBuilder {
         }
       } catch (error) {
         // 分析失败不影响构建
-        console.warn("构建分析失败:", error);
+        logger.warn("构建分析失败", { error });
       }
     }
 
@@ -371,7 +382,7 @@ export class Builder implements IBuilder {
     if (
       mode === "dev" && performance.total > 0 && !buildOptions.silent
     ) {
-      console.log(this.generatePerformanceReport(performance, buildOptions));
+      logger.info(this.generatePerformanceReport(performance, buildOptions));
     }
 
     this.reportProgress(buildOptions, "完成", 100);
@@ -489,12 +500,16 @@ export class Builder implements IBuilder {
         .sort(([, a], [, b]) => b - a);
 
       // 识别构建瓶颈（耗时最长的阶段）
+      // 只在总耗时超过 3 秒时才显示瓶颈警告，避免在快速构建时产生误导
       const maxDuration = Math.max(...Object.values(performance.stages));
       const bottleneckThreshold = performance.total * 0.5; // 超过总耗时 50% 的阶段
+      const shouldShowBottleneck = performance.total > 3000; // 总耗时超过 3 秒才显示瓶颈警告
 
       for (const [stage, duration] of sortedStages) {
         const percentage = ((duration / performance.total) * 100).toFixed(1);
-        const isBottleneck = duration > bottleneckThreshold &&
+        // 只在总耗时较长时才标记瓶颈，避免在快速构建（如测试）时产生误导
+        const isBottleneck = shouldShowBottleneck &&
+          duration > bottleneckThreshold &&
           duration === maxDuration;
         const bottleneckMarker = isBottleneck ? " ⚠️ (瓶颈)" : "";
         lines.push(
@@ -713,16 +728,16 @@ export class Builder implements IBuilder {
 
     switch (level) {
       case "debug":
-        console.debug(...args);
+        logger.debug(args[0] as string, args.slice(1));
         break;
       case "info":
-        console.log(...args);
+        logger.info(args[0] as string, args.slice(1));
         break;
       case "warn":
-        console.warn(...args);
+        logger.warn(args[0] as string, args.slice(1));
         break;
       case "error":
-        console.error(...args);
+        logger.error(args[0] as string, args.slice(1));
         break;
       case "silent":
         // 不输出
@@ -835,7 +850,7 @@ export class Builder implements IBuilder {
         ">".repeat(progress % 2 === 0 ? 0 : 1) +
         " ".repeat(50 - Math.floor(progress / 2));
       const fileInfo = currentFile ? ` [${currentFile}]` : "";
-      console.log(
+      logger.info(
         `[${stage}] ${progressBar} ${progress.toFixed(1)}%${fileInfo}`,
       );
     }
@@ -892,16 +907,16 @@ export class Builder implements IBuilder {
 
     // 输出警告和错误
     if (warnings.length > 0) {
-      console.warn("构建产物验证警告:");
+      logger.warn("构建产物验证警告", { warnings });
       for (const warning of warnings) {
-        console.warn(`  ⚠️  ${warning}`);
+        logger.warn(`  ⚠️  ${warning}`);
       }
     }
 
     if (errors.length > 0) {
-      console.error("构建产物验证错误:");
+      logger.error("构建产物验证错误", { errors });
       for (const error of errors) {
-        console.error(`  ❌ ${error}`);
+        logger.error(`  ❌ ${error}`);
       }
       throw new Error("构建产物验证失败");
     }
@@ -1040,7 +1055,7 @@ export class Builder implements IBuilder {
    */
   async watch(options?: BuildOptions): Promise<void> {
     if (this.isWatching) {
-      console.warn("Watch 模式已在运行中");
+      logger.warn("Watch 模式已在运行中");
       return;
     }
 
@@ -1076,7 +1091,7 @@ export class Builder implements IBuilder {
     });
 
     this.isWatching = true;
-    console.log(`开始监听文件变化: ${watchPaths.join(", ")}`);
+    logger.info(`开始监听文件变化: ${watchPaths.join(", ")}`);
 
     // 首次构建
     await this.build(options);
@@ -1119,7 +1134,7 @@ export class Builder implements IBuilder {
             try {
               await watchOptions.onFileChange(path, event.kind);
             } catch (error) {
-              console.error(`文件变化回调失败: ${error}`);
+              logger.error("文件变化回调失败", { error });
             }
           }
         }
@@ -1131,16 +1146,16 @@ export class Builder implements IBuilder {
 
         rebuildTimer = setTimeout(async () => {
           try {
-            console.log(`检测到文件变化，开始重新构建...`);
+            logger.info("检测到文件变化，开始重新构建...");
             await this.build(options);
-            console.log(`重新构建完成`);
+            logger.info("重新构建完成");
           } catch (error) {
-            console.error(`重新构建失败: ${error}`);
+            logger.error("重新构建失败", { error });
           }
         }, debounceTime) as unknown as number;
       }
     })().catch((error) => {
-      console.error(`文件监听错误: ${error}`);
+      logger.error("文件监听错误", { error });
       this.isWatching = false;
     });
   }
@@ -1153,7 +1168,7 @@ export class Builder implements IBuilder {
       this.watcher.close();
       this.watcher = undefined;
       this.isWatching = false;
-      console.log("已停止文件监听");
+      logger.info("已停止文件监听");
     }
   }
 
@@ -1212,7 +1227,7 @@ export class Builder implements IBuilder {
         const combinedAnalysis = this.buildAnalyzer.analyze(
           allMetafiles[0] as any,
         );
-        console.log(this.buildAnalyzer.generateReport(combinedAnalysis));
+        logger.info(this.buildAnalyzer.generateReport(combinedAnalysis));
 
         const suggestions = this.buildAnalyzer.generateOptimizationSuggestions(
           combinedAnalysis,
@@ -1239,7 +1254,7 @@ export class Builder implements IBuilder {
           }
         }
       } catch (error) {
-        console.warn("构建分析失败:", error);
+        logger.warn("构建分析失败", { error });
       }
     }
 
@@ -1287,10 +1302,13 @@ export class Builder implements IBuilder {
   /**
    * 输出优化建议
    */
+  /**
+   * 输出优化建议
+   */
   private logOptimizationSuggestions(
     suggestions: OptimizationSuggestion[],
   ): void {
-    console.log("\n=== 构建优化建议 ===\n");
+    logger.info("\n=== 构建优化建议 ===\n");
 
     for (const suggestion of suggestions) {
       const icon = suggestion.type === "error"
@@ -1298,19 +1316,19 @@ export class Builder implements IBuilder {
         : suggestion.type === "warning"
         ? "⚠️"
         : "ℹ️";
-      console.log(`${icon} ${suggestion.title}`);
-      console.log(`   ${suggestion.description}`);
+      logger.info(`${icon} ${suggestion.title}`);
+      logger.info(`   ${suggestion.description}`);
       if (suggestion.fix) {
-        console.log(`   修复建议: ${suggestion.fix}`);
+        logger.info(`   修复建议: ${suggestion.fix}`);
       }
       if (suggestion.files && suggestion.files.length > 0) {
         const fileList = suggestion.files.slice(0, 5).join(", ");
         const more = suggestion.files.length > 5
           ? ` 等 ${suggestion.files.length} 个文件`
           : "";
-        console.log(`   相关文件: ${fileList}${more}`);
+        logger.info(`   相关文件: ${fileList}${more}`);
       }
-      console.log("");
+      logger.info("");
     }
   }
 }

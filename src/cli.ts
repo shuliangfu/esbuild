@@ -19,6 +19,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { Builder } from "./builder.ts";
 import type { BuilderConfig, BuildMode, BuildOptions } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * 查找配置文件
@@ -110,7 +111,7 @@ async function executeBuild(
   } catch (err) {
     error(`构建失败: ${err instanceof Error ? err.message : String(err)}`);
     if (err instanceof Error && err.stack) {
-      console.error(err.stack);
+      logger.error("构建失败", { error: err, stack: err.stack });
     }
     exit(1);
   }
@@ -153,7 +154,7 @@ async function executeBuildServer(
       `服务端构建失败: ${err instanceof Error ? err.message : String(err)}`,
     );
     if (err instanceof Error && err.stack) {
-      console.error(err.stack);
+      logger.error("服务端构建失败", { error: err, stack: err.stack });
     }
     exit(1);
   }
@@ -196,7 +197,7 @@ async function executeBuildClient(
       `客户端构建失败: ${err instanceof Error ? err.message : String(err)}`,
     );
     if (err instanceof Error && err.stack) {
-      console.error(err.stack);
+      logger.error("客户端构建失败", { error: err, stack: err.stack });
     }
     exit(1);
   }
@@ -237,7 +238,7 @@ async function executeWatch(
   } catch (err) {
     error(`监听失败: ${err instanceof Error ? err.message : String(err)}`);
     if (err instanceof Error && err.stack) {
-      console.error(err.stack);
+      logger.error("监听失败", { error: err, stack: err.stack });
     }
     exit(1);
   }
@@ -255,7 +256,7 @@ async function executeClean(config: BuilderConfig): Promise<void> {
   } catch (err) {
     error(`清理失败: ${err instanceof Error ? err.message : String(err)}`);
     if (err instanceof Error && err.stack) {
-      console.error(err.stack);
+      logger.error("清理失败", { error: err, stack: err.stack });
     }
     exit(1);
   }

@@ -13,6 +13,7 @@ import {
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import type { HTMLConfig, HTMLEntry } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * HTML 生成器类
@@ -42,7 +43,7 @@ export class HTMLGenerator {
         const templatePath = await resolve(this.config.template);
         htmlTemplate = await readTextFile(templatePath);
       } catch (_error) {
-        console.warn(
+        logger.warn(
           `无法读取 HTML 模板: ${this.config.template}，使用默认模板`,
         );
       }

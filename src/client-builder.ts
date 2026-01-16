@@ -9,6 +9,8 @@
 import { mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
+import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
+import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -29,7 +31,13 @@ export class ClientBuilder {
     this.config = config;
     this.pluginManager = new PluginManager();
 
-    // 注册配置中的插件
+    // 方案一：自动注册服务端模块检测插件（优先级最高，最先执行）
+    this.pluginManager.register(createServerModuleDetectorPlugin());
+
+    // 方案二：自动注册条件编译插件
+    this.pluginManager.register(createConditionalCompilePlugin());
+
+    // 注册配置中的插件（用户自定义插件）
     if (config.plugins) {
       this.pluginManager.registerAll(config.plugins);
     }
@@ -93,6 +101,10 @@ export class ClientBuilder {
       sourcemapOption = bundleOptions.sourcemap || false;
     }
 
+    // 方案一：自动检测并排除服务端模块（通过插件实现）
+    // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
+    const externalModules = bundleOptions.external || [];
+
     // esbuild 构建选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -104,7 +116,7 @@ export class ClientBuilder {
       minify: bundleOptions.minify,
       sourcemap: sourcemapOption,
       splitting: splittingEnabled,
-      external: bundleOptions.external || [],
+      external: externalModules,
       chunkNames,
       treeShaking: true,
       metafile: true,
@@ -168,6 +180,10 @@ export class ClientBuilder {
     // 生成 chunk 名称模式（根据分割策略）
     const chunkNames = this.getChunkNames(bundleOptions.splitting);
 
+    // 方案一：自动检测并排除服务端模块（通过插件实现）
+    // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
+    const externalModules = bundleOptions.external || [];
+
     // esbuild 构建上下文选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -179,7 +195,7 @@ export class ClientBuilder {
       minify: bundleOptions.minify,
       sourcemap: bundleOptions.sourcemap,
       splitting: splittingEnabled,
-      external: bundleOptions.external || [],
+      external: externalModules,
       chunkNames,
       treeShaking: true,
       metafile: true,

@@ -18,7 +18,24 @@ export { ClientBuilder } from "./client-builder.ts";
 export { CSSOptimizer } from "./css-optimizer.ts";
 export { HTMLGenerator } from "./html-generator.ts";
 export { PluginManager } from "./plugin.ts";
+export { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
+export type { ConditionalCompileOptions } from "./plugins/conditional-compile.ts";
+export { createCSSImportHandlerPlugin } from "./plugins/css-import-handler.ts";
+export type {
+  CSSImportHandlerOptions,
+  CSSImportHandlerPluginInstance,
+} from "./plugins/css-import-handler.ts";
+export { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
+export type { ServerModuleDetectorOptions } from "./plugins/server-module-detector.ts";
 export { ServerBuilder } from "./server-builder.ts";
+export {
+  generateCSSTag,
+  generateCSSTags,
+  getCSSRelativePath,
+  injectCSSFromDependencies,
+  injectCSSIntoHTML,
+} from "./utils/css-injector.ts";
+export type { CSSFileInfo, CSSInjectOptions } from "./utils/css-injector.ts";
 
 export type {
   BuilderConfig,
