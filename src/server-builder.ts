@@ -68,7 +68,6 @@ export class ServerBuilder {
 
     // 确保输出路径是绝对路径，避免 Deno 在根目录生成临时文件
     const outputDir = await resolve(this.config.output);
-    const outputPath = join(outputDir, "server");
 
     // 确保输出目录存在
     await mkdir(outputDir, { recursive: true });
@@ -133,15 +132,14 @@ export class ServerBuilder {
     const compileOptions = this.config.compile || {};
 
     // 确保输出路径是绝对路径
-    const outputDir = await resolve(this.config.output);
-    const outputPath = join(outputDir, "server.js");
+    const outputDir = resolve(this.config.output);
 
     // 确保输出目录存在
     await mkdir(outputDir, { recursive: true });
 
     // 构建 bun build 命令
     // 使用绝对路径确保文件生成在正确位置
-    const absoluteEntryPoint = await resolve(entryPoint);
+    const absoluteEntryPoint = resolve(entryPoint);
     const args: string[] = ["build", absoluteEntryPoint];
 
     // 添加输出路径
