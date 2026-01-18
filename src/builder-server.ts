@@ -9,13 +9,17 @@
  */
 
 import {
+  basename,
   createCommand,
+  dirname,
+  existsSync,
   IS_BUN,
   IS_DENO,
   join,
   makeTempDir,
   mkdir,
   readFile,
+  relative,
   remove,
   resolve,
 } from "@dreamer/runtime-adapter"
@@ -250,6 +254,7 @@ export class BuilderServer {
 
     // 解析入口文件路径
     const entryPoint = await resolve(this.config.entry);
+    const entryDir = dirname(entryPoint);
 
     // 合并配置选项和模式选项
     const compileOptions = {
@@ -262,6 +267,19 @@ export class BuilderServer {
     const outputFileName = "server.js";
     const outfile = join(outputDir, outputFileName);
 
+    // 在 Bun 环境下，bun build 的行为：
+    // 1. 对于相对路径导入，不需要 package.json，可以直接工作
+    // 2. 对于 npm 包，可以从缓存读取，不需要 package.json
+    // 3. 对于路径别名（@/, ~/），需要 package.json 的 imports 或 tsconfig.json 的 paths
+    //
+    // 优化策略：
+    // - 优先使用入口文件所在目录（如果存在 package.json 或 tsconfig.json）
+    // - 如果没有配置文件，也可以工作（Bun 可以从缓存读取 npm 包）
+    // - 对于输出目录，如果是内存模式使用临时目录，否则使用配置的输出目录
+    const entryPackageJson = join(entryDir, "package.json");
+    const entryTsconfig = join(entryDir, "tsconfig.json");
+    const hasConfig = existsSync(entryPackageJson) || existsSync(entryTsconfig);
+
     // 如果是内存模式，使用临时目录
     const tempDir = write
       ? null
@@ -269,9 +287,15 @@ export class BuilderServer {
     const actualOutputDir = write ? outputDir : tempDir!;
     const actualOutfile = join(actualOutputDir, outputFileName);
 
+    // 确定工作目录：如果有配置文件，在入口文件目录执行；否则使用输出目录
+    // 注意：即使没有配置文件，Bun 也能从缓存读取 npm 包，所以也可以工作
+    const workDir = hasConfig ? entryDir : actualOutputDir;
+
     try {
       // 构建 bun build 命令参数
-      const args: string[] = ["build", entryPoint];
+      // 如果有配置文件，使用相对路径；否则使用绝对路径
+      const buildEntryPoint = hasConfig ? basename(entryPoint) : entryPoint;
+      const args: string[] = ["build", buildEntryPoint];
 
       // 设置目标平台为 node（服务端）
       args.push("--target", "node");
@@ -280,7 +304,12 @@ export class BuilderServer {
       args.push("--format", "esm");
 
       // 设置输出文件（使用相对路径，配合 cwd 使用）
-      args.push("--outfile", outputFileName);
+      // 如果工作目录是入口文件目录，输出文件路径需要相对于工作目录
+      // 如果工作目录是输出目录，输出文件就在当前目录
+      const outputRelativePath = hasConfig
+        ? join(relative(entryDir, actualOutputDir), outputFileName)
+        : outputFileName;
+      args.push("--outfile", outputRelativePath);
 
       // 压缩选项
       if (compileOptions.minify) {
@@ -293,12 +322,12 @@ export class BuilderServer {
       }
 
       // 执行 bun build 命令
-      // 设置 cwd 确保输出文件在正确的目录下生成
+      // 在包含 package.json 或 tsconfig.json 的目录下执行，这样 bun build 才能正确解析路径别名
       const command = createCommand("bun", {
         args,
         stdout: "piped",
         stderr: "piped",
-        cwd: actualOutputDir,
+        cwd: workDir,
       });
 
       const output = await command.output();

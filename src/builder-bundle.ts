@@ -10,7 +10,10 @@
  */
 
 import {
+  basename,
   createCommand,
+  dirname,
+  existsSync,
   IS_BUN,
   IS_DENO,
   join,
@@ -185,15 +188,34 @@ export class BuilderBundle {
    * @returns 打包结果
    */
   private async buildWithBun(options: BundleOptions): Promise<BundleResult> {
-    // 使用系统临时目录创建临时输出目录
-    const tempDir = await makeTempDir({ prefix: "esbuild-bundle-" });
+    // 解析入口文件路径
+    const entryPoint = await resolve(options.entryPoint);
+    const entryDir = dirname(entryPoint);
+
+    // 在 Bun 环境下，bun build 的行为：
+    // 1. 对于相对路径导入，不需要 package.json，可以直接工作
+    // 2. 对于 npm 包，可以从缓存读取，不需要 package.json
+    // 3. 对于路径别名（@/, ~/），需要 package.json 的 imports 或 tsconfig.json 的 paths
+    //
+    // 优化策略：
+    // - 优先使用入口文件所在目录（如果存在 package.json 或 tsconfig.json）
+    // - 如果没有配置文件，也可以工作（Bun 可以从缓存读取 npm 包）
+    // - 使用临时目录作为后备方案
+    const entryPackageJson = join(entryDir, "package.json");
+    const entryTsconfig = join(entryDir, "tsconfig.json");
+    const hasConfig = existsSync(entryPackageJson) || existsSync(entryTsconfig);
+
+    // 如果有配置文件，在入口文件目录执行；否则使用临时目录
+    // 注意：即使没有配置文件，Bun 也能从缓存读取 npm 包，所以也可以工作
+    const workDir = hasConfig ? entryDir : await makeTempDir({
+      prefix: "esbuild-bundle-",
+    });
 
     try {
-      // 解析入口文件路径
-      const entryPoint = await resolve(options.entryPoint);
-
       // 构建 bun build 命令参数
-      const args: string[] = ["build", entryPoint];
+      // 如果有配置文件，使用相对路径；否则使用绝对路径
+      const buildEntryPoint = hasConfig ? basename(entryPoint) : entryPoint;
+      const args: string[] = ["build", buildEntryPoint];
 
       // 设置目标平台
       const platform = options.platform || "browser";
@@ -217,7 +239,7 @@ export class BuilderBundle {
 
       // 设置输出文件
       const outputFileName = "bundle.js";
-      const outputPath = join(tempDir, outputFileName);
+      const outputPath = join(workDir, outputFileName);
       args.push("--outfile", outputFileName);
 
       // 压缩选项
@@ -250,11 +272,12 @@ export class BuilderBundle {
       const needsGlobalNameWrapper = format === "iife" && options.globalName;
 
       // 执行 bun build 命令
+      // 在包含 package.json 的目录下执行，这样 bun build 才能正确解析路径别名
       const command = createCommand("bun", {
         args,
         stdout: "piped",
         stderr: "piped",
-        cwd: tempDir,
+        cwd: workDir,
       });
 
       const output = await command.output();
@@ -279,11 +302,23 @@ export class BuilderBundle {
 
       return { code };
     } finally {
-      // 清理临时目录
-      try {
-        await remove(tempDir, { recursive: true });
-      } catch {
-        // 忽略清理错误
+      // 清理临时目录（如果使用了临时目录）
+      if (!hasConfig) {
+        try {
+          await remove(workDir, { recursive: true });
+        } catch {
+          // 忽略清理错误
+        }
+      } else {
+        // 如果使用入口文件目录，清理生成的 bundle.js
+        try {
+          const outputPath = join(workDir, "bundle.js");
+          if (existsSync(outputPath)) {
+            await remove(outputPath);
+          }
+        } catch {
+          // 忽略清理错误
+        }
       }
     }
   }
