@@ -25,7 +25,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { buildBundle } from "../src/builder-bundle.ts";
-import { createResolverPlugin } from "../src/plugins/resolver.ts";
+import { createResolverPlugin } from "../src/plugins/resolver-deno.ts";
 import { cleanupDir, getTestDataDir } from "./test-utils.ts";
 
 if (IS_DENO) {

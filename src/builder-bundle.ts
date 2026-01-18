@@ -23,7 +23,7 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
-import { createResolverPlugin } from "./plugins/resolver.ts";
+import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 
 /**
  * 简单打包选项
@@ -127,7 +127,7 @@ export class BuilderBundle {
     // 在 Deno 环境下自动启用 Deno 解析器插件
     // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
     if (IS_DENO) {
-      plugins.push(createResolverPlugin());
+      plugins.push(denoResolverPlugin());
     }
 
     // 添加用户自定义插件

@@ -10,7 +10,7 @@ import { IS_BUN, IS_DENO, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
-import { createResolverPlugin } from "./plugins/resolver.ts";
+import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 import type {
   BuildMode,
@@ -48,7 +48,7 @@ export class BuilderClient {
     this.pluginManager = new PluginManager();
 
     // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-    this.pluginManager.registerNative(createResolverPlugin());
+    this.pluginManager.registerNative(denoResolverPlugin());
 
     // 方案一：自动注册服务端模块检测插件
     this.pluginManager.register(createServerModuleDetectorPlugin());

@@ -23,7 +23,8 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
-import { createResolverPlugin } from "./plugins/resolver.ts";
+import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
+import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -144,9 +145,15 @@ export class BuilderServer {
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
 
-    // 在 Deno 环境下自动启用解析器插件
-    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-    plugins.push(createResolverPlugin());
+    if (IS_BUN) {
+      // 在 Bun 环境下自动启用解析器插件
+      // 用于解析 package.json 的 imports 配置（如 @dreamer/logger/client）
+      plugins.push(bunResolverPlugin());
+    } else {
+      // 在 Deno 环境下自动启用解析器插件
+      // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+      plugins.push(denoResolverPlugin());
+    }
 
     // 输出文件名
     const outfile = join(outputDir, "server.js");

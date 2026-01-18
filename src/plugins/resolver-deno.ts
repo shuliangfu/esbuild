@@ -200,7 +200,7 @@ async function resolveDenoProtocolPath(
  * });
  * ```
  */
-export function createResolverPlugin(
+export function denoResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
   const { enabled = true } = options;
