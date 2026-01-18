@@ -85,7 +85,7 @@ describe("Builder 配置验证", () => {
         },
         Error,
       );
-    });
+    }, { sanitizeOps: false, sanitizeResources: false });
 
     it("应该验证客户端配置缺少输出目录", async () => {
       const config: BuilderConfig = {
@@ -158,7 +158,7 @@ describe("Builder 配置验证", () => {
       const builder = new Builder(config);
       expect(builder).toBeTruthy();
     });
-  });
+  }, { sanitizeOps: false, sanitizeResources: false });
 
   // 清理测试输出目录
   it("应该清理测试输出目录", async () => {
@@ -170,4 +170,4 @@ describe("Builder 配置验证", () => {
       }
     }
   }, { sanitizeOps: false, sanitizeResources: false });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

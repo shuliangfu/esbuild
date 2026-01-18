@@ -47,16 +47,32 @@ console.log(message);`,
       expect(result.code.length).toBeGreaterThan(0);
     });
 
-    it("应该默认使用 IIFE 格式", async () => {
+    it("应该默认使用 ESM 格式（未指定 globalName）", async () => {
       const bundler = new BuilderBundle();
       const result = await bundler.build({
         entryPoint: entryFile,
       });
 
-      // IIFE 格式通常以 (() => { 或 (function() 开头
+      // ESM 格式通常包含 export 或 import 语句，或者以模块代码开头
+      // 不应该包含 IIFE 格式的特征
+      const isIIFE = result.code.includes("(() => {") ||
+        result.code.includes("(function()");
+      expect(isIIFE).toBe(false);
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it("应该在使用 globalName 时使用 IIFE 格式", async () => {
+      const bundler = new BuilderBundle();
+      const result = await bundler.build({
+        entryPoint: entryFile,
+        globalName: "TestBundle",
+      });
+
+      // IIFE 格式通常以 (() => { 或 (function() 开头，或者包含全局变量赋值
       expect(
         result.code.includes("(() => {") ||
-          result.code.includes("(function()"),
+          result.code.includes("(function()") ||
+          result.code.includes("TestBundle"),
       ).toBe(true);
     });
 

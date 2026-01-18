@@ -135,13 +135,17 @@ export class BuilderBundle {
       plugins.push(...options.plugins);
     }
 
+    // 如果指定了 globalName 且格式为 iife，使用 IIFE 格式
+    // 否则默认使用 ESM 格式（更现代，更简单）
+    const format = options.format || (options.globalName ? "iife" : "esm");
+
     const buildResult = await esbuild.build({
       entryPoints: [options.entryPoint],
       bundle: options.bundle !== false,
-      format: options.format || "iife",
+      format,
       platform: options.platform || "browser",
       target: options.target || "es2020",
-      globalName: options.globalName,
+      globalName: format === "iife" ? options.globalName : undefined,
       minify: options.minify || false,
       sourcemap: options.sourcemap ? "inline" : false,
       external: options.external,
@@ -227,7 +231,9 @@ export class BuilderBundle {
       // neutral 不需要特别指定
 
       // 设置输出格式
-      const format = options.format || "iife";
+      // 如果指定了 globalName 且格式为 iife，使用 IIFE 格式
+      // 否则默认使用 ESM 格式（更现代，更简单）
+      const format = options.format || (options.globalName ? "iife" : "esm");
       if (format === "esm") {
         args.push("--format", "esm");
       } else if (format === "cjs") {
@@ -268,7 +274,7 @@ export class BuilderBundle {
 
       // 全局变量名（IIFE 格式）
       // 注意：bun build 的 IIFE 格式不支持 globalName 参数
-      // 如果需要 globalName，可能需要在输出代码中包装
+      // 如果需要 globalName，需要在输出代码中包装
       const needsGlobalNameWrapper = format === "iife" && options.globalName;
 
       // 执行 bun build 命令
@@ -295,9 +301,44 @@ export class BuilderBundle {
 
       // 如果需要 globalName 包装（IIFE 格式）
       if (needsGlobalNameWrapper) {
-        // 将代码包装为 IIFE 并赋值给全局变量
-        code =
-          `var ${options.globalName} = (function() {\n${code}\nreturn ${options.globalName};\n})();`;
+        // Bun 的 IIFE 输出通常包含 exports 对象
+        // 根据平台选择正确的全局对象
+        const platform = options.platform || "browser";
+        let globalAssignment = "";
+
+        if (platform === "browser") {
+          // 浏览器环境：使用 window
+          globalAssignment =
+            `if (typeof window !== 'undefined') {\n  window.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+        } else if (platform === "node") {
+          // Node.js 环境：使用 global
+          globalAssignment =
+            `if (typeof global !== 'undefined') {\n  global.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+        } else {
+          // neutral 或其他：使用 globalThis（最通用）
+          globalAssignment =
+            `if (typeof globalThis !== 'undefined') {\n  globalThis.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+        }
+
+        code += `\n${globalAssignment}`;
+      } else if (format === "esm" && options.globalName) {
+        // ESM 格式 + globalName：将模块导出赋值给全局变量
+        // 在 ESM 中，需要通过 import 然后赋值
+        const platform = options.platform || "browser";
+        let globalVar = "";
+
+        if (platform === "browser") {
+          globalVar = "window";
+        } else if (platform === "node") {
+          globalVar = "global";
+        } else {
+          globalVar = "globalThis";
+        }
+
+        // 在 ESM 代码末尾添加全局变量赋值
+        // 注意：ESM 模块的导出需要通过 import 访问，这里我们假设代码中已经有导出
+        code +=
+          `\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
       }
 
       return { code };
