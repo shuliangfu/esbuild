@@ -6,7 +6,7 @@
  * 使用 esbuild 进行客户端代码打包
  */
 
-import { IS_BUN, IS_DENO, mkdir, resolve } from "@dreamer/runtime-adapter";
+import { mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";

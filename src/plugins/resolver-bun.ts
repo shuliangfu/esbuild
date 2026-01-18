@@ -48,24 +48,6 @@ interface TsconfigConfig {
 }
 
 /**
- * 根据文件路径确定 esbuild loader
- *
- * @param filePath - 文件路径
- * @returns esbuild loader 类型
- */
-function getLoaderFromPath(filePath: string): "ts" | "tsx" | "js" | "jsx" {
-  if (filePath.endsWith(".tsx") || filePath.endsWith(".jsx")) {
-    return "tsx";
-  } else if (filePath.endsWith(".ts") || filePath.endsWith(".mts")) {
-    return "ts";
-  } else if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
-    return "js";
-  }
-  // 默认返回 ts
-  return "ts";
-}
-
-/**
  * 查找项目的 package.json 文件
  *
  * @param startDir - 起始目录
@@ -220,9 +202,11 @@ function resolvePathAlias(
           : dirname(tsconfigPath);
 
         // 查找匹配的路径别名
-        for (const [pattern, paths] of Object.entries(
-          config.compilerOptions.paths,
-        )) {
+        for (
+          const [pattern, paths] of Object.entries(
+            config.compilerOptions.paths,
+          )
+        ) {
           // 处理通配符模式，如 "@/*" -> ["src/*"]
           if (pattern.endsWith("/*")) {
             const prefix = pattern.slice(0, -2);
@@ -231,7 +215,11 @@ function resolvePathAlias(
               for (const mappedPath of paths) {
                 if (mappedPath.endsWith("/*")) {
                   const mappedPrefix = mappedPath.slice(0, -2);
-                  const resolvedPath = join(baseUrl, mappedPrefix, remainingPath);
+                  const resolvedPath = join(
+                    baseUrl,
+                    mappedPrefix,
+                    remainingPath,
+                  );
                   if (existsSync(resolvedPath)) {
                     return resolvedPath;
                   } else {

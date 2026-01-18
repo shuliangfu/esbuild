@@ -169,7 +169,7 @@ async function resolveDenoProtocolPath(
         namespace: "deno-protocol",
       };
     }
-  } catch (error) {
+  } catch (_error) {
     // 如果 resolve 失败，尝试使用 onLoad 钩子
     return {
       path: protocolPath,
@@ -288,7 +288,7 @@ export function denoResolverPlugin(
                 }
               }
             }
-          } catch (error) {
+          } catch (_error) {
             // 忽略错误，返回 undefined
           }
 
@@ -373,7 +373,7 @@ export function denoResolverPlugin(
             let fileUrl: string | undefined;
             try {
               fileUrl = await import.meta.resolve(protocolPath);
-            } catch (resolveError) {
+            } catch (_resolveError) {
               // 忽略 resolve 错误
             }
 
@@ -415,14 +415,14 @@ export function denoResolverPlugin(
                     loader,
                   };
                 }
-              } catch (fetchError) {
+              } catch (_fetchError) {
                 // 忽略 fetch 错误
               }
             }
 
             // 如果所有方法都失败，返回 undefined
             return undefined;
-          } catch (error) {
+          } catch (_error) {
             // 忽略错误，返回 undefined
             return undefined;
           }

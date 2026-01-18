@@ -185,13 +185,13 @@ export function injectCSSIntoHTML(
  * @param options 注入选项
  * @returns 注入后的 HTML
  */
-export async function injectCSSFromDependencies(
+export function injectCSSFromDependencies(
   html: string,
   dependencies: {
     styles: Array<{ path: string; external?: boolean }>;
   },
   options: CSSInjectOptions = {},
-): Promise<string> {
+): string {
   const cssFiles: CSSFileInfo[] = dependencies.styles.map((style) => ({
     path: style.path,
     external: style.external,
