@@ -4,9 +4,7 @@
  * 统一模块解析插件（支持 Deno 和 Bun）
  *
  * 为 esbuild 提供跨运行时的模块解析，支持：
- * - 读取 deno.json 的 exports 和 imports 配置（Deno）
- * - 读取 package.json 的 imports 配置（Bun/Node）
- * - 读取 tsconfig.json 的 paths 配置（Bun/Node）
+ * - 读取 deno.json 的 imports 配置（路径别名和包导入映射）
  * - 解析 JSR 包的子路径导出（如 @dreamer/logger/client）
  * - 支持 jsr: 协议的模块引用（如 jsr:@dreamer/logger@^1.0.0）
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
@@ -31,118 +29,13 @@ import * as esbuild from "esbuild";
 export interface ResolverOptions {
   /** 是否启用插件（默认：true） */
   enabled?: boolean;
-  /** 是否启用调试日志（默认：false） */
-  debug?: boolean;
-  /** node_modules 目录路径（默认：自动检测） */
-  nodeModulesDir?: string;
 }
 
 /**
  * deno.json 配置结构
  */
 interface DenoConfig {
-  name?: string;
-  version?: string;
-  exports?: Record<string, string> | string;
   imports?: Record<string, string>;
-}
-
-/**
- * package.json 配置结构
- */
-interface PackageJsonConfig {
-  name?: string;
-  version?: string;
-  imports?: Record<string, string>;
-}
-
-/**
- * tsconfig.json 配置结构
- */
-interface TsconfigConfig {
-  compilerOptions?: {
-    baseUrl?: string;
-    paths?: Record<string, string[]>;
-  };
-}
-
-/**
- * 解析 deno.json 的 exports 配置
- *
- * @param denoJsonPath - deno.json 文件路径
- * @param subpath - 子路径（如 "./client"）
- * @returns 解析后的文件路径，如果未找到返回 undefined
- */
-function _resolveDenoExport(
-  denoJsonPath: string,
-  subpath: string,
-): string | undefined {
-  try {
-    const content = readTextFileSync(denoJsonPath);
-    const config: DenoConfig = JSON.parse(content);
-
-    if (!config.exports) {
-      return undefined;
-    }
-
-    // 如果 exports 是字符串，只能匹配 "."
-    if (typeof config.exports === "string") {
-      if (subpath === ".") {
-        return config.exports;
-      }
-      return undefined;
-    }
-
-    // exports 是对象，查找对应的子路径
-    const exportPath = config.exports[subpath];
-    if (exportPath) {
-      return exportPath;
-    }
-
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 查找 node_modules 目录
- *
- * @param startDir - 起始目录
- * @returns node_modules 目录路径，如果未找到返回 undefined
- */
-function _findNodeModulesDir(startDir: string): string | undefined {
-  let currentDir = startDir;
-  const maxDepth = 10; // 防止无限循环
-  let depth = 0;
-
-  while (depth < maxDepth) {
-    const nodeModulesPath = join(currentDir, "node_modules");
-    if (existsSync(nodeModulesPath)) {
-      return nodeModulesPath;
-    }
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      // 已到达根目录
-      break;
-    }
-    currentDir = parentDir;
-    depth++;
-  }
-
-  return undefined;
-}
-
-/**
- * 将包名转换为目录名
- * 例如：@dreamer/logger -> @dreamer/logger
- *
- * @param packageName - 包名
- * @returns 目录名
- */
-function packageNameToDir(packageName: string): string {
-  return packageName;
 }
 
 /**
@@ -217,84 +110,14 @@ function getPackageImport(
 }
 
 /**
- * 从 Deno 协议导入路径解析包的实际位置
- * 例如：jsr:@dreamer/logger@^1.0.0-beta.4 -> node_modules/@dreamer/logger
- * 例如：npm:esbuild@^0.27.2 -> node_modules/esbuild
- *
- * @param importPath - 导入路径（如 jsr:@dreamer/logger@^1.0.0-beta.4 或 npm:esbuild@^0.27.2）
- * @param nodeModulesDir - node_modules 目录
- * @returns 包的实际目录路径，如果未找到返回 undefined
- */
-function _resolveDenoProtocolPackage(
-  importPath: string,
-  nodeModulesDir: string,
-): string | undefined {
-  // 解析 JSR 导入路径：jsr:@dreamer/logger@^1.0.0-beta.4
-  // 解析 NPM 导入路径：npm:esbuild@^0.27.2
-  if (importPath.startsWith("jsr:")) {
-    const packageSpec = importPath.slice(4); // 移除 "jsr:"
-    // 提取包名（@ 符号到 @ 或版本号之前）
-    const atIndex = packageSpec.indexOf("@");
-    if (atIndex > 0) {
-      const packageName = packageSpec.slice(0, atIndex);
-      const packageDir = join(nodeModulesDir, packageNameToDir(packageName));
-      if (existsSync(packageDir)) {
-        return packageDir;
-      }
-    }
-  } else if (importPath.startsWith("npm:")) {
-    const packageSpec = importPath.slice(4); // 移除 "npm:"
-    // 提取包名（到 @ 或版本号之前）
-    const atIndex = packageSpec.indexOf("@");
-    if (atIndex > 0) {
-      const packageName = packageSpec.slice(0, atIndex);
-      const packageDir = join(nodeModulesDir, packageName);
-      if (existsSync(packageDir)) {
-        return packageDir;
-      }
-    } else {
-      // 没有版本号的情况（较少见）
-      const packageDir = join(nodeModulesDir, packageSpec);
-      if (existsSync(packageDir)) {
-        return packageDir;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * 创建 Deno 模块解析插件
- *
- * 该插件解决 esbuild 在 Deno 环境下无法正确解析 JSR 包子路径导出的问题。
- * esbuild 默认读取 package.json，但 Deno/JSR 包使用 deno.json 定义 exports。
- *
- * @param options - 插件选项
- * @returns esbuild 插件
- *
- * @example
- * ```typescript
- * import { buildBundle } from "@dreamer/esbuild";
- * import { createResolverPlugin } from "@dreamer/esbuild/plugins/deno-resolver";
- *
- * const result = await buildBundle({
- *   entryPoint: "./src/client/mod.ts",
- *   plugins: [createResolverPlugin()],
- * });
- * ```
- */
-/**
  * 解析 Deno 协议路径（jsr: 或 npm:）
  * 通过动态导入让 Deno 下载和缓存模块，然后从缓存中读取
  *
  * @param protocolPath - Deno 协议路径（如 jsr:@dreamer/logger@^1.0.0-beta.4）
- * @param debug - 是否启用调试日志
  * @returns 解析结果
  */
 async function resolveDenoProtocolPath(
   protocolPath: string,
-  debug: boolean,
 ): Promise<esbuild.OnResolveResult | undefined> {
   try {
     // 使用 import.meta.resolve 尝试解析路径
@@ -357,10 +180,30 @@ async function resolveDenoProtocolPath(
   return undefined;
 }
 
+/**
+ * 创建统一模块解析插件
+ *
+ * 该插件解决 esbuild 在 Deno/Bun 环境下无法正确解析 JSR 包子路径导出的问题。
+ * esbuild 默认读取 package.json，但 Deno/JSR 包使用 deno.json 定义 imports。
+ *
+ * @param options - 插件选项
+ * @returns esbuild 插件
+ *
+ * @example
+ * ```typescript
+ * import { buildBundle } from "@dreamer/esbuild";
+ * import { createResolverPlugin } from "@dreamer/esbuild/plugins/resolver";
+ *
+ * const result = await buildBundle({
+ *   entryPoint: "./src/client/mod.ts",
+ *   plugins: [createResolverPlugin()],
+ * });
+ * ```
+ */
 export function createResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
-  const { enabled = true, debug = false } = options;
+  const { enabled = true } = options;
 
   return {
     name: "resolver",
@@ -460,7 +303,7 @@ export function createResolverPlugin(
         { filter: /^(jsr|npm):/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
-          return await resolveDenoProtocolPath(path, debug);
+          return await resolveDenoProtocolPath(path);
         },
       );
 
@@ -505,7 +348,7 @@ export function createResolverPlugin(
           const fullProtocolPath = `${packageImport}/${subpath}`;
 
           // 使用统一的协议路径解析函数
-          return await resolveDenoProtocolPath(fullProtocolPath, debug);
+          return await resolveDenoProtocolPath(fullProtocolPath);
         },
       );
 
