@@ -3,26 +3,30 @@
  *
  * 服务端构建器
  *
- * 使用 @dreamer/runtime-adapter 进行服务端代码编译
+ * 使用不同的编译方式进行服务端代码编译，输出 JavaScript 文件
+ * - Deno 环境：使用 esbuild + Deno 解析器插件（支持 deno.json exports）
+ * - Bun 环境：使用 bun build 原生打包（更快）
  */
 
 import {
   createCommand,
+  IS_BUN,
   IS_DENO,
   join,
+  makeTempDir,
   mkdir,
   readFile,
   remove,
   resolve,
-  stat,
-} from "@dreamer/runtime-adapter";
+} from "@dreamer/runtime-adapter"
+import * as esbuild from "esbuild"
+import { createDenoResolverPlugin } from "./plugins/deno-resolver.ts"
 import type {
   BuildMode,
   BuildResult,
   OutputFileContent,
-  Platform,
   ServerConfig,
-} from "./types.ts";
+} from "./types.ts"
 
 /**
  * 服务端构建选项
@@ -37,14 +41,18 @@ export interface ServerBuildOptions {
   /**
    * 是否写入文件（默认：true）
    * 设置为 false 时，不写入文件，而是在 BuildResult.outputContents 中返回编译后的代码
-   * 注意：由于 deno compile/bun build 必须先输出文件，write: false 会使用临时目录，
-   * 编译完成后读取文件内容并删除临时文件
    */
   write?: boolean;
 }
 
 /**
  * 服务端构建器类
+ *
+ * 根据运行时环境自动选择最佳编译方式：
+ * - Deno 环境：使用 esbuild + Deno 解析器插件
+ * - Bun 环境：使用 bun build 原生打包（更快）
+ *
+ * 输出 JavaScript 文件，保留相对路径的灵活性，适合需要动态加载资源的场景
  */
 export class BuilderServer {
   private config: ServerConfig;
@@ -70,9 +78,27 @@ export class BuilderServer {
    * console.log(result.outputContents?.[0]?.text); // 编译后的代码
    * ```
    */
-  async build(
+  build(
     options: BuildMode | ServerBuildOptions = "prod",
   ): Promise<BuildResult> {
+    // 根据运行时环境选择编译方式
+    if (IS_BUN) {
+      return this.buildWithBun(options);
+    }
+    return this.buildWithEsbuild(options);
+  }
+
+  /**
+   * 使用 esbuild 进行服务端代码编译（Deno 环境）
+   *
+   * @param options - 构建选项
+   * @returns 构建结果
+   */
+  private async buildWithEsbuild(
+    options: BuildMode | ServerBuildOptions = "prod",
+  ): Promise<BuildResult> {
+    const startTime = Date.now();
+
     // 解析选项
     const mode: BuildMode = typeof options === "string"
       ? options
@@ -82,230 +108,242 @@ export class BuilderServer {
       ? true
       : (options.write !== false);
 
-    // 根据 mode 设置编译选项（如果配置中未指定）
+    // 只有在需要写入文件时才验证输出目录配置
+    let outputDir: string;
+    if (write) {
+      if (!this.config.output || this.config.output.trim() === "") {
+        throw new Error("服务端配置缺少输出目录 (output)");
+      }
+      outputDir = await resolve(this.config.output);
+    } else {
+      // 内存模式不需要输出目录，使用临时目录
+      outputDir = await resolve(this.config.output || "./");
+    }
+
+    // 根据 mode 设置编译选项
     const isProd = mode === "prod";
 
-    // 确保输出目录存在
-    // 使用 resolve 确保输出路径是绝对路径，避免在根目录生成临时文件
-    const outputDir = await resolve(this.config.output);
-
-    // 如果 write 为 false，使用临时目录
-    const actualOutputDir = write
-      ? outputDir
-      : await resolve(join(outputDir, `.temp-${Date.now()}`));
-
-    await mkdir(actualOutputDir, { recursive: true });
+    // 确保输出目录存在（仅在写入文件时）
+    if (write) {
+      await mkdir(outputDir, { recursive: true });
+    }
 
     // 解析入口文件路径
     const entryPoint = await resolve(this.config.entry);
 
-    // 根据目标运行时选择编译方式
-    const target = this.config.target || (IS_DENO ? "deno" : "bun");
+    // 合并配置选项和模式选项
+    const compileOptions = {
+      ...this.config.compile,
+      // 生产模式默认启用 minify（如果配置中未显式禁用）
+      minify: this.config.compile?.minify ?? isProd,
+    };
 
-    // 临时更新 config.output 为绝对路径，确保所有文件生成在正确位置
-    const originalOutput = this.config.output;
-    this.config.output = actualOutputDir;
+    // 构建插件列表
+    const plugins: esbuild.Plugin[] = [];
+
+    // 在 Deno 环境下自动启用 Deno 解析器插件
+    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+    if (IS_DENO) {
+      plugins.push(createDenoResolverPlugin());
+    }
+
+    // 输出文件名
+    const outfile = join(outputDir, "server.js");
+
+    // esbuild 构建选项
+    const buildOptions: esbuild.BuildOptions = {
+      entryPoints: [entryPoint],
+      bundle: true,
+      format: "esm",
+      platform: "node", // 服务端使用 node 平台
+      target: "es2022", // 现代 Node.js/Deno/Bun 都支持 ES2022
+      minify: compileOptions.minify,
+      sourcemap: !isProd, // 开发模式生成 sourcemap
+      treeShaking: true,
+      metafile: true,
+      write,
+      plugins: plugins.length > 0 ? plugins : undefined,
+    };
+
+    // 如果写入文件，设置输出文件路径
+    if (write) {
+      buildOptions.outfile = outfile;
+    }
+
+    // 执行构建
+    const result = await esbuild.build(buildOptions);
+
+    const duration = Date.now() - startTime;
+
+    // 获取输出文件列表
+    const outputFiles: string[] = [];
+    if (result.metafile) {
+      for (const file in result.metafile.outputs) {
+        outputFiles.push(file);
+      }
+    }
+
+    // 如果不写入文件，返回编译后的代码内容
+    if (!write && result.outputFiles) {
+      const outputContents: OutputFileContent[] = result.outputFiles.map(
+        (file) => ({
+          path: file.path,
+          text: file.text,
+          contents: file.contents,
+        }),
+      );
+
+      return {
+        outputFiles: outputContents.map((f) => f.path),
+        outputContents,
+        metafile: result.metafile,
+        duration,
+      };
+    }
+
+    return {
+      outputFiles: write ? [outfile] : outputFiles,
+      metafile: result.metafile,
+      duration,
+    };
+  }
+
+  /**
+   * 使用 bun build 进行服务端代码编译（Bun 环境）
+   *
+   * bun build 会自动读取 package.json 的依赖配置，
+   * 比 esbuild 更快，且原生支持 TypeScript
+   *
+   * @param options - 构建选项
+   * @returns 构建结果
+   */
+  private async buildWithBun(
+    options: BuildMode | ServerBuildOptions = "prod",
+  ): Promise<BuildResult> {
+    const startTime = Date.now();
+
+    // 解析选项
+    const mode: BuildMode = typeof options === "string"
+      ? options
+      : (options.mode || "prod");
+    // write 默认为 true，表示写入文件
+    const write = typeof options === "string"
+      ? true
+      : (options.write !== false);
+
+    // 只有在需要写入文件时才验证输出目录配置
+    let outputDir: string;
+    if (write) {
+      if (!this.config.output || this.config.output.trim() === "") {
+        throw new Error("服务端配置缺少输出目录 (output)");
+      }
+      outputDir = await resolve(this.config.output);
+      // 确保输出目录存在
+      await mkdir(outputDir, { recursive: true });
+    } else {
+      // 内存模式不需要输出目录，使用临时目录
+      outputDir = await resolve(this.config.output || "./");
+    }
+
+    // 根据 mode 设置编译选项
+    const isProd = mode === "prod";
+
+    // 解析入口文件路径
+    const entryPoint = await resolve(this.config.entry);
+
+    // 合并配置选项和模式选项
+    const compileOptions = {
+      ...this.config.compile,
+      // 生产模式默认启用 minify（如果配置中未显式禁用）
+      minify: this.config.compile?.minify ?? isProd,
+    };
+
+    // 输出文件名和路径
+    const outputFileName = "server.js";
+    const outfile = join(outputDir, outputFileName);
+
+    // 如果是内存模式，使用临时目录
+    const tempDir = write
+      ? null
+      : await makeTempDir({ prefix: "esbuild-server-" });
+    const actualOutputDir = write ? outputDir : tempDir!;
+    const actualOutfile = join(actualOutputDir, outputFileName);
 
     try {
-      let result: BuildResult;
+      // 构建 bun build 命令参数
+      const args: string[] = ["build", entryPoint];
 
-      if (target === "deno") {
-        result = await this.buildWithDeno(entryPoint, isProd);
-      } else if (target === "bun") {
-        result = await this.buildWithBun(entryPoint, isProd);
-      } else {
-        throw new Error(`不支持的目标运行时: ${target}`);
+      // 设置目标平台为 node（服务端）
+      args.push("--target", "node");
+
+      // 设置输出格式为 ESM
+      args.push("--format", "esm");
+
+      // 设置输出文件（使用相对路径，配合 cwd 使用）
+      args.push("--outfile", outputFileName);
+
+      // 压缩选项
+      if (compileOptions.minify) {
+        args.push("--minify");
       }
 
-      // 如果 write 为 false，读取文件内容并删除临时文件
-      if (!write) {
-        const outputContents: OutputFileContent[] = [];
+      // sourcemap 选项（开发模式生成）
+      if (!isProd) {
+        args.push("--sourcemap=inline");
+      }
 
-        for (const filePath of result.outputFiles) {
-          const contents = await readFile(filePath);
-          const text = new TextDecoder().decode(contents);
+      // 执行 bun build 命令
+      // 设置 cwd 确保输出文件在正确的目录下生成
+      const command = createCommand("bun", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+        cwd: actualOutputDir,
+      });
 
-          outputContents.push({
-            path: filePath,
-            text,
-            contents,
-          });
-        }
+      const output = await command.output();
 
-        // 删除临时目录
-        await remove(actualOutputDir, { recursive: true });
+      if (!output.success) {
+        const stderr = output.stderr || "未知错误";
+        throw new Error(
+          `Bun 服务端编译失败: ${stderr}。入口文件: ${this.config.entry}`,
+        );
+      }
+
+      const duration = Date.now() - startTime;
+
+      // 如果是内存模式，读取输出文件内容并返回
+      if (!write && tempDir) {
+        const codeBuffer = await readFile(actualOutfile);
+        const code = new TextDecoder().decode(codeBuffer);
+
+        const outputContents: OutputFileContent[] = [{
+          path: outfile, // 使用原始输出路径
+          text: code,
+          contents: codeBuffer,
+        }];
 
         return {
-          ...result,
-          outputFiles: outputContents.map((f) => f.path),
+          outputFiles: [outfile],
           outputContents,
+          duration,
         };
       }
 
-      return result;
+      return {
+        outputFiles: [outfile],
+        duration,
+      };
     } finally {
-      // 恢复原始配置
-      this.config.output = originalOutput;
-    }
-  }
-
-  /**
-   * 使用 Deno 编译
-   *
-   * @param entryPoint - 入口文件路径
-   * @param isProd - 是否为生产模式
-   */
-  private async buildWithDeno(
-    entryPoint: string,
-    isProd: boolean,
-  ): Promise<BuildResult> {
-    const startTime = Date.now();
-    // 合并配置选项和模式选项
-    const compileOptions = {
-      ...this.config.compile,
-      // 生产模式默认启用 minify（如果配置中未显式禁用）
-      minify: this.config.compile?.minify ?? isProd,
-    };
-
-    // 确保输出路径是绝对路径，避免 Deno 在根目录生成临时文件
-    const outputDir = await resolve(this.config.output);
-
-    // 确保输出目录存在
-    await mkdir(outputDir, { recursive: true });
-
-    // 构建 deno compile 命令
-    const args: string[] = ["compile"];
-
-    // 添加输出路径
-    // 关键：使用相对于输出目录的路径，这样临时文件会生成在输出目录
-    // 如果使用绝对路径，deno compile 可能会在根目录生成临时文件
-    const relativeOutputPath = "server";
-    args.push("--output", relativeOutputPath);
-
-    // 添加平台选项
-    if (compileOptions.platform && compileOptions.platform.length > 0) {
-      for (const platform of compileOptions.platform) {
-        args.push("--target", this.mapPlatformToDeno(platform));
+      // 清理临时目录
+      if (tempDir) {
+        try {
+          await remove(tempDir, { recursive: true });
+        } catch {
+          // 忽略清理错误
+        }
       }
     }
-
-    // 添加入口文件（使用绝对路径）
-    const absoluteEntryPoint = await resolve(entryPoint);
-    args.push(absoluteEntryPoint);
-
-    // 执行编译命令
-    // 注意：deno compile 会在当前工作目录生成临时文件
-    // 因此必须设置 cwd 为输出目录，确保临时文件生成在输出目录而不是根目录
-    const command = createCommand("deno", {
-      args,
-      stdout: "piped",
-      stderr: "piped",
-      cwd: outputDir, // 关键：设置工作目录为输出目录，临时文件会生成在这里
-    });
-
-    const output = await command.output();
-
-    if (!output.success) {
-      throw new Error(`Deno 编译失败: ${output.stderr || "未知错误"}`);
-    }
-
-    // 检查输出文件是否存在（使用相对于输出目录的路径）
-    const finalOutputPath = join(outputDir, relativeOutputPath);
-    try {
-      await stat(finalOutputPath);
-    } catch {
-      throw new Error(`编译输出文件不存在: ${finalOutputPath}`);
-    }
-
-    const duration = Date.now() - startTime;
-
-    return {
-      outputFiles: [finalOutputPath],
-      duration,
-    };
-  }
-
-  /**
-   * 使用 Bun 打包
-   *
-   * @param entryPoint - 入口文件路径
-   * @param isProd - 是否为生产模式
-   */
-  private async buildWithBun(
-    entryPoint: string,
-    isProd: boolean,
-  ): Promise<BuildResult> {
-    const startTime = Date.now();
-    // 合并配置选项和模式选项
-    const compileOptions = {
-      ...this.config.compile,
-      // 生产模式默认启用 minify（如果配置中未显式禁用）
-      minify: this.config.compile?.minify ?? isProd,
-    };
-
-    // 确保输出路径是绝对路径
-    const outputDir = resolve(this.config.output);
-
-    // 确保输出目录存在
-    await mkdir(outputDir, { recursive: true });
-
-    // 构建 bun build 命令
-    // 使用绝对路径确保文件生成在正确位置
-    const absoluteEntryPoint = resolve(entryPoint);
-    const args: string[] = ["build", absoluteEntryPoint];
-
-    // 添加输出路径
-    // 关键：使用相对于输出目录的路径，这样临时文件会生成在输出目录
-    const relativeOutputPath = "server.js";
-    args.push("--outfile", relativeOutputPath);
-
-    // 添加压缩选项
-    if (compileOptions.minify) {
-      args.push("--minify");
-    }
-
-    // 执行打包命令
-    // 注意：使用 "piped" 而不是 "inherit"，因为 output() 方法需要捕获输出
-    // 设置工作目录为输出目录，确保临时文件生成在正确位置
-    const command = createCommand("bun", {
-      args,
-      stdout: "piped",
-      stderr: "piped",
-      cwd: outputDir, // 关键：设置工作目录为输出目录，临时文件会生成在这里
-    });
-
-    const output = await command.output();
-
-    if (!output.success) {
-      throw new Error(`Bun 打包失败: ${output.stderr || "未知错误"}`);
-    }
-
-    // 检查输出文件是否存在（使用相对于输出目录的路径）
-    const finalOutputPath = join(outputDir, relativeOutputPath);
-    try {
-      await stat(finalOutputPath);
-    } catch {
-      throw new Error(`打包输出文件不存在: ${finalOutputPath}`);
-    }
-
-    const duration = Date.now() - startTime;
-
-    return {
-      outputFiles: [finalOutputPath],
-      duration,
-    };
-  }
-
-  /**
-   * 映射平台名称到 Deno 目标格式
-   */
-  private mapPlatformToDeno(platform: Platform): string {
-    const platformMap: Record<Platform, string> = {
-      linux: "x86_64-unknown-linux-gnu",
-      darwin: "x86_64-apple-darwin",
-      windows: "x86_64-pc-windows-msvc",
-    };
-    return platformMap[platform] || platformMap.linux;
   }
 
   /**

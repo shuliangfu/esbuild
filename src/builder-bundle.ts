@@ -4,9 +4,23 @@
  * 简单打包器
  *
  * 提供快速将代码打包为浏览器可用格式的功能，适用于浏览器测试、服务端渲染等场景
+ *
+ * - Deno 环境：使用 esbuild + Deno 解析器插件
+ * - Bun 环境：使用 bun build 原生打包（更快）
  */
 
+import {
+  createCommand,
+  IS_BUN,
+  IS_DENO,
+  join,
+  makeTempDir,
+  readFile,
+  remove,
+  resolve,
+} from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
+import { createDenoResolverPlugin } from "./plugins/deno-resolver.ts";
 
 /**
  * 简单打包选项
@@ -29,7 +43,7 @@ export interface BundleOptions {
   sourcemap?: boolean;
   /** 外部依赖（不打包） */
   external?: string[];
-  /** 自定义 esbuild 插件 */
+  /** 自定义 esbuild 插件（仅 Deno 环境有效） */
   plugins?: esbuild.Plugin[];
   /** 定义替换（define） */
   define?: Record<string, string>;
@@ -51,6 +65,10 @@ export interface BundleResult {
  * 简单打包器类
  *
  * 提供快速将 TypeScript/JavaScript 代码打包为浏览器可用格式的功能
+ *
+ * 根据运行时环境自动选择最佳打包方式：
+ * - Deno 环境：使用 esbuild + Deno 解析器插件（支持 deno.json exports）
+ * - Bun 环境：使用 bun build 原生打包（更快，自动读取 package.json）
  *
  * @example
  * ```typescript
@@ -81,7 +99,39 @@ export class BuilderBundle {
    * @param options - 打包选项
    * @returns 打包结果，包含代码和可选的 Source Map
    */
-  async build(options: BundleOptions): Promise<BundleResult> {
+  build(options: BundleOptions): Promise<BundleResult> {
+    // 根据运行时环境选择打包方式
+    if (IS_BUN) {
+      return this.buildWithBun(options);
+    } else {
+      // Deno 环境或其他环境使用 esbuild
+      return this.buildWithEsbuild(options);
+    }
+  }
+
+  /**
+   * 使用 esbuild 打包（Deno 环境）
+   *
+   * @param options - 打包选项
+   * @returns 打包结果
+   */
+  private async buildWithEsbuild(
+    options: BundleOptions,
+  ): Promise<BundleResult> {
+    // 构建插件列表
+    const plugins: esbuild.Plugin[] = [];
+
+    // 在 Deno 环境下自动启用 Deno 解析器插件
+    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+    if (IS_DENO) {
+      plugins.push(createDenoResolverPlugin());
+    }
+
+    // 添加用户自定义插件
+    if (options.plugins) {
+      plugins.push(...options.plugins);
+    }
+
     const buildResult = await esbuild.build({
       entryPoints: [options.entryPoint],
       bundle: options.bundle !== false,
@@ -92,7 +142,7 @@ export class BuilderBundle {
       minify: options.minify || false,
       sourcemap: options.sourcemap ? "inline" : false,
       external: options.external,
-      plugins: options.plugins,
+      plugins: plugins.length > 0 ? plugins : undefined,
       define: options.define,
       write: false,
     });
@@ -124,6 +174,119 @@ export class BuilderBundle {
 
     return { code, map };
   }
+
+  /**
+   * 使用 Bun 原生打包（Bun 环境）
+   *
+   * bun build 会自动读取 package.json 的依赖配置，
+   * 比 esbuild 更快，且原生支持 TypeScript
+   *
+   * @param options - 打包选项
+   * @returns 打包结果
+   */
+  private async buildWithBun(options: BundleOptions): Promise<BundleResult> {
+    // 使用系统临时目录创建临时输出目录
+    const tempDir = await makeTempDir({ prefix: "esbuild-bundle-" });
+
+    try {
+      // 解析入口文件路径
+      const entryPoint = await resolve(options.entryPoint);
+
+      // 构建 bun build 命令参数
+      const args: string[] = ["build", entryPoint];
+
+      // 设置目标平台
+      const platform = options.platform || "browser";
+      if (platform === "browser") {
+        args.push("--target", "browser");
+      } else if (platform === "node") {
+        args.push("--target", "node");
+      }
+      // neutral 不需要特别指定
+
+      // 设置输出格式
+      const format = options.format || "iife";
+      if (format === "esm") {
+        args.push("--format", "esm");
+      } else if (format === "cjs") {
+        args.push("--format", "cjs");
+      } else {
+        // iife 格式
+        args.push("--format", "iife");
+      }
+
+      // 设置输出文件
+      const outputFileName = "bundle.js";
+      const outputPath = join(tempDir, outputFileName);
+      args.push("--outfile", outputFileName);
+
+      // 压缩选项
+      if (options.minify) {
+        args.push("--minify");
+      }
+
+      // sourcemap 选项
+      if (options.sourcemap) {
+        args.push("--sourcemap=inline");
+      }
+
+      // 外部依赖
+      if (options.external && options.external.length > 0) {
+        for (const ext of options.external) {
+          args.push("--external", ext);
+        }
+      }
+
+      // define 替换
+      if (options.define) {
+        for (const [key, value] of Object.entries(options.define)) {
+          args.push("--define", `${key}=${value}`);
+        }
+      }
+
+      // 全局变量名（IIFE 格式）
+      // 注意：bun build 的 IIFE 格式不支持 globalName 参数
+      // 如果需要 globalName，可能需要在输出代码中包装
+      const needsGlobalNameWrapper = format === "iife" && options.globalName;
+
+      // 执行 bun build 命令
+      const command = createCommand("bun", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+        cwd: tempDir,
+      });
+
+      const output = await command.output();
+
+      if (!output.success) {
+        const stderr = output.stderr || "未知错误";
+        throw new Error(
+          `Bun 打包失败: ${stderr}。入口文件: ${options.entryPoint}`,
+        );
+      }
+
+      // 读取输出文件
+      const codeBuffer = await readFile(outputPath);
+      let code = new TextDecoder().decode(codeBuffer);
+
+      // 如果需要 globalName 包装（IIFE 格式）
+      if (needsGlobalNameWrapper) {
+        // 将代码包装为 IIFE 并赋值给全局变量
+        code =
+          `var ${options.globalName} = (function() {\n${code}\nreturn ${options.globalName};\n})();`;
+      }
+
+      return { code };
+    } finally {
+      // 清理临时目录
+      try {
+        await remove(tempDir, { recursive: true });
+      } catch {
+        // 忽略清理错误
+      }
+    }
+  }
 }
 
 /**
@@ -131,6 +294,10 @@ export class BuilderBundle {
  *
  * 这是一个简化的打包函数，适用于需要快速将 TypeScript/JavaScript 代码
  * 打包为 IIFE 或其他格式的场景，如浏览器测试、服务端渲染等。
+ *
+ * 根据运行时环境自动选择最佳打包方式：
+ * - Deno 环境：使用 esbuild + Deno 解析器插件
+ * - Bun 环境：使用 bun build 原生打包（更快）
  *
  * @param options - 打包选项
  * @returns 打包结果，包含代码和可选的 Source Map

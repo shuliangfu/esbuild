@@ -2,11 +2,11 @@
  * @fileoverview Builder 多入口构建测试
  */
 
-import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { Builder } from "../src/builder.ts";
 import type { BuilderConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("Builder 多入口构建", () => {
   let entryFile1: string;
@@ -131,7 +131,7 @@ describe("Builder 多入口构建", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

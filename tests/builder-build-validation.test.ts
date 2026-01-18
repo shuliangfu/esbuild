@@ -14,7 +14,7 @@ import {
 import { describe, expect, it } from "@dreamer/test";
 import { Builder } from "../src/builder.ts";
 import type { BuilderConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("Builder 构建产物验证", () => {
   let entryFile: string;
@@ -133,7 +133,7 @@ describe("Builder 构建产物验证", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

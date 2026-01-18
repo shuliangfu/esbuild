@@ -15,7 +15,7 @@ import { describe, expect, it } from "@dreamer/test";
 import type { ServerModuleDetectorOptions } from "../src/plugins/server-module-detector.ts";
 import { createServerModuleDetectorPlugin } from "../src/plugins/server-module-detector.ts";
 import type { ClientConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 /**
  * 动态导入 BuilderClient（避免在模块加载时触发 esbuild）
@@ -597,8 +597,8 @@ console.log("test");
   // 清理测试文件
   it("应该清理测试文件", async () => {
     try {
-      await remove(testDataDir, { recursive: true });
-      await remove(outputDir, { recursive: true });
+      await cleanupDir(testDataDir);
+      await cleanupDir(outputDir);
     } catch {
       // 忽略清理错误
     }

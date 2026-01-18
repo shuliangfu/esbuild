@@ -10,7 +10,7 @@ import {
   remove,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 // 注意：CLI 测试需要模拟命令行环境，这里主要测试配置加载功能
 describe("CLI 工具", () => {
@@ -150,7 +150,7 @@ describe("CLI 工具", () => {
   it("应该清理测试输出目录", async () => {
     if (configDir) {
       try {
-        await remove(configDir, { recursive: true });
+        await cleanupDir(configDir);
       } catch {
         // 忽略错误
       }

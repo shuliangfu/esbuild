@@ -2,11 +2,11 @@
  * @fileoverview ClientBuilder 上下文和资源管理测试
  */
 
-import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("BuilderClient 上下文和资源管理", () => {
   let entryFile: string;
@@ -157,7 +157,7 @@ describe("BuilderClient 上下文和资源管理", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

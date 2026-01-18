@@ -12,7 +12,15 @@ import {
   remove,
   resolve,
   stat,
-} from "@dreamer/runtime-adapter";
+} from "@dreamer/runtime-adapter"
+
+/**
+ * 是否在测试完成后清理测试数据
+ *
+ * 设为 false 可以保留测试输出文件，方便检查编译结果
+ * 设为 true 则会在测试完成后自动清理
+ */
+export const CLEANUP_AFTER_TEST = false;
 
 /**
  * 获取测试数据目录路径
@@ -101,6 +109,29 @@ export async function cleanupTestData(): Promise<void> {
 }
 
 /**
+ * 清理指定目录
+ *
+ * 受 CLEANUP_AFTER_TEST 开关控制，如果禁用清理则不执行
+ *
+ * @param dirPath - 要清理的目录路径
+ * @returns Promise<void>
+ */
+export async function cleanupDir(dirPath: string): Promise<void> {
+  // 如果禁用清理，直接返回
+  if (!CLEANUP_AFTER_TEST) {
+    return;
+  }
+
+  try {
+    if (await exists(dirPath)) {
+      await remove(dirPath, { recursive: true });
+    }
+  } catch {
+    // 忽略清理错误
+  }
+}
+
+/**
  * 清理根目录下的临时文件
  *
  * 清理可能生成在库根目录的临时文件，如：
@@ -112,6 +143,10 @@ export async function cleanupTestData(): Promise<void> {
  * @returns Promise<void>
  */
 export async function cleanupRootTempFiles(): Promise<void> {
+  // 如果禁用清理，直接返回
+  if (!CLEANUP_AFTER_TEST) {
+    return;
+  }
   try {
     // 获取库的根目录（tests 目录的父目录）
     const testDir = new URL(".", import.meta.url).pathname;

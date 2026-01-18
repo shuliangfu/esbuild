@@ -159,12 +159,23 @@ export interface BuildPlugin {
  */
 export class PluginManager {
   private plugins: BuildPlugin[] = [];
+  private nativePlugins: esbuild.Plugin[] = [];
 
   /**
    * 注册插件
    */
   register(plugin: BuildPlugin): void {
     this.plugins.push(plugin);
+  }
+
+  /**
+   * 注册原生 esbuild 插件
+   * 用于直接添加 esbuild.Plugin 类型的插件，如 Deno 解析器插件
+   *
+   * @param plugin - 原生 esbuild 插件
+   */
+  registerNative(plugin: esbuild.Plugin): void {
+    this.nativePlugins.push(plugin);
   }
 
   /**
@@ -182,10 +193,18 @@ export class PluginManager {
   }
 
   /**
+   * 获取所有原生 esbuild 插件
+   */
+  getNativePlugins(): esbuild.Plugin[] {
+    return [...this.nativePlugins];
+  }
+
+  /**
    * 清空所有插件
    */
   clear(): void {
     this.plugins = [];
+    this.nativePlugins = [];
   }
 
   /**
@@ -195,7 +214,7 @@ export class PluginManager {
     esbuildInstance: typeof esbuild,
     initialOptions: esbuild.BuildOptions,
   ): esbuild.Plugin[] {
-    return this.plugins.map((plugin) => {
+    const convertedPlugins = this.plugins.map((plugin) => {
       const esbuildPlugin: esbuild.Plugin = {
         name: plugin.name,
         setup(build) {
@@ -290,5 +309,8 @@ export class PluginManager {
       };
       return esbuildPlugin;
     });
+
+    // 将原生插件放在最前面（优先级最高）
+    return [...this.nativePlugins, ...convertedPlugins];
   }
 }

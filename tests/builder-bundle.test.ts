@@ -2,10 +2,10 @@
  * @fileoverview BuilderBundle 简单打包器测试
  */
 
-import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { buildBundle, BuilderBundle } from "../src/builder-bundle.ts";
-import { getTestDataDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir } from "./test-utils.ts";
 
 describe("BuilderBundle", () => {
   let entryFile: string;
@@ -351,7 +351,7 @@ console.log(path);`,
   // 测试后清理
   it("应该清理测试目录", async () => {
     try {
-      await remove(testDataDir, { recursive: true });
+      await cleanupDir(testDataDir);
     } catch {
       // 忽略清理错误
     }

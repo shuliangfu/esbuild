@@ -12,7 +12,7 @@ import {
 import { describe, expect, it } from "@dreamer/test";
 import { HTMLGenerator } from "../src/html-generator.ts";
 import type { HTMLConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("HTMLGenerator", () => {
   let outputDir: string;
@@ -291,7 +291,7 @@ describe("HTMLGenerator", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

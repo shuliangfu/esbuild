@@ -2,11 +2,11 @@
  * @fileoverview 主构建器测试
  */
 
-import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { assertRejects, describe, expect, it } from "@dreamer/test";
 import { Builder, createBuilder } from "../src/mod.ts";
 import type { BuilderConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("Builder", () => {
   let entryFile: string;
@@ -279,7 +279,7 @@ describe("Builder", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

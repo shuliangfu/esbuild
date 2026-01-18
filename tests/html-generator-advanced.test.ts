@@ -2,11 +2,11 @@
  * @fileoverview HTMLGenerator 高级功能测试
  */
 
-import { mkdir, readTextFile, remove } from "@dreamer/runtime-adapter";
+import { mkdir, readTextFile} from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { HTMLGenerator } from "../src/html-generator.ts";
 import type { HTMLConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("HTMLGenerator 高级功能", () => {
   let outputDir: string;
@@ -173,7 +173,7 @@ describe("HTMLGenerator 高级功能", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

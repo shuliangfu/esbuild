@@ -4,12 +4,12 @@
  * 测试 CSS 导入处理插件与 CSS 注入工具的集成使用
  */
 
-import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
+import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { createCSSImportHandlerPlugin } from "../src/plugins/css-import-handler.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { injectCSSIntoHTML } from "../src/utils/css-injector.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("CSS 自动注入集成测试", () => {
   let testDataDir: string;
@@ -246,8 +246,8 @@ console.log("App loaded");
   // 清理测试文件
   it("应该清理测试文件", async () => {
     try {
-      await remove(testDataDir, { recursive: true });
-      await remove(outputDir, { recursive: true });
+      await cleanupDir(testDataDir);
+      await cleanupDir(outputDir);
     } catch {
       // 忽略清理错误
     }

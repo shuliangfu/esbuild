@@ -11,7 +11,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { CacheManager } from "../src/cache-manager.ts";
 import type { BuildOptions, BuildResult } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("CacheManager 高级功能", () => {
   let testDataDir: string;
@@ -102,7 +102,7 @@ describe("CacheManager 高级功能", () => {
   it("应该清理测试输出目录", async () => {
     if (cacheDir) {
       try {
-        await remove(cacheDir, { recursive: true });
+        await cleanupDir(cacheDir);
       } catch {
         // 忽略错误
       }

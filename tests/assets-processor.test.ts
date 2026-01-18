@@ -15,7 +15,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import { AssetsProcessor } from "../src/assets-processor.ts";
 import type { AssetsConfig } from "../src/types.ts";
-import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("AssetsProcessor", () => {
   let outputDir: string;
@@ -240,7 +240,7 @@ describe("AssetsProcessor", () => {
   it("应该清理测试输出目录", async () => {
     if (outputDir) {
       try {
-        await remove(outputDir, { recursive: true });
+        await cleanupDir(outputDir);
       } catch {
         // 忽略错误
       }

@@ -6,10 +6,11 @@
  * 使用 esbuild 进行客户端代码打包
  */
 
-import { mkdir, resolve } from "@dreamer/runtime-adapter";
+import { IS_DENO, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
+import { createDenoResolverPlugin } from "./plugins/deno-resolver.ts";
 import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 import type {
   BuildMode,
@@ -46,7 +47,13 @@ export class BuilderClient {
     this.config = config;
     this.pluginManager = new PluginManager();
 
-    // 方案一：自动注册服务端模块检测插件（优先级最高，最先执行）
+    // 在 Deno 环境下自动注册 Deno 解析器插件（优先级最高，最先执行）
+    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+    if (IS_DENO) {
+      this.pluginManager.registerNative(createDenoResolverPlugin());
+    }
+
+    // 方案一：自动注册服务端模块检测插件
     this.pluginManager.register(createServerModuleDetectorPlugin());
 
     // 方案二：自动注册条件编译插件
@@ -88,8 +95,12 @@ export class BuilderClient {
       ? true
       : (options.write !== false);
 
-    // 如果需要写入文件，确保输出目录存在
+    // 只有在需要写入文件时才验证输出目录配置
     if (write) {
+      if (!this.config.output || this.config.output.trim() === "") {
+        throw new Error("客户端配置缺少输出目录 (output)");
+      }
+      // 确保输出目录存在
       await mkdir(this.config.output, { recursive: true });
     }
 
@@ -221,6 +232,11 @@ export class BuilderClient {
   async createContext(
     mode: BuildMode = "dev",
   ): Promise<esbuild.BuildContext> {
+    // 验证输出目录配置
+    if (!this.config.output || this.config.output.trim() === "") {
+      throw new Error("客户端配置缺少输出目录 (output)");
+    }
+
     // 确保输出目录存在
     await mkdir(this.config.output, { recursive: true });
 

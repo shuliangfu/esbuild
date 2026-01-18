@@ -30,6 +30,8 @@ export type {
   CSSImportHandlerOptions,
   CSSImportHandlerPluginInstance,
 } from "./plugins/css-import-handler.ts";
+export { createDenoResolverPlugin } from "./plugins/deno-resolver.ts";
+export type { DenoResolverOptions } from "./plugins/deno-resolver.ts";
 export { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 export type { ServerModuleDetectorOptions } from "./plugins/server-module-detector.ts";
 export {

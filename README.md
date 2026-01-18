@@ -517,16 +517,40 @@ const builder = createBuilder({
 
 ---
 
+## ⚙️ 编译方式
+
+本库根据运行时环境自动选择最优的编译方式：
+
+| 构建器 | Deno 环境 | Bun 环境 |
+|--------|-----------|----------|
+| **BuilderClient** | esbuild + Deno 解析器插件 | esbuild |
+| **BuilderServer** | esbuild + Deno 解析器插件 | `bun build` 原生打包 |
+| **BuilderBundle** | esbuild + Deno 解析器插件 | `bun build` 原生打包 |
+
+### Deno 解析器插件
+
+在 Deno 环境下，会自动启用 Deno 解析器插件（`createDenoResolverPlugin`），用于：
+
+- 解析 `deno.json` 的 `exports` 配置
+- 支持 JSR 包的子路径导出（如 `@dreamer/logger/client`）
+- 兼容 `jsr:` 协议的模块引用
+
+### Bun 原生打包
+
+`BuilderServer` 和 `BuilderBundle` 在 Bun 环境下使用 `bun build` 原生命令进行打包，具有更快的编译速度。`BuilderClient` 统一使用 esbuild 以保证客户端打包的跨平台一致性和代码分割功能。
+
+---
+
 ## 📊 测试报告
 
-本库经过全面测试，所有 407 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+本库经过全面测试，所有 431 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
 - **总测试数**: 431
 - **通过**: 431 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~26秒
+- **测试执行时间**: ~17秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理
 - **测试环境**: Deno 2.x
 
