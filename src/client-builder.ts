@@ -16,8 +16,23 @@ import type {
   BuildResult,
   ClientBundleOptions,
   ClientConfig,
+  OutputFileContent,
   SplittingStrategy,
 } from "./types.ts";
+
+/**
+ * 客户端构建选项
+ */
+export interface ClientBuildOptions {
+  /** 构建模式（默认：prod） */
+  mode?: BuildMode;
+  /**
+   * 是否写入文件（默认：true）
+   * 设置为 false 时，不写入文件，而是在 BuildResult.outputContents 中返回编译后的代码
+   * 适用于服务端渲染等需要直接使用代码内容的场景
+   */
+  write?: boolean;
+}
 
 /**
  * 客户端构建器类
@@ -45,12 +60,38 @@ export class ClientBuilder {
 
   /**
    * 构建客户端代码
+   *
+   * @param options - 构建选项，可以是 BuildMode 字符串或 ClientBuildOptions 对象
+   * @returns 构建结果，当 write 为 false 时，outputContents 包含编译后的代码
+   *
+   * @example
+   * ```typescript
+   * // 写入文件（默认行为）
+   * const result = await builder.build("prod");
+   *
+   * // 不写入文件，返回代码内容
+   * const result = await builder.build({ mode: "prod", write: false });
+   * console.log(result.outputContents?.[0]?.text); // 编译后的代码
+   * ```
    */
-  async build(mode: BuildMode = "prod"): Promise<BuildResult> {
+  async build(
+    options: BuildMode | ClientBuildOptions = "prod",
+  ): Promise<BuildResult> {
     const startTime = Date.now();
 
-    // 确保输出目录存在
-    await mkdir(this.config.output, { recursive: true });
+    // 解析选项
+    const mode: BuildMode = typeof options === "string"
+      ? options
+      : (options.mode || "prod");
+    // write 默认为 true，表示写入文件
+    const write = typeof options === "string"
+      ? true
+      : (options.write !== false);
+
+    // 如果需要写入文件，确保输出目录存在
+    if (write) {
+      await mkdir(this.config.output, { recursive: true });
+    }
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
@@ -109,18 +150,24 @@ export class ClientBuilder {
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
       bundle: true,
-      outdir: this.config.output,
       format: bundleOptions.format || "esm",
       platform: "browser",
       target: "es2020",
       minify: bundleOptions.minify,
       sourcemap: sourcemapOption,
-      splitting: splittingEnabled,
+      splitting: write ? splittingEnabled : false, // 内存模式不支持 splitting
       external: externalModules,
-      chunkNames,
       treeShaking: true,
       metafile: true,
+      // 根据 write 选项决定是否写入文件
+      write,
     };
+
+    // 如果写入文件，需要设置输出目录和 chunk 名称
+    if (write) {
+      buildOptions.outdir = this.config.output;
+      buildOptions.chunkNames = chunkNames;
+    }
 
     // 添加插件
     buildOptions.plugins = this.pluginManager.toEsbuildPlugins(
@@ -141,6 +188,24 @@ export class ClientBuilder {
 
     const duration = Date.now() - startTime;
 
+    // 如果不写入文件，返回编译后的代码内容
+    if (!write && result.outputFiles) {
+      const outputContents: OutputFileContent[] = result.outputFiles.map(
+        (file) => ({
+          path: file.path,
+          text: file.text,
+          contents: file.contents,
+        }),
+      );
+
+      return {
+        outputFiles: outputContents.map((f) => f.path),
+        outputContents,
+        metafile: result.metafile,
+        duration,
+      };
+    }
+
     return {
       outputFiles,
       metafile: result.metafile,
@@ -150,6 +215,8 @@ export class ClientBuilder {
 
   /**
    * 创建增量构建上下文
+   *
+   * @param mode - 构建模式，影响 minify 和 sourcemap 的默认值
    */
   async createContext(
     mode: BuildMode = "dev",
@@ -163,10 +230,13 @@ export class ClientBuilder {
     }
     const entryPoint = await resolve(this.config.entry);
 
+    // 根据模式设置默认值：dev 模式禁用压缩启用 sourcemap，prod 模式反之
+    const isProd = mode === "prod";
+
     // 构建选项
     const bundleOptions: ClientBundleOptions = {
-      minify: false,
-      sourcemap: true,
+      minify: isProd,
+      sourcemap: !isProd,
       splitting: true,
       format: "esm",
       ...this.config.bundle,

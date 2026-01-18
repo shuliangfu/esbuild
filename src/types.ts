@@ -358,11 +358,26 @@ export interface BuildPerformance {
 }
 
 /**
+ * 输出文件内容
+ * 当 write 为 false 时，返回此类型包含文件内容
+ */
+export interface OutputFileContent {
+  /** 文件路径（虚拟路径，不实际写入） */
+  path: string;
+  /** 文件内容（字符串格式） */
+  text: string;
+  /** 文件内容（二进制格式） */
+  contents: Uint8Array;
+}
+
+/**
  * 构建结果
  */
 export interface BuildResult {
-  /** 输出文件列表 */
+  /** 输出文件列表（文件路径） */
   outputFiles: string[];
+  /** 输出文件内容列表（当 write 为 false 时有值） */
+  outputContents?: OutputFileContent[];
   /** 构建元数据（esbuild Metafile） */
   metafile?: unknown;
   /** 构建时间（毫秒） */

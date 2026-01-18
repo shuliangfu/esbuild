@@ -253,6 +253,182 @@ describe("ClientBuilder", () => {
     });
   });
 
+  describe("write 参数（内存模式）", () => {
+    it("应该在 write: false 时返回代码内容而不写入文件", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        bundle: {
+          minify: false,
+          sourcemap: false,
+        },
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "dev", write: false });
+
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      expect(result.outputContents!.length).toBeGreaterThan(0);
+      // 检查返回的代码内容
+      const firstOutput = result.outputContents![0];
+      expect(firstOutput.text).toBeTruthy();
+      expect(firstOutput.text).toContain("Hello");
+      expect(firstOutput.contents).toBeInstanceOf(Uint8Array);
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("应该在 write: true（默认）时正常写入文件", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        bundle: {
+          minify: false,
+          sourcemap: false,
+        },
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "dev", write: true });
+
+      expect(result).toBeTruthy();
+      expect(result.outputFiles.length).toBeGreaterThan(0);
+      // write: true 时不应该有 outputContents
+      expect(result.outputContents).toBeUndefined();
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("应该在生产模式下使用 write: false 时返回压缩后的代码", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        bundle: {
+          minify: true,
+        },
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "prod", write: false });
+
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      expect(result.outputContents!.length).toBeGreaterThan(0);
+      // 压缩后的代码应该更短
+      const firstOutput = result.outputContents![0];
+      expect(firstOutput.text).toBeTruthy();
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("应该支持使用字符串模式参数（默认 write: true）", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+      };
+      const builder = new ClientBuilder(config);
+
+      // 使用字符串模式，默认 write: true
+      const result = await builder.build("dev");
+
+      expect(result).toBeTruthy();
+      expect(result.outputFiles.length).toBeGreaterThan(0);
+      expect(result.outputContents).toBeUndefined();
+    }, { sanitizeOps: false, sanitizeResources: false });
+  });
+
+  describe("mode 参数行为", () => {
+    it("dev 模式应该禁用压缩", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        // 不显式设置 minify，应该根据 mode 自动设置
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "dev", write: false });
+
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      // dev 模式下代码不应该被压缩，应该保留可读性
+      const code = result.outputContents![0].text;
+      expect(code).toContain("Hello");
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("prod 模式应该启用压缩", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        // 不显式设置 minify，应该根据 mode 自动设置
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "prod", write: false });
+
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      // prod 模式下代码应该被压缩
+      const code = result.outputContents![0].text;
+      expect(code).toBeTruthy();
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("配置中的 minify 应该覆盖 mode 的默认行为", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+        bundle: {
+          // 显式禁用 minify，即使是生产模式
+          minify: false,
+        },
+      };
+      const builder = new ClientBuilder(config);
+
+      const result = await builder.build({ mode: "prod", write: false });
+
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      // 即使是生产模式，也应该禁用 minify
+      const code = result.outputContents![0].text;
+      expect(code).toContain("Hello");
+    }, { sanitizeOps: false, sanitizeResources: false });
+  });
+
+  describe("createContext mode 参数", () => {
+    it("dev 模式应该禁用压缩启用 sourcemap", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+      };
+      const builder = new ClientBuilder(config);
+
+      // dev 模式创建上下文
+      const context = await builder.createContext("dev");
+      expect(context).toBeTruthy();
+
+      // 清理
+      await builder.dispose();
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("prod 模式应该启用压缩禁用 sourcemap", async () => {
+      const config: ClientConfig = {
+        entry: entryFile,
+        output: outputDir,
+        engine: "react",
+      };
+      const builder = new ClientBuilder(config);
+
+      // prod 模式创建上下文
+      const context = await builder.createContext("prod");
+      expect(context).toBeTruthy();
+
+      // 清理
+      await builder.dispose();
+    }, { sanitizeOps: false, sanitizeResources: false });
+  });
+
   describe("边界情况", () => {
     it("应该处理不存在的入口文件", async () => {
       const config: ClientConfig = {

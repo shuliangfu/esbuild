@@ -11,10 +11,37 @@ import {
   IS_DENO,
   join,
   mkdir,
+  readFile,
+  remove,
   resolve,
   stat,
 } from "@dreamer/runtime-adapter";
-import type { BuildResult, Platform, ServerConfig } from "./types.ts";
+import type {
+  BuildMode,
+  BuildResult,
+  OutputFileContent,
+  Platform,
+  ServerConfig,
+} from "./types.ts";
+
+/**
+ * 服务端构建选项
+ */
+export interface ServerBuildOptions {
+  /**
+   * 构建模式（默认：prod）
+   * - prod: 生产模式，启用压缩优化
+   * - dev: 开发模式，保留源码可读性
+   */
+  mode?: BuildMode;
+  /**
+   * 是否写入文件（默认：true）
+   * 设置为 false 时，不写入文件，而是在 BuildResult.outputContents 中返回编译后的代码
+   * 注意：由于 deno compile/bun build 必须先输出文件，write: false 会使用临时目录，
+   * 编译完成后读取文件内容并删除临时文件
+   */
+  write?: boolean;
+}
 
 /**
  * 服务端构建器类
@@ -28,12 +55,46 @@ export class ServerBuilder {
 
   /**
    * 构建服务端代码
+   *
+   * @param options - 构建选项，可以是 BuildMode 字符串或 ServerBuildOptions 对象
+   * @returns 构建结果，当 write 为 false 时，outputContents 包含编译后的代码
+   *
+   * @example
+   * ```typescript
+   * // 写入文件（默认行为）
+   * const result = await builder.build();
+   * const result = await builder.build("prod");
+   *
+   * // 不写入文件，返回代码内容
+   * const result = await builder.build({ mode: "prod", write: false });
+   * console.log(result.outputContents?.[0]?.text); // 编译后的代码
+   * ```
    */
-  async build(): Promise<BuildResult> {
+  async build(
+    options: BuildMode | ServerBuildOptions = "prod",
+  ): Promise<BuildResult> {
+    // 解析选项
+    const mode: BuildMode = typeof options === "string"
+      ? options
+      : (options.mode || "prod");
+    // write 默认为 true，表示写入文件
+    const write = typeof options === "string"
+      ? true
+      : (options.write !== false);
+
+    // 根据 mode 设置编译选项（如果配置中未指定）
+    const isProd = mode === "prod";
+
     // 确保输出目录存在
     // 使用 resolve 确保输出路径是绝对路径，避免在根目录生成临时文件
     const outputDir = await resolve(this.config.output);
-    await mkdir(outputDir, { recursive: true });
+
+    // 如果 write 为 false，使用临时目录
+    const actualOutputDir = write
+      ? outputDir
+      : await resolve(join(outputDir, `.temp-${Date.now()}`));
+
+    await mkdir(actualOutputDir, { recursive: true });
 
     // 解析入口文件路径
     const entryPoint = await resolve(this.config.entry);
@@ -43,16 +104,45 @@ export class ServerBuilder {
 
     // 临时更新 config.output 为绝对路径，确保所有文件生成在正确位置
     const originalOutput = this.config.output;
-    this.config.output = outputDir;
+    this.config.output = actualOutputDir;
 
     try {
+      let result: BuildResult;
+
       if (target === "deno") {
-        return await this.buildWithDeno(entryPoint);
+        result = await this.buildWithDeno(entryPoint, isProd);
       } else if (target === "bun") {
-        return await this.buildWithBun(entryPoint);
+        result = await this.buildWithBun(entryPoint, isProd);
       } else {
         throw new Error(`不支持的目标运行时: ${target}`);
       }
+
+      // 如果 write 为 false，读取文件内容并删除临时文件
+      if (!write) {
+        const outputContents: OutputFileContent[] = [];
+
+        for (const filePath of result.outputFiles) {
+          const contents = await readFile(filePath);
+          const text = new TextDecoder().decode(contents);
+
+          outputContents.push({
+            path: filePath,
+            text,
+            contents,
+          });
+        }
+
+        // 删除临时目录
+        await remove(actualOutputDir, { recursive: true });
+
+        return {
+          ...result,
+          outputFiles: outputContents.map((f) => f.path),
+          outputContents,
+        };
+      }
+
+      return result;
     } finally {
       // 恢复原始配置
       this.config.output = originalOutput;
@@ -61,10 +151,21 @@ export class ServerBuilder {
 
   /**
    * 使用 Deno 编译
+   *
+   * @param entryPoint - 入口文件路径
+   * @param isProd - 是否为生产模式
    */
-  private async buildWithDeno(entryPoint: string): Promise<BuildResult> {
+  private async buildWithDeno(
+    entryPoint: string,
+    isProd: boolean,
+  ): Promise<BuildResult> {
     const startTime = Date.now();
-    const compileOptions = this.config.compile || {};
+    // 合并配置选项和模式选项
+    const compileOptions = {
+      ...this.config.compile,
+      // 生产模式默认启用 minify（如果配置中未显式禁用）
+      minify: this.config.compile?.minify ?? isProd,
+    };
 
     // 确保输出路径是绝对路径，避免 Deno 在根目录生成临时文件
     const outputDir = await resolve(this.config.output);
@@ -126,10 +227,21 @@ export class ServerBuilder {
 
   /**
    * 使用 Bun 打包
+   *
+   * @param entryPoint - 入口文件路径
+   * @param isProd - 是否为生产模式
    */
-  private async buildWithBun(entryPoint: string): Promise<BuildResult> {
+  private async buildWithBun(
+    entryPoint: string,
+    isProd: boolean,
+  ): Promise<BuildResult> {
     const startTime = Date.now();
-    const compileOptions = this.config.compile || {};
+    // 合并配置选项和模式选项
+    const compileOptions = {
+      ...this.config.compile,
+      // 生产模式默认启用 minify（如果配置中未显式禁用）
+      minify: this.config.compile?.minify ?? isProd,
+    };
 
     // 确保输出路径是绝对路径
     const outputDir = resolve(this.config.output);

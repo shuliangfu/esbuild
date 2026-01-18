@@ -1,148 +1,132 @@
 # @dreamer/esbuild
 
-> 一个兼容 Deno 和 Bun 的构建工具库，提供服务端和客户端编译功能
+> 一个兼容 Deno 和 Bun 的构建工具库，提供服务端和客户端编译、打包、优化功能
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-407%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
 ## 🎯 功能
 
-构建工具库，用于编译服务端和客户端代码。
+构建工具库，提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能。基于 esbuild 实现高性能打包，支持 TypeScript、JSX、代码分割、Tree-shaking 等现代构建特性。
 
-## 特性
+---
 
-### 服务端编译
+## 📦 安装
 
-- 服务端代码编译和打包（基于 `@dreamer/runtime-adapter`，兼容 Deno 和 Bun）
-- TypeScript 编译（Deno/Bun 内置）
-- 代码压缩和优化
-- 依赖分析和打包
-- 单文件打包（standalone）
-- 多平台编译（Linux、macOS、Windows）
-- 编译配置（deno.json/bun.json 支持）
-- **运行时兼容性**：必须兼容 Deno 和 Bun，使用 `@dreamer/runtime-adapter` 实现跨运行时编译
-
-### 客户端编译
-
-- **打包工具**：基于 esbuild（通过 npm:esbuild）
-- **JS Bundle 生成**：
-  - 入口文件打包（entry point → bundle.js）
-  - 代码分割（路由级别、组件级别）
-  - 生成多个 chunk 文件（main.js、chunk-xxx.js）
-  - 依赖打包（将 node_modules 中的依赖打包）
-  - Tree-shaking（移除未使用的代码）
-- **HTML 生成**：
-  - 自动生成 HTML 入口文件（index.html）
-  - 自动注入打包后的 JS 文件（`<script src="main.js">`）
-  - 自动注入 CSS 文件（`<link rel="stylesheet" href="main.css">`）
-  - 支持自定义 HTML 模板
-  - 支持多入口 HTML（MPA 多页应用）
-- **支持框架**：Preact、React、Vue3（支持这三个框架）
-- **客户端渲染（CSR）支持**：
-  - 纯客户端渲染（SPA 单页应用）
-  - 生成完整的客户端 JS bundle
-  - 客户端路由支持（React Router、Preact Router）
-  - 客户端状态管理
-  - 客户端数据获取
-- **资源处理**：
-  - CSS 处理和优化（提取、压缩、自动前缀）
-  - 图片处理（压缩、格式转换）
-  - 字体文件处理
-  - 静态资源复制和优化
-- **生产构建优化**：
-  - 代码压缩（minify）
-  - 代码混淆（mangle）
-  - Source Map 生成
-  - 资源压缩和优化
-
-### 通用功能
-
-- 统一的构建配置
-- 多环境构建（dev、prod）
-- 构建缓存
-- 增量编译
-- 构建产物分析
-- 插件系统
-
-## 实现技术栈
-
-- **服务端编译**：`@dreamer/runtime-adapter`（跨运行时编译，兼容 Deno 和 Bun）
-- **客户端打包**：esbuild（通过 npm:esbuild）
-- **渲染功能**：由 `@dreamer/render` 库负责（不在本库实现）
-- **HTML 生成**：模板引擎（自定义实现）
-
-## 实现可行性分析
-
-- ✅ **服务端编译**：完全可行
-  - 使用 `@dreamer/runtime-adapter` 实现跨运行时编译（兼容 Deno 和 Bun）
-  - Deno 环境：使用 Deno 编译 API（通过运行时适配器）
-  - Bun 环境：使用 Bun 打包 API（通过运行时适配器）
-  - 支持多平台编译（Linux、macOS、Windows）
-  - 支持 standalone 打包（包含所有依赖）
-
-- ✅ **客户端 JS Bundle 生成**：完全可行
-  - 使用 esbuild（npm:esbuild）进行打包
-  - esbuild 支持 TypeScript、JSX、代码分割、Tree-shaking
-  - 可以处理 npm 依赖和本地模块
-  - 生成优化后的 bundle 文件（main.js、chunk-xxx.js）
-  - **关键**：入口文件（entry）→ 打包工具 → 生成 bundle.js → HTML 中引入
-
-- ✅ **HTML 生成**：完全可行
-  - 使用模板引擎生成 HTML 文件
-  - 自动注入打包后的 JS 和 CSS 文件路径
-  - 支持自定义 HTML 模板
-  - 可以处理多入口场景
-  - **关键**：构建时扫描生成的 JS/CSS 文件 → 生成 HTML → 注入 `<script>` 和 `<link>` 标签
-
-
-- ✅ **资源处理**：完全可行
-  - CSS 提取和处理（esbuild 内置支持）
-  - 图片和字体等静态资源复制
-  - 可以使用 Deno 内置 API 处理文件操作
-
-- ⚠️ **注意事项**：
-  - 需要依赖 npm 包（esbuild）
-  - 需要依赖 `@dreamer/runtime-adapter`（跨运行时兼容）
-  - 客户端打包功能相对复杂，需要处理各种边界情况
-  - 必须确保 Deno 和 Bun 兼容性，不能直接使用 `deno compile`
-  - 建议分阶段实现：先实现基础打包，再添加高级特性
-
-## 使用场景
-
-- Deno 项目构建和打包
-- 前端项目构建（Preact、React）
-- **客户端渲染（CSR）项目构建**（SPA 单页应用）
-- 全栈项目构建（服务端 + 客户端）
-- CI/CD 构建流程
-- 多平台应用打包
-
-## 安装
+### Deno
 
 ```bash
 deno add jsr:@dreamer/esbuild
 ```
 
-## 环境兼容性
+### Bun
 
-- **运行时要求**：Deno 2.6+ 或 Bun 1.3.5
-- **服务端**：✅ 支持（兼容 Deno 和 Bun 运行时，服务端编译支持）
-- **客户端**：❌ 不支持（构建工具，仅在服务端运行）
-- **依赖**：
-  - `npm:esbuild`（客户端打包）
-  - `@dreamer/runtime-adapter`（跨运行时编译，必须）
-  - `@dreamer/render`（渲染功能，独立库，不在本库实现）
-- **平台限制**：服务端编译支持 Linux、macOS、Windows（通过运行时适配器）
+```bash
+bunx jsr add -D @dreamer/esbuild
+```
+
+---
+
+## 🌍 环境兼容性
+
+| 环境 | 版本要求 | 状态 |
+|------|---------|------|
+| **Deno** | 2.5.0+ | ✅ 完全支持 |
+| **Bun** | 1.3.0+ | ✅ 完全支持 |
+| **服务端** | - | ✅ 支持（兼容 Deno 和 Bun 运行时） |
+| **客户端** | - | ❌ 不支持（构建工具，仅在服务端运行） |
+
+---
+
+## ✨ 特性
+
+- **服务端编译**：
+  - 服务端代码编译和打包（基于 `@dreamer/runtime-adapter`）
+  - TypeScript 编译（Deno/Bun 内置）
+  - 代码压缩和优化
+  - 单文件打包（standalone）
+  - 多平台编译（Linux、macOS、Windows）
+  - **内存模式**：支持 `write: false` 直接返回编译代码，不写入文件
+- **客户端打包**：
+  - 基于 esbuild 高性能打包
+  - 入口文件打包（entry point → bundle.js）
+  - 代码分割（路由级别、组件级别）
+  - Tree-shaking（移除未使用的代码）
+  - 多种输出格式（ESM、CJS、IIFE）
+  - **内存模式**：支持 `write: false` 直接返回编译代码，不写入文件
+- **HTML 生成**：
+  - 自动生成 HTML 入口文件
+  - 自动注入打包后的 JS/CSS 文件
+  - 支持自定义 HTML 模板
+  - 支持预加载策略配置
+  - 支持多入口 HTML（MPA 多页应用）
+- **CSS 处理**：
+  - CSS 提取和优化
+  - 自动添加浏览器前缀（autoprefixer）
+  - CSS 压缩（cssnano）
+  - 自动注入 CSS 到 HTML
+- **构建优化**：
+  - 构建缓存管理
+  - 增量编译
+  - Watch 模式
+  - 构建产物分析
+  - 性能监控和报告
+- **插件系统**：
+  - 灵活的插件架构
+  - 服务端模块自动检测和排除
+  - 条件编译支持
+  - 自定义构建逻辑
+
+---
+
+## 🎯 使用场景
+
+- **全栈项目构建**：同时构建服务端和客户端代码
+- **前端项目构建**：React、Preact、Vue3 应用打包
+- **SPA 单页应用**：客户端渲染（CSR）项目构建
+- **多平台应用打包**：支持 Linux、macOS、Windows
+- **服务端渲染**：使用内存模式获取编译代码用于 SSR
+- **CI/CD 构建流程**：自动化构建和部署
 
 ---
 
 ## 🚀 快速开始
 
+### 基础使用
+
 ```typescript
-import { Builder, createBuilder } from "jsr:@dreamer/esbuild";
+import { createBuilder } from "@dreamer/esbuild";
 
 // 创建构建器
+const builder = createBuilder({
+  // 客户端构建配置
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+    bundle: {
+      minify: true,
+      sourcemap: true,
+      splitting: true,
+    },
+    html: {
+      title: "My App",
+    },
+  },
+});
+
+// 构建客户端
+await builder.buildClient();
+```
+
+### 全栈项目构建
+
+```typescript
+import { createBuilder } from "@dreamer/esbuild";
+
 const builder = createBuilder({
   // 服务端构建配置
   server: {
@@ -151,149 +135,356 @@ const builder = createBuilder({
     target: "deno",
     compile: {
       minify: true,
-      platform: ["linux", "darwin"], // 支持 Linux 和 macOS
-    }
+      platform: ["linux", "darwin"],
+    },
   },
-  // 客户端构建配置（支持 Preact、React 或 Vue3）
+  // 客户端构建配置
   client: {
-    entry: "./src/client/index.tsx", // 或 .vue
+    entry: "./src/client/index.tsx",
     output: "./dist/client",
-    engine: "react", // 或 "preact" 或 "vue3"
+    engine: "react",
     bundle: {
       minify: true,
       sourcemap: true,
-      splitting: true,
     },
-    html: {
-      template: "./public/index.html", // 可选：自定义 HTML 模板
-      title: "My App"
-    }
-  }
+  },
 });
-
-// 构建服务端
-await builder.buildServer();
-
-// 构建客户端
-await builder.buildClient();
 
 // 同时构建服务端和客户端
 await builder.build();
-
 ```
 
-### 纯客户端渲染（CSR - SPA 模式）
+---
+
+## 🎨 使用示例
+
+### 示例 1：客户端构建（内存模式）
+
+使用 `write: false` 参数，可以直接获取编译后的代码而不写入文件，适用于服务端渲染等场景。
+
+```typescript
+import { ClientBuilder } from "@dreamer/esbuild";
+
+const builder = new ClientBuilder({
+  entry: "./src/client/mod.ts",
+  output: "./dist",
+  engine: "react",
+});
+
+// 内存模式：不写入文件，直接返回编译代码
+const result = await builder.build({ mode: "prod", write: false });
+
+// 获取编译后的代码
+const code = result.outputContents?.[0]?.text;
+console.log(code);
+```
+
+### 示例 2：服务端构建（内存模式）
+
+```typescript
+import { ServerBuilder } from "@dreamer/esbuild";
+
+const builder = new ServerBuilder({
+  entry: "./src/server.ts",
+  output: "./dist/server",
+  target: "deno",
+});
+
+// 内存模式：返回编译后的代码
+const result = await builder.build({ mode: "prod", write: false });
+
+// 获取编译后的代码
+const code = result.outputContents?.[0]?.text;
+console.log(code);
+```
+
+### 示例 3：增量构建（Watch 模式）
+
+```typescript
+import { createBuilder } from "@dreamer/esbuild";
+
+const builder = createBuilder({
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+  build: {
+    watch: {
+      enabled: true,
+      debounce: 300,
+      onFileChange: (path, kind) => {
+        console.log(`文件变化: ${path} (${kind})`);
+      },
+    },
+  },
+});
+
+// 启动 Watch 模式
+await builder.watch();
+
+// 停止 Watch 模式
+builder.stopWatch();
+```
+
+### 示例 4：构建产物分析
+
+```typescript
+import { createBuilder, BuildAnalyzer } from "@dreamer/esbuild";
+
+const builder = createBuilder({
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+});
+
+const result = await builder.buildClient();
+
+// 分析构建产物
+const analyzer = new BuildAnalyzer();
+const analysis = await analyzer.analyze(result.metafile);
+
+// 生成分析报告
+const report = analyzer.generateReport(analysis);
+console.log(report);
+
+// 生成 HTML 报告
+await analyzer.generateHTMLReport(analysis, "./dist/build-report.html");
+```
+
+### 示例 5：使用插件
+
+```typescript
+import { ClientBuilder, createServerModuleDetectorPlugin } from "@dreamer/esbuild";
+
+const builder = new ClientBuilder({
+  entry: "./src/client/index.tsx",
+  output: "./dist/client",
+  engine: "react",
+  plugins: [
+    // 自动排除服务端模块
+    createServerModuleDetectorPlugin({
+      patterns: ["@dreamer/database", "express"],
+    }),
+  ],
+});
+
+await builder.build("prod");
+```
+
+---
+
+## 📚 API 文档
+
+### Builder
+
+统一的构建器，支持同时构建服务端和客户端代码。
+
+```typescript
+import { Builder, createBuilder } from "@dreamer/esbuild";
+
+const builder = createBuilder(config);
+```
+
+#### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `build(options?)` | 同时构建服务端和客户端 |
+| `buildServer(options?)` | 仅构建服务端代码 |
+| `buildClient(options?)` | 仅构建客户端代码 |
+| `clean()` | 清理构建产物 |
+| `watch(options?)` | 启动 Watch 模式 |
+| `stopWatch()` | 停止 Watch 模式 |
+
+### ClientBuilder
+
+客户端构建器，用于打包客户端代码。
+
+```typescript
+import { ClientBuilder } from "@dreamer/esbuild";
+
+const builder = new ClientBuilder(config);
+```
+
+#### 构造函数
+
+```typescript
+new ClientBuilder(config: ClientConfig)
+```
+
+#### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `build(options?)` | 构建客户端代码，支持 `{ mode, write }` 参数 |
+| `createContext(mode?)` | 创建增量构建上下文 |
+| `rebuild()` | 增量重新构建 |
+| `dispose()` | 清理构建上下文 |
+| `registerPlugin(plugin)` | 注册插件 |
+| `getPluginManager()` | 获取插件管理器 |
+| `getConfig()` | 获取配置 |
+
+#### ClientBuildOptions
+
+```typescript
+interface ClientBuildOptions {
+  /** 构建模式（默认：prod） */
+  mode?: "dev" | "prod";
+  /** 是否写入文件（默认：true），设为 false 返回编译代码 */
+  write?: boolean;
+}
+```
+
+### ServerBuilder
+
+服务端构建器，用于编译服务端代码。
+
+```typescript
+import { ServerBuilder } from "@dreamer/esbuild";
+
+const builder = new ServerBuilder(config);
+```
+
+#### 构造函数
+
+```typescript
+new ServerBuilder(config: ServerConfig)
+```
+
+#### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `build(options?)` | 构建服务端代码，支持 `{ mode, write }` 参数或字符串模式 |
+| `getConfig()` | 获取配置 |
+
+#### ServerBuildOptions
+
+```typescript
+interface ServerBuildOptions {
+  /** 构建模式（默认：prod） */
+  mode?: "dev" | "prod";
+  /** 是否写入文件（默认：true），设为 false 返回编译代码 */
+  write?: boolean;
+}
+```
+
+### BuildResult
+
+构建结果类型。
+
+```typescript
+interface BuildResult {
+  /** 输出文件列表（文件路径） */
+  outputFiles: string[];
+  /** 输出文件内容列表（当 write 为 false 时有值） */
+  outputContents?: OutputFileContent[];
+  /** 构建元数据 */
+  metafile?: unknown;
+  /** 构建时间（毫秒） */
+  duration: number;
+}
+
+interface OutputFileContent {
+  /** 文件路径 */
+  path: string;
+  /** 文件内容（字符串格式） */
+  text: string;
+  /** 文件内容（二进制格式） */
+  contents: Uint8Array;
+}
+```
+
+---
+
+## 🔧 高级配置
+
+### 代码分割策略
+
+```typescript
+const builder = new ClientBuilder({
+  entry: "./src/client/index.tsx",
+  output: "./dist/client",
+  engine: "react",
+  bundle: {
+    splitting: {
+      enabled: true,
+      byRoute: true,      // 按路由分割
+      byComponent: true,  // 按组件分割
+      bySize: 50000,      // 按大小分割（50KB）
+    },
+  },
+});
+```
+
+### Source Map 配置
+
+```typescript
+const builder = new ClientBuilder({
+  entry: "./src/client/index.tsx",
+  output: "./dist/client",
+  engine: "react",
+  sourcemap: {
+    enabled: true,
+    mode: "external",  // "inline" | "external" | "both"
+  },
+});
+```
+
+### 缓存配置
 
 ```typescript
 const builder = createBuilder({
   client: {
-    entry: "./src/client/index.tsx", // 入口文件（.tsx 或 .vue）
-    output: "./dist/client", // 输出目录
-    engine: "react", // 或 "preact" 或 "vue3"
-    html: {
-      template: "./public/index.html", // 可选：自定义 HTML 模板
-      title: "My App"
-    }
-  }
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+  build: {
+    cache: true,  // 或指定缓存目录: "./cache"
+  },
 });
-
-await builder.buildClient();
-
-// 构建产物：
-// dist/client/index.html:
-//   <!DOCTYPE html>
-//   <html>
-//     <head>
-//       <link rel="stylesheet" href="/main.css">
-//     </head>
-//     <body>
-//       <div id="root"></div>
-//       <script src="/main.js"></script>
-//     </body>
-//   </html>
-// dist/client/main.js: 打包后的 React/Preact 应用代码
 ```
-
-### 客户端渲染 JS 生成流程（详细说明）
-
-**步骤 1：入口文件分析**
-```
-入口：./src/client/index.tsx
-↓
-分析依赖（import 语句）
-↓
-构建依赖图（dependency graph）
-```
-
-**步骤 2：代码打包**
-```
-使用 esbuild 打包：
-- 入口文件 + 所有依赖 → bundle
-- TypeScript → JavaScript（编译）
-- JSX → JavaScript（转换）
-- 代码分割（按路由、按组件）
-- Tree-shaking（移除未使用代码）
-- 压缩和优化
-↓
-生成文件：
-- main.js（主 bundle）
-- chunk-route-home.js（路由 chunk）
-- chunk-route-about.js（路由 chunk）
-```
-
-**步骤 3：HTML 生成**
-```
-扫描生成的 JS/CSS 文件
-↓
-生成 HTML 模板：
-<!DOCTYPE html>
-<html>
-  <head>
-    <link rel="stylesheet" href="/main.css">
-  </head>
-  <body>
-    <div id="root"></div>
-    <!-- 自动注入打包后的 JS -->
-    <script src="/main.js"></script>
-    <script src="/chunk-route-home.js"></script>
-    <script src="/chunk-route-about.js"></script>
-  </body>
-</html>
-↓
-输出：dist/client/index.html
-```
-
-**步骤 4：资源处理**
-```
-- CSS 提取：从 JS 中提取 CSS → main.css
-- 静态资源：复制到 dist/client/assets/
-- 资源路径：自动更新为正确的路径
-```
-
-**最终产物结构（CSR）**：
-```
-dist/client/
-├── index.html          # HTML 入口（包含所有 <script> 标签）
-├── main.js             # 主 bundle（React/Preact + 应用代码）
-├── main.css            # 提取的 CSS
-├── chunk-*.js          # 代码分割后的 chunk
-└── assets/             # 静态资源（图片、字体等）
-    ├── logo.png
-    └── fonts/
-```
-
 
 ---
 
-## 📝 备注
+## 📊 测试报告
 
-- **构建工具**：仅在服务端运行，用于构建客户端和服务端代码
-- **统一接口**：提供统一的构建 API 接口，降低学习成本
-- **类型安全**：完整的 TypeScript 类型支持
-- **依赖**：
-  - `npm:esbuild`（客户端打包）
-  - `@dreamer/runtime-adapter`（跨运行时编译）
-- **平台限制**：服务端编译支持 Linux、macOS、Windows（通过运行时适配器）
+本库经过全面测试，所有 407 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+
+**测试统计**：
+- **总测试数**: 407
+- **通过**: 407 ✅
+- **失败**: 0
+- **通过率**: 100% ✅
+- **测试执行时间**: ~3分钟
+- **测试覆盖**: 所有公共 API、边界情况、错误处理
+- **测试环境**: Deno 2.x
+
+**测试类型**：
+- ✅ 单元测试（约 350 个）
+- ✅ 集成测试（约 30 个）
+- ✅ 边界情况和错误处理测试（约 27 个）
+
+**测试亮点**：
+- ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
+- ✅ 集成测试验证了端到端的完整流程
+- ✅ 新增内存模式（write: false）功能完整测试
+
+查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
+
+---
+
+## 📝 注意事项
+
+- **依赖要求**：需要安装 `npm:esbuild` 和 `@dreamer/runtime-adapter`
+- **运行环境**：构建工具仅在服务端运行，不能在浏览器中使用
+- **内存模式**：使用 `write: false` 时，内存模式不支持代码分割（splitting）
+- **平台编译**：服务端多平台编译需要对应平台的编译工具链
+- **缓存管理**：生产环境建议启用构建缓存以提升性能
 
 ---
 

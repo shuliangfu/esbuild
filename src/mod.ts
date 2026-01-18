@@ -15,6 +15,7 @@ export { Builder } from "./builder.ts";
 export { CacheManager } from "./cache-manager.ts";
 export type { CacheStats } from "./cache-manager.ts";
 export { ClientBuilder } from "./client-builder.ts";
+export type { ClientBuildOptions } from "./client-builder.ts";
 export { CSSOptimizer } from "./css-optimizer.ts";
 export { HTMLGenerator } from "./html-generator.ts";
 export { PluginManager } from "./plugin.ts";
@@ -28,6 +29,7 @@ export type {
 export { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 export type { ServerModuleDetectorOptions } from "./plugins/server-module-detector.ts";
 export { ServerBuilder } from "./server-builder.ts";
+export type { ServerBuildOptions } from "./server-builder.ts";
 export {
   generateCSSTag,
   generateCSSTags,
@@ -50,6 +52,7 @@ export type {
   ErrorStats,
   LogLevel,
   OptimizationSuggestion,
+  OutputFileContent,
   OutputFormat,
   Platform,
   PreloadConfig,
