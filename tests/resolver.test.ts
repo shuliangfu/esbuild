@@ -26,8 +26,8 @@ import {
 } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { buildBundle } from "../src/builder-bundle.ts";
-import { denoResolverPlugin } from "../src/plugins/resolver-deno.ts";
 import { bunResolverPlugin } from "../src/plugins/resolver-bun.ts";
+import { denoResolverPlugin } from "../src/plugins/resolver-deno.ts";
 import { cleanupDir, getTestDataDir } from "./test-utils.ts";
 
 if (IS_DENO) {
@@ -306,7 +306,7 @@ export { msg, sum, product, helper, config };
             globalName: "TestJSRDirect",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -345,7 +345,7 @@ export { logger };
             globalName: "TestJSRSubpath",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -376,7 +376,7 @@ export { logger };
             globalName: "TestNPMDirect",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -406,7 +406,7 @@ export { logger };
             globalName: "TestSubpath",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -431,7 +431,7 @@ export { logger };
             globalName: "TestImportsMapping",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -474,7 +474,7 @@ export const result = utilValue;
             globalName: "TestSameLevel",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -502,7 +502,7 @@ export const result = utilValue;
             globalName: "TestRelative",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -548,7 +548,7 @@ export const result = parentValue;
             globalName: "TestParentDir",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -580,7 +580,7 @@ export const result = parentValue;
             globalName: "TestAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -617,7 +617,7 @@ export { logger };
             globalName: "TestAliasSubpath",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -647,7 +647,7 @@ export { logger };
             globalName: "TestPathAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -685,7 +685,7 @@ export { msg };
             globalName: "TestAtAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -720,7 +720,7 @@ export { result };
             globalName: "TestTildeAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -940,7 +940,7 @@ export const result = utilValue;
             globalName: "BunTestSameLevel",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -968,7 +968,7 @@ export const result = utilValue;
             globalName: "BunTestRelative",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -1014,7 +1014,7 @@ export const result = parentValue;
             globalName: "BunTestParentDir",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -1045,7 +1045,7 @@ export const result = parentValue;
             globalName: "BunTestNPM",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -1077,7 +1077,7 @@ export const result = parentValue;
             globalName: "BunTestPathAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -1115,7 +1115,7 @@ export { msg };
             globalName: "BunTestAtAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
@@ -1150,7 +1150,7 @@ export { result };
             globalName: "BunTestTildeAlias",
             platform: "browser",
             format: "iife",
-            plugins: [IS_BUN ? bunResolverPlugin() : denoResolverPlugin()],
+            plugins: [denoResolverPlugin()],
           });
 
           expect(result).toBeDefined();
