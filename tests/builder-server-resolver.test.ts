@@ -134,6 +134,21 @@ export { helper, config };
 `,
     );
 
+    // 创建 deno.json 配置文件（Deno 测试必须要有这个）
+    // 包含路径别名和 JSR 包的导入映射
+    const denoJsonPath = join(testDataDir, "deno.json");
+    const denoJson = {
+      imports: {
+        "@/": "./src/",
+        "~/": "./",
+        "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
+      },
+    };
+    writeTextFileSync(
+      denoJsonPath,
+      JSON.stringify(denoJson, null, 2),
+    );
+
     expect(testDataDir).toBeTruthy();
   });
 
@@ -147,19 +162,17 @@ export { helper, config };
         };
         const builder = new BuilderServer(config);
 
-        try {
-          const result = await builder.build({ mode: "dev", write: false });
-          expect(result).toBeTruthy();
-          expect(result.outputContents).toBeDefined();
-          expect(result.outputContents!.length).toBeGreaterThan(0);
+        // 构建应该成功，不应该抛出错误
+        const result = await builder.build({ mode: "dev", write: false });
+        expect(result).toBeTruthy();
+        expect(result.outputContents).toBeDefined();
+        expect(result.outputContents!.length).toBeGreaterThan(0);
 
-          const code = result.outputContents![0]?.text || "";
-          // 验证代码包含 logger 相关内容
-          expect(code.length).toBeGreaterThan(0);
-        } catch (error) {
-          // 如果构建失败，至少验证构建器创建成功
-          expect(builder).toBeTruthy();
-        }
+        const code = result.outputContents![0]?.text || "";
+        // 验证代码包含 logger 相关内容
+        expect(code.length).toBeGreaterThan(0);
+        // 验证代码包含 logger 相关的实际内容（不仅仅是空代码）
+        expect(code).toContain("logger");
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够解析相对路径导入", async () => {
@@ -193,6 +206,7 @@ export { helper, config };
           imports: {
             "@/": "./src/",
             "~/": "./",
+            "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
           },
         };
         writeTextFileSync(

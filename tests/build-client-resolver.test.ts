@@ -152,6 +152,21 @@ export { msg, config, Button };
 `,
     );
 
+    // 创建 deno.json 配置文件（Deno 测试必须要有这个）
+    // 包含路径别名和 JSR 包的导入映射
+    const denoJsonPath = join(testDataDir, "deno.json");
+    const denoJson = {
+      imports: {
+        "@/": "./src/",
+        "~/": "./",
+        "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
+      },
+    };
+    writeTextFileSync(
+      denoJsonPath,
+      JSON.stringify(denoJson, null, 2),
+    );
+
     expect(testDataDir).toBeTruthy();
   });
 
@@ -211,6 +226,7 @@ export { msg, config, Button };
           imports: {
             "@/": "./src/",
             "~/": "./",
+            "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
           },
         };
         writeTextFileSync(

@@ -145,10 +145,10 @@ export class BuilderServer {
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
 
-    // 在 Deno 环境下自动启用 Deno 解析器插件
+    // 在 Deno 环境下自动启用解析器插件
     // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
     if (IS_DENO) {
-      plugins.push(createResolverPlugin());
+      plugins.push(createResolverPlugin({ debug: true }));
     }
 
     // 输出文件名

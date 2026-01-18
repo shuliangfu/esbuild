@@ -319,7 +319,8 @@ async function resolveDenoProtocolPath(
         // 忽略解码错误
       }
 
-      if (existsSync(filePath)) {
+      // 确保文件路径不为空
+      if (filePath && existsSync(filePath)) {
         if (debug) {
           console.log(
             `[deno-resolver] 成功解析为文件路径: ${protocolPath} -> ${filePath}`,
@@ -329,6 +330,17 @@ async function resolveDenoProtocolPath(
         return {
           path: filePath,
           namespace: "file",
+        };
+      } else if (filePath) {
+        // 文件路径存在但文件不存在，尝试使用 onLoad 钩子
+        if (debug) {
+          console.log(
+            `[deno-resolver] 文件路径存在但文件不存在，使用 onLoad 钩子: ${filePath}`,
+          );
+        }
+        return {
+          path: protocolPath,
+          namespace: "deno-protocol",
         };
       }
     } else if (
@@ -418,8 +430,11 @@ export function createResolverPlugin(
           }
 
           // 查找项目的 deno.json 文件
-          const resolveDir = args.resolveDir || cwd();
-          const projectDenoJsonPath = findProjectDenoJson(resolveDir);
+          // 优先使用 importer 的目录，如果没有则使用 resolveDir，最后使用 cwd()
+          const startDir = args.importer
+            ? dirname(args.importer)
+            : (args.resolveDir || cwd());
+          const projectDenoJsonPath = findProjectDenoJson(startDir);
 
           if (!projectDenoJsonPath) {
             if (debug) {
@@ -538,12 +553,17 @@ export function createResolverPlugin(
           const subpathParts = parts.slice(2); // ["client"] 或 ["client", "utils"] 等多级
 
           // 查找项目的 deno.json 文件
-          const resolveDir = args.resolveDir || cwd();
-          const projectDenoJsonPath = findProjectDenoJson(resolveDir);
+          // 优先使用 importer 的目录，如果没有则使用 resolveDir，最后使用 cwd()
+          const startDir = args.importer
+            ? dirname(args.importer)
+            : (args.resolveDir || cwd());
+          const projectDenoJsonPath = findProjectDenoJson(startDir);
 
           if (!projectDenoJsonPath) {
             if (debug) {
-              console.log(`[deno-resolver] 未找到项目的 deno.json`);
+              console.log(
+                `[deno-resolver] 未找到项目的 deno.json (从 ${startDir} 开始查找)`,
+              );
             }
             return undefined;
           }
@@ -557,7 +577,7 @@ export function createResolverPlugin(
           if (!packageImport) {
             if (debug) {
               console.log(
-                `[deno-resolver] 未在 deno.json 的 imports 中找到: ${packageName}`,
+                `[deno-resolver] 未在 deno.json 的 imports 中找到: ${packageName} (deno.json: ${projectDenoJsonPath})`,
               );
             }
             return undefined;
@@ -605,7 +625,8 @@ export function createResolverPlugin(
             await import(protocolPath);
 
             // 步骤 2: 等待一小段时间，确保文件系统操作完成
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            // 增加延时以确保 Deno 完全缓存模块
+            await new Promise((resolve) => setTimeout(resolve, 200));
 
             // 步骤 3: 再次尝试使用 import.meta.resolve 获取文件路径
             // 动态导入后，Deno 应该已经缓存了模块，resolve 应该能返回文件路径
