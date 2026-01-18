@@ -338,12 +338,16 @@ export class BuilderBundle {
         const exportsMatch = code.match(/var\s+(exports_\w+)\s*=/);
         if (exportsMatch) {
           const exportsVar = exportsMatch[1];
-          // 在 IIFE 末尾添加返回语句，然后包装整个 IIFE 并赋值给全局变量
-          // 先移除末尾的 })();
-          const iifeContent = code.replace(/\}\s*\)\s*\(\)\s*;?\s*$/, "");
-          // 添加返回语句，然后包装并赋值给全局变量
+          // 在 IIFE 末尾（})(); 之前）添加 return 语句，使 IIFE 返回 exports 对象
+          const iifeWithReturn = code.replace(
+            /}\s*\)\s*\(\)\s*;?\s*$/,
+            `\n  return ${exportsVar};\n})();`,
+          );
+          // 将 IIFE 的返回值赋给全局变量
+          // 使用临时变量保存 IIFE 的返回值，避免重复执行
+          const tempVarName = `__${options.globalName}_result`;
           code =
-            `${iifeContent}\n  return ${exportsVar};\n})();\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = (function() {\n${iifeContent}\n    return ${exportsVar};\n  })();\n}`;
+            `const ${tempVarName} = ${iifeWithReturn}\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = ${tempVarName};\n}`;
         } else {
           // 如果没有找到 exports 对象，简单包装整个 IIFE
           code = code.replace(

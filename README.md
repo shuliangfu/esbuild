@@ -4,7 +4,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-456%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-460%20(Bun)%20%7C%20469%20(Deno)%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -614,34 +614,38 @@ const builder = createBuilder({
 
 ## 📊 测试报告
 
-本库经过全面测试，所有 456 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+本库经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
-- **总测试数**: 456
-- **通过**: 456 ✅
+- **Bun 环境测试数**: 460
+- **Deno 环境测试数**: 469
+- **通过**: 全部通过 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
 - **测试执行时间**:
-  - Bun 环境: ~3.47秒
-  - Deno 环境: ~17秒
+  - Bun 环境: ~4.01秒
+  - Deno 环境: ~46秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理
 - **测试环境**: Deno 2.x, Bun 1.3.5
 
 **测试类型**：
-- ✅ 单元测试（约 390 个）
+- ✅ 单元测试（约 400 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 36 个）
+- ✅ 边界情况和错误处理测试（约 39 个）
 
 **测试亮点**：
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
-- ✅ 新增内存模式（write: false）功能完整测试
-- ✅ 新增 BuilderBundle 简单打包器完整测试（24 个）
-- ✅ 新增路径解析功能测试（Deno 和 Bun 环境，22 个测试）
-  - 解析器插件测试（Bun 环境，10 个测试）
-  - 服务端构建器路径解析测试（Bun 环境，4 个测试）
-  - 客户端构建器路径解析测试（Bun 环境，4 个测试）
-  - 客户端构建路径解析测试（Bun 环境，4 个测试）
+- ✅ 内存模式（write: false）功能完整测试
+- ✅ BuilderBundle 简单打包器完整测试（28 个）
+  - ESM 和 IIFE 格式测试
+  - 全局变量设置测试（window/global/globalThis）
+  - 平台特定行为测试（browser/node/neutral）
+- ✅ 路径解析功能测试（Deno 和 Bun 环境）
+  - Deno 解析器插件测试（17 个测试）
+  - Bun 解析器插件测试（10 个测试）
+  - 服务端构建器路径解析测试（Deno 和 Bun 环境）
+  - 客户端构建器路径解析测试（Deno 和 Bun 环境）
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 

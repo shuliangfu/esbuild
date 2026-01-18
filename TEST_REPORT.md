@@ -15,13 +15,14 @@
 
 ### 总体统计
 
-- **总测试数**: 456
-- **通过**: 456 ✅
+- **Bun 环境测试数**: 460
+- **Deno 环境测试数**: 469
+- **通过**: 全部通过 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
 - **测试执行时间**:
-  - Bun 环境: ~3.47秒
-  - Deno 环境: ~17秒
+  - Bun 环境: ~4.01秒
+  - Deno 环境: ~46秒
 
 ### 测试文件统计
 
@@ -32,7 +33,7 @@
 | `build-analyzer-internal.test.ts` | 9 | ✅ 全部通过 | 构建分析器内部方法测试 |
 | `build-analyzer.test.ts` | 17 | ✅ 全部通过 | 构建分析器功能测试 |
 | `builder-build-validation.test.ts` | 6 | ✅ 全部通过 | 构建产物验证测试 |
-| `builder-bundle.test.ts` | 24 | ✅ 全部通过 | 简单打包器功能测试 |
+| `builder-bundle.test.ts` | 28 | ✅ 全部通过 | 简单打包器功能测试 |
 | `builder-config-validation.test.ts` | 9 | ✅ 全部通过 | 构建配置验证测试 |
 | `builder-error-handling.test.ts` | 6 | ✅ 全部通过 | 构建错误处理测试 |
 | `builder-internal-methods.test.ts` | 11 | ✅ 全部通过 | 构建器内部方法测试 |
@@ -147,13 +148,17 @@
 
 **测试结果**: 6 个测试全部通过
 
-### 6. 简单打包器 (builder-bundle.test.ts) - 24 个测试
+### 6. 简单打包器 (builder-bundle.test.ts) - 28 个测试
 
 **测试场景**:
 - ✅ 应该能够实例化 BuilderBundle
 - ✅ 应该能够打包简单的 TypeScript 文件
-- ✅ 应该默认使用 IIFE 格式
+- ✅ 应该默认使用 ESM 格式（未指定 globalName）
+- ✅ 应该在使用 globalName 时使用 IIFE 格式
 - ✅ 应该支持设置 globalName
+- ✅ 应该在使用 globalName + browser platform 时设置 window 全局变量
+- ✅ 应该在使用 globalName + node platform 时设置 global 全局变量
+- ✅ 应该在使用 globalName + neutral platform 时设置 globalThis 全局变量
 - ✅ 应该支持 platform: browser
 - ✅ 应该支持 platform: node
 - ✅ 应该支持 platform: neutral
@@ -173,7 +178,7 @@
 - ✅ browser 平台应该正确处理浏览器 API
 - ✅ node 平台应该正确处理 Node API
 
-**测试结果**: 24 个测试全部通过
+**测试结果**: 28 个测试全部通过
 
 ### 7. 构建配置验证 (builder-config-validation.test.ts) - 9 个测试
 
@@ -791,7 +796,12 @@
 |------|------|----------|
 | `BuilderBundle.build({ platform: "browser" })` | 浏览器平台打包 | ✅ 4个测试 |
 | `BuilderBundle.build({ platform: "node" })` | Node平台打包 | ✅ 2个测试 |
-| `BuilderBundle.build({ format: "esm" })` | ESM格式打包 | ✅ 2个测试 |
+| `BuilderBundle.build({ platform: "neutral" })` | 中性平台打包 | ✅ 2个测试 |
+| `BuilderBundle.build({ format: "esm" })` | ESM格式打包（默认） | ✅ 2个测试 |
+| `BuilderBundle.build({ format: "iife", globalName: "..." })` | IIFE格式打包（指定globalName） | ✅ 4个测试 |
+| `BuilderBundle.build({ globalName: "...", platform: "browser" })` | 浏览器平台全局变量设置 | ✅ 1个测试 |
+| `BuilderBundle.build({ globalName: "...", platform: "node" })` | Node平台全局变量设置 | ✅ 1个测试 |
+| `BuilderBundle.build({ globalName: "...", platform: "neutral" })` | 中性平台全局变量设置 | ✅ 1个测试 |
 | `BuilderBundle.build({ minify: true })` | 压缩打包 | ✅ 2个测试 |
 | `BuilderClient.build({ write: false })` | 内存模式，返回编译代码 | ✅ 4个测试 |
 | `BuilderClient.build({ mode: "dev" })` | 开发模式构建 | ✅ 3个测试 |
@@ -821,27 +831,31 @@
 
 ## 结论
 
-@dreamer/esbuild 库经过全面测试，所有 **456** 个测试全部通过，测试覆盖率达到 100%。
+@dreamer/esbuild 库经过全面测试，所有测试全部通过，测试覆盖率达到 100%。
 
-**测试总数**: 456
+**测试总数**:
+- Bun 环境: **460** 个测试
+- Deno 环境: **469** 个测试
 
 **测试类型**:
-- ✅ 单元测试（约 390 个）
+- ✅ 单元测试（约 400 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 36 个）
+- ✅ 边界情况和错误处理测试（约 39 个）
 
 **测试执行环境**:
 - Deno 2.x
 - Bun 1.3.5
-- esbuild 0.27.2
+- esbuild 0.24.2
 - PostCSS 8.4.39
 - Autoprefixer 10.4.19
 - cssnano 7.0.3
 
-**新增测试覆盖**:
-- ✅ 解析器插件测试（Bun 环境，10 个测试）
-- ✅ 服务端构建器路径解析测试（Bun 环境，4 个测试）
-- ✅ 客户端构建器路径解析测试（Bun 环境，4 个测试）
-- ✅ 客户端构建路径解析测试（Bun 环境，4 个测试）
+**测试覆盖**:
+- ✅ 解析器插件测试（Deno 和 Bun 环境）
+- ✅ 服务端构建器路径解析测试（Deno 和 Bun 环境）
+- ✅ 客户端构建器路径解析测试（Deno 和 Bun 环境）
+- ✅ 简单打包器（BuilderBundle）测试（Deno 和 Bun 环境）
+- ✅ 全局变量设置测试（window/global/globalThis）
+- ✅ ESM 和 IIFE 格式测试
 
 **可以放心用于生产环境**。
