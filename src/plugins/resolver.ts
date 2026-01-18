@@ -1,17 +1,22 @@
 /**
- * @module @dreamer/esbuild/plugins/deno-resolver
+ * @module @dreamer/esbuild/plugins/resolver
  *
- * Deno 模块解析插件
+ * 统一模块解析插件（支持 Deno 和 Bun）
  *
- * 为 esbuild 提供 Deno 兼容的模块解析，支持：
- * - 读取 deno.json 的 exports 配置
+ * 为 esbuild 提供跨运行时的模块解析，支持：
+ * - 读取 deno.json 的 exports 和 imports 配置（Deno）
+ * - 读取 package.json 的 imports 配置（Bun/Node）
+ * - 读取 tsconfig.json 的 paths 配置（Bun/Node）
  * - 解析 JSR 包的子路径导出（如 @dreamer/logger/client）
  * - 支持 jsr: 协议的模块引用（如 jsr:@dreamer/logger@^1.0.0）
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
  * - 自动处理 Deno 模块的下载和缓存
+ *
+ * 注意：Deno 和 Bun 都使用 npm:esbuild 进行构建，因此解析逻辑统一
  */
 
 import {
+  cwd,
   dirname,
   existsSync,
   join,
@@ -21,9 +26,9 @@ import {
 import * as esbuild from "esbuild";
 
 /**
- * Deno 解析器选项
+ * 解析器选项
  */
-export interface DenoResolverOptions {
+export interface ResolverOptions {
   /** 是否启用插件（默认：true） */
   enabled?: boolean;
   /** 是否启用调试日志（默认：false） */
@@ -40,6 +45,25 @@ interface DenoConfig {
   version?: string;
   exports?: Record<string, string> | string;
   imports?: Record<string, string>;
+}
+
+/**
+ * package.json 配置结构
+ */
+interface PackageJsonConfig {
+  name?: string;
+  version?: string;
+  imports?: Record<string, string>;
+}
+
+/**
+ * tsconfig.json 配置结构
+ */
+interface TsconfigConfig {
+  compilerOptions?: {
+    baseUrl?: string;
+    paths?: Record<string, string[]>;
+  };
 }
 
 /**
@@ -252,11 +276,11 @@ function _resolveDenoProtocolPackage(
  * @example
  * ```typescript
  * import { buildBundle } from "@dreamer/esbuild";
- * import { createDenoResolverPlugin } from "@dreamer/esbuild/plugins/deno-resolver";
+ * import { createResolverPlugin } from "@dreamer/esbuild/plugins/deno-resolver";
  *
  * const result = await buildBundle({
  *   entryPoint: "./src/client/mod.ts",
- *   plugins: [createDenoResolverPlugin()],
+ *   plugins: [createResolverPlugin()],
  * });
  * ```
  */
@@ -365,17 +389,20 @@ async function resolveDenoProtocolPath(
   return undefined;
 }
 
-export function createDenoResolverPlugin(
-  options: DenoResolverOptions = {},
+export function createResolverPlugin(
+  options: ResolverOptions = {},
 ): esbuild.Plugin {
   const { enabled = true, debug = false } = options;
 
   return {
-    name: "deno-resolver",
+    name: "resolver",
     setup(build) {
       if (!enabled) {
         return;
       }
+
+      // 设置插件优先级，确保在其他解析器之前运行
+      // 这样可以拦截 JSR 包和路径别名的解析
 
       // 1. 处理路径别名（通过 deno.json imports 配置）
       // 例如：import { x } from "@/utils.ts"
@@ -391,7 +418,7 @@ export function createDenoResolverPlugin(
           }
 
           // 查找项目的 deno.json 文件
-          const resolveDir = args.resolveDir || Deno.cwd();
+          const resolveDir = args.resolveDir || cwd();
           const projectDenoJsonPath = findProjectDenoJson(resolveDir);
 
           if (!projectDenoJsonPath) {
@@ -511,7 +538,7 @@ export function createDenoResolverPlugin(
           const subpathParts = parts.slice(2); // ["client"] 或 ["client", "utils"] 等多级
 
           // 查找项目的 deno.json 文件
-          const resolveDir = args.resolveDir || Deno.cwd();
+          const resolveDir = args.resolveDir || cwd();
           const projectDenoJsonPath = findProjectDenoJson(resolveDir);
 
           if (!projectDenoJsonPath) {

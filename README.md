@@ -529,7 +529,7 @@ const builder = createBuilder({
 
 ### Deno 解析器插件
 
-在 Deno 环境下，会自动启用 Deno 解析器插件（`createDenoResolverPlugin`），用于：
+在 Deno 环境下，会自动启用 Deno 解析器插件（`createResolverPlugin`），用于：
 
 - 解析 `deno.json` 的 `exports` 配置
 - 支持 JSR 包的子路径导出（如 `@dreamer/logger/client`）

@@ -22,15 +22,15 @@ import {
   relative,
   remove,
   resolve,
-} from "@dreamer/runtime-adapter"
-import * as esbuild from "esbuild"
-import { createDenoResolverPlugin } from "./plugins/deno-resolver.ts"
+} from "@dreamer/runtime-adapter";
+import * as esbuild from "esbuild";
+import { createResolverPlugin } from "./plugins/resolver.ts";
 import type {
   BuildMode,
   BuildResult,
   OutputFileContent,
   ServerConfig,
-} from "./types.ts"
+} from "./types.ts";
 
 /**
  * 服务端构建选项
@@ -148,7 +148,7 @@ export class BuilderServer {
     // 在 Deno 环境下自动启用 Deno 解析器插件
     // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
     if (IS_DENO) {
-      plugins.push(createDenoResolverPlugin());
+      plugins.push(createResolverPlugin());
     }
 
     // 输出文件名
