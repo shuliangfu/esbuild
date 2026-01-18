@@ -14,7 +14,6 @@ import {
   dirname,
   existsSync,
   IS_BUN,
-  IS_DENO,
   join,
   makeTempDir,
   mkdir,
@@ -147,9 +146,7 @@ export class BuilderServer {
 
     // 在 Deno 环境下自动启用解析器插件
     // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-    if (IS_DENO) {
-      plugins.push(createResolverPlugin({ debug: true }));
-    }
+    plugins.push(createResolverPlugin());
 
     // 输出文件名
     const outfile = join(outputDir, "server.js");

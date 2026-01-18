@@ -296,19 +296,9 @@ async function resolveDenoProtocolPath(
   protocolPath: string,
   debug: boolean,
 ): Promise<esbuild.OnResolveResult | undefined> {
-  if (debug) {
-    console.log(`[deno-resolver] 解析 Deno 协议路径: ${protocolPath}`);
-  }
-
   try {
     // 使用 import.meta.resolve 尝试解析路径
     const resolvedUrl = await import.meta.resolve(protocolPath);
-
-    if (debug) {
-      console.log(
-        `[deno-resolver] import.meta.resolve 结果: ${protocolPath} -> ${resolvedUrl}`,
-      );
-    }
 
     // 如果返回的是 file:// URL，直接使用文件路径
     if (resolvedUrl.startsWith("file://")) {
@@ -321,23 +311,12 @@ async function resolveDenoProtocolPath(
 
       // 确保文件路径不为空
       if (filePath && existsSync(filePath)) {
-        if (debug) {
-          console.log(
-            `[deno-resolver] 成功解析为文件路径: ${protocolPath} -> ${filePath}`,
-          );
-        }
-
         return {
           path: filePath,
           namespace: "file",
         };
       } else if (filePath) {
         // 文件路径存在但文件不存在，尝试使用 onLoad 钩子
-        if (debug) {
-          console.log(
-            `[deno-resolver] 文件路径存在但文件不存在，使用 onLoad 钩子: ${filePath}`,
-          );
-        }
         return {
           path: protocolPath,
           namespace: "deno-protocol",
@@ -350,12 +329,6 @@ async function resolveDenoProtocolPath(
       // 如果返回的是 HTTP URL（如 JSR 的网页 URL），不能直接使用
       // 因为 JSR 的 HTTP URL 返回的是 HTML 页面，不是源代码
       // 应该使用 deno-protocol namespace 让 Deno 通过动态导入来处理
-      if (debug) {
-        console.log(
-          `[deno-resolver] 解析为 HTTP URL（可能是 JSR/NPM 网页），使用 deno-protocol namespace: ${resolvedUrl}`,
-        );
-      }
-
       // 使用 deno-protocol namespace，让 Deno 通过动态导入来下载和缓存模块
       return {
         path: protocolPath,
@@ -368,30 +341,13 @@ async function resolveDenoProtocolPath(
     ) {
       // 如果返回的还是协议路径，说明 Deno 还没有下载/缓存这个模块
       // 这种情况下，我们需要使用 onLoad 钩子来触发下载并加载模块内容
-      if (debug) {
-        console.log(
-          `[deno-resolver] 仍为协议路径，使用 onLoad 钩子触发下载: ${protocolPath}`,
-        );
-      }
-
       return {
         path: protocolPath,
         namespace: "deno-protocol",
       };
     }
   } catch (error) {
-    if (debug) {
-      console.log(
-        `[deno-resolver] import.meta.resolve 失败:`,
-        error,
-      );
-    }
     // 如果 resolve 失败，尝试使用 onLoad 钩子
-    if (debug) {
-      console.log(
-        `[deno-resolver] resolve 失败，使用 onLoad 钩子作为后备: ${protocolPath}`,
-      );
-    }
     return {
       path: protocolPath,
       namespace: "deno-protocol",
@@ -425,10 +381,6 @@ export function createResolverPlugin(
         (args): esbuild.OnResolveResult | undefined => {
           const path = args.path;
 
-          if (debug) {
-            console.log(`[deno-resolver] 检测到路径别名: ${path}`);
-          }
-
           // 查找项目的 deno.json 文件
           // 优先使用 importer 的目录，如果没有则使用 resolveDir，最后使用 cwd()
           const startDir = args.importer
@@ -437,9 +389,6 @@ export function createResolverPlugin(
           const projectDenoJsonPath = findProjectDenoJson(startDir);
 
           if (!projectDenoJsonPath) {
-            if (debug) {
-              console.log(`[deno-resolver] 未找到项目的 deno.json`);
-            }
             return undefined;
           }
 
@@ -449,9 +398,6 @@ export function createResolverPlugin(
             const config: DenoConfig = JSON.parse(content);
 
             if (!config.imports) {
-              if (debug) {
-                console.log(`[deno-resolver] deno.json 中没有 imports 配置`);
-              }
               return undefined;
             }
 
@@ -480,12 +426,6 @@ export function createResolverPlugin(
                     resolvedPath = aliasValue + remainingPath;
                   }
 
-                  if (debug) {
-                    console.log(
-                      `[deno-resolver] 路径别名解析: ${path} -> ${resolvedPath} (别名: ${alias} -> ${aliasValue})`,
-                    );
-                  }
-
                   // 检查文件是否存在
                   if (existsSync(resolvedPath)) {
                     return {
@@ -505,14 +445,8 @@ export function createResolverPlugin(
                 }
               }
             }
-
-            if (debug) {
-              console.log(`[deno-resolver] 未找到匹配的路径别名: ${path}`);
-            }
           } catch (error) {
-            if (debug) {
-              console.log(`[deno-resolver] 解析路径别名失败:`, error);
-            }
+            // 忽略错误，返回 undefined
           }
 
           return undefined;
@@ -526,11 +460,6 @@ export function createResolverPlugin(
         { filter: /^(jsr|npm):/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
-
-          if (debug) {
-            console.log(`[deno-resolver] 检测到 Deno 协议导入: ${path}`);
-          }
-
           return await resolveDenoProtocolPath(path, debug);
         },
       );
@@ -541,10 +470,6 @@ export function createResolverPlugin(
         { filter: /^@[^/]+\/[^/]+\/.+$/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
-
-          if (debug) {
-            console.log(`[deno-resolver] 尝试解析: ${path}`);
-          }
 
           // 解析包名和子路径
           // @dreamer/logger/client -> packageName: @dreamer/logger, subpath: client
@@ -560,11 +485,6 @@ export function createResolverPlugin(
           const projectDenoJsonPath = findProjectDenoJson(startDir);
 
           if (!projectDenoJsonPath) {
-            if (debug) {
-              console.log(
-                `[deno-resolver] 未找到项目的 deno.json (从 ${startDir} 开始查找)`,
-              );
-            }
             return undefined;
           }
 
@@ -575,18 +495,7 @@ export function createResolverPlugin(
           );
 
           if (!packageImport) {
-            if (debug) {
-              console.log(
-                `[deno-resolver] 未在 deno.json 的 imports 中找到: ${packageName} (deno.json: ${projectDenoJsonPath})`,
-              );
-            }
             return undefined;
-          }
-
-          if (debug) {
-            console.log(
-              `[deno-resolver] 找到导入映射: ${packageName} -> ${packageImport}`,
-            );
           }
 
           // 拼接子路径到导入路径
@@ -594,12 +503,6 @@ export function createResolverPlugin(
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
-
-          if (debug) {
-            console.log(
-              `[deno-resolver] 拼接后的协议路径: ${fullProtocolPath}`,
-            );
-          }
 
           // 使用统一的协议路径解析函数
           return await resolveDenoProtocolPath(fullProtocolPath, debug);
@@ -612,12 +515,6 @@ export function createResolverPlugin(
         { filter: /.*/, namespace: "deno-protocol" },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = args.path;
-
-          if (debug) {
-            console.log(
-              `[deno-resolver] onLoad 加载 Deno 协议模块: ${protocolPath}`,
-            );
-          }
 
           try {
             // 步骤 1: 先使用动态导入触发 Deno 下载和缓存模块
@@ -633,18 +530,8 @@ export function createResolverPlugin(
             let fileUrl: string | undefined;
             try {
               fileUrl = await import.meta.resolve(protocolPath);
-              if (debug) {
-                console.log(
-                  `[deno-resolver] onLoad 中 resolve 结果: ${protocolPath} -> ${fileUrl}`,
-                );
-              }
             } catch (resolveError) {
-              if (debug) {
-                console.log(
-                  `[deno-resolver] onLoad 中 resolve 失败:`,
-                  resolveError,
-                );
-              }
+              // 忽略 resolve 错误
             }
 
             // 步骤 4: 如果 resolve 返回 file:// URL，读取文件内容
@@ -662,22 +549,10 @@ export function createResolverPlugin(
                 // 根据文件扩展名确定 loader
                 const loader = getLoaderFromPath(filePath);
 
-                if (debug) {
-                  console.log(
-                    `[deno-resolver] 成功读取文件: ${filePath} (loader: ${loader})`,
-                  );
-                }
-
                 return {
                   contents,
                   loader,
                 };
-              } else {
-                if (debug) {
-                  console.log(
-                    `[deno-resolver] 文件不存在: ${filePath}`,
-                  );
-                }
               }
             } else if (
               fileUrl &&
@@ -687,11 +562,6 @@ export function createResolverPlugin(
               // 这种情况可能发生在 Deno 还没有完全缓存模块时
               // 注意：对于 JSR/NPM 的 HTTP URL，通常返回的是 HTML 页面，不是源代码
               // 所以这里应该尽量避免使用
-              if (debug) {
-                console.log(
-                  `[deno-resolver] resolve 返回 HTTP URL，尝试使用 fetch: ${fileUrl}`,
-                );
-              }
               try {
                 const response = await fetch(fileUrl);
                 if (response.ok) {
@@ -703,30 +573,14 @@ export function createResolverPlugin(
                   };
                 }
               } catch (fetchError) {
-                if (debug) {
-                  console.log(
-                    `[deno-resolver] fetch 失败:`,
-                    fetchError,
-                  );
-                }
+                // 忽略 fetch 错误
               }
             }
 
-            // 如果所有方法都失败，返回错误
-            if (debug) {
-              console.log(
-                `[deno-resolver] 无法获取 Deno 协议模块的文件内容: ${protocolPath}`,
-              );
-            }
-
+            // 如果所有方法都失败，返回 undefined
             return undefined;
           } catch (error) {
-            if (debug) {
-              console.log(
-                `[deno-resolver] 加载 Deno 协议模块失败: ${protocolPath}`,
-                error,
-              );
-            }
+            // 忽略错误，返回 undefined
             return undefined;
           }
         },
