@@ -159,7 +159,7 @@ export { msg, config, Button };
       imports: {
         "@/": "./src/",
         "~/": "./",
-        "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
+        "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
       },
     };
     writeTextFileSync(
@@ -226,7 +226,7 @@ export { msg, config, Button };
           imports: {
             "@/": "./src/",
             "~/": "./",
-            "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.4",
+            "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
           },
         };
         writeTextFileSync(

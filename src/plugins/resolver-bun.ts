@@ -28,6 +28,35 @@ import * as esbuild from "esbuild";
 export interface ResolverOptions {
   /** 是否启用插件（默认：true） */
   enabled?: boolean;
+  /** 浏览器模式：将 jsr: 和 npm: 依赖转换为 CDN URL（如 esm.sh） */
+  browserMode?: boolean;
+}
+
+/**
+ * 将 npm: 或 jsr: specifier 转换为浏览器可用的 URL (esm.sh)
+ * @param specifier npm: 或 jsr: specifier
+ * @returns 浏览器可用的 URL
+ */
+function convertSpecifierToBrowserUrl(specifier: string): string | null {
+  // 处理 npm: 前缀
+  if (specifier.startsWith("npm:")) {
+    const pkg = specifier.slice(4);
+    return `https://esm.sh/${pkg}`;
+  }
+
+  // 处理 jsr: 前缀
+  if (specifier.startsWith("jsr:")) {
+    // jsr:@scope/pkg -> https://esm.sh/jsr/@scope/pkg
+    const pkg = specifier.slice(4);
+    return `https://esm.sh/jsr/${pkg}`;
+  }
+
+  // 如果已经是 http/https URL，直接返回
+  if (specifier.startsWith("http:") || specifier.startsWith("https:")) {
+    return specifier;
+  }
+
+  return null;
 }
 
 /**
@@ -108,7 +137,7 @@ function findProjectTsconfig(startDir: string): string | undefined {
  *
  * @param projectPackageJsonPath - 项目的 package.json 路径
  * @param packageName - 包名（如 @dreamer/logger）
- * @returns 包的导入路径（如 jsr:@dreamer/logger@^1.0.0-beta.4），如果未找到返回 undefined
+ * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.4），如果未找到返回 undefined
  */
 function getPackageImport(
   projectPackageJsonPath: string,
@@ -262,7 +291,7 @@ function resolvePathAlias(
  * 解析 Bun 协议路径（jsr: 或 npm:）
  * Bun 原生支持这些协议，可以直接使用 import.meta.resolve
  *
- * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@^1.0.0-beta.4）
+ * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.4）
  * @returns 解析结果
  */
 async function resolveBunProtocolPath(
@@ -321,7 +350,7 @@ async function resolveBunProtocolPath(
 export function bunResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
-  const { enabled = true } = options;
+  const { enabled = true, browserMode = false } = options;
 
   return {
     name: "bun-resolver",
@@ -356,13 +385,27 @@ export function bunResolverPlugin(
       );
 
       // 2. 处理直接的 jsr: 和 npm: 协议导入
-      // 例如：import { x } from "jsr:@dreamer/logger@^1.0.0-beta.4"
+      // 例如：import { x } from "jsr:@dreamer/logger@1.0.0-beta.4"
       // 例如：import { x } from "npm:esbuild@^0.27.2"
       // 注意：Bun 原生支持这些协议，但 esbuild 可能无法直接解析，所以需要插件帮助
       build.onResolve(
         { filter: /^(jsr|npm):/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
+
+          // 浏览器模式：将依赖标记为 external，让浏览器从 CDN 加载
+          if (browserMode) {
+            const browserUrl = convertSpecifierToBrowserUrl(path);
+            if (browserUrl) {
+              // 返回 external，让 esbuild 不打包这个依赖
+              // 浏览器会在运行时从 CDN 加载
+              return {
+                path: browserUrl,
+                external: true,
+              };
+            }
+          }
+
           return await resolveBunProtocolPath(path);
         },
       );
@@ -404,10 +447,23 @@ export function bunResolverPlugin(
           }
 
           // 拼接子路径到导入路径
-          // 例如：jsr:@dreamer/logger@^1.0.0-beta.4 + /client -> jsr:@dreamer/logger@^1.0.0-beta.4/client
+          // 例如：jsr:@dreamer/logger@1.0.0-beta.4 + /client -> jsr:@dreamer/logger@1.0.0-beta.4/client
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
+
+          // 浏览器模式：将依赖标记为 external，让浏览器从 CDN 加载
+          if (browserMode) {
+            const browserUrl = convertSpecifierToBrowserUrl(fullProtocolPath);
+            if (browserUrl) {
+              // 返回 external，让 esbuild 不打包这个依赖
+              // 浏览器会在运行时从 CDN 加载
+              return {
+                path: browserUrl,
+                external: true,
+              };
+            }
+          }
 
           // 使用统一的协议路径解析函数
           return await resolveBunProtocolPath(fullProtocolPath);

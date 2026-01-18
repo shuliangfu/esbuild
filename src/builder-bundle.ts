@@ -104,10 +104,15 @@ export class BuilderBundle {
    */
   build(options: BundleOptions): Promise<BundleResult> {
     // 根据运行时环境选择打包方式
-    if (IS_BUN) {
+    // 注意：在浏览器模式下，Bun 也使用 esbuild + bunResolverPlugin
+    // 因为 bun build 无法解析 JSR 包的子路径导入（如 @dreamer/socket-io/client）
+    const isBrowserPlatform = (options.platform || "browser") === "browser";
+
+    if (IS_BUN && !isBrowserPlatform) {
+      // Bun 环境且非浏览器平台，使用 bun build（更快）
       return this.buildWithBun(options);
     } else {
-      // Deno 环境或其他环境使用 esbuild
+      // Deno 环境或浏览器模式使用 esbuild + resolver plugin
       return this.buildWithEsbuild(options);
     }
   }
@@ -124,10 +129,22 @@ export class BuilderBundle {
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
 
-    // 在 Deno 环境下自动启用 Deno 解析器插件
-    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+    // 在 Deno 或 Bun 环境下自动启用解析器插件
+    // 用于解析 deno.json/package.json 的 exports 配置（如 @dreamer/logger/client）
+    // 浏览器平台：启用浏览器模式，将 jsr: 和 npm: 依赖转换为 CDN URL
+    const isBrowserPlatform = (options.platform || "browser") === "browser";
+
     if (IS_DENO) {
-      plugins.push(denoResolverPlugin());
+      plugins.push(denoResolverPlugin({
+        browserMode: isBrowserPlatform,
+      }));
+    } else if (IS_BUN) {
+      // Bun 环境下使用 bunResolverPlugin
+      const { bunResolverPlugin } = await import("./plugins/resolver-bun.ts");
+      plugins.push(bunResolverPlugin({
+        enabled: true,
+        browserMode: isBrowserPlatform,
+      }));
     }
 
     // 添加用户自定义插件
