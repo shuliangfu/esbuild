@@ -88,6 +88,54 @@ console.log(message);`,
       expect(result.code.includes("MyBundle")).toBe(true);
     });
 
+    it("应该在使用 globalName + browser platform 时设置 window 全局变量", async () => {
+      const bundler = new BuilderBundle();
+      const result = await bundler.build({
+        entryPoint: entryFile,
+        globalName: "TestBundle",
+        platform: "browser",
+      });
+
+      expect(result.code).toBeDefined();
+      // 应该包含 window.TestBundle 的赋值
+      expect(
+        result.code.includes("window.TestBundle") ||
+          result.code.includes("window['TestBundle']"),
+      ).toBe(true);
+    });
+
+    it("应该在使用 globalName + node platform 时设置 global 全局变量", async () => {
+      const bundler = new BuilderBundle();
+      const result = await bundler.build({
+        entryPoint: entryFile,
+        globalName: "TestBundle",
+        platform: "node",
+      });
+
+      expect(result.code).toBeDefined();
+      // 应该包含 global.TestBundle 的赋值
+      expect(
+        result.code.includes("global.TestBundle") ||
+          result.code.includes("global['TestBundle']"),
+      ).toBe(true);
+    });
+
+    it("应该在使用 globalName + neutral platform 时设置 globalThis 全局变量", async () => {
+      const bundler = new BuilderBundle();
+      const result = await bundler.build({
+        entryPoint: entryFile,
+        globalName: "TestBundle",
+        platform: "neutral",
+      });
+
+      expect(result.code).toBeDefined();
+      // 应该包含 globalThis.TestBundle 的赋值
+      expect(
+        result.code.includes("globalThis.TestBundle") ||
+          result.code.includes("globalThis['TestBundle']"),
+      ).toBe(true);
+    });
+
     it("应该支持 platform: browser", async () => {
       const bundler = new BuilderBundle();
       const result = await bundler.build({

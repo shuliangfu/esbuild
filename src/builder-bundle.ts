@@ -168,7 +168,27 @@ export class BuilderBundle {
       );
     }
 
-    const code = new TextDecoder().decode(outputFile.contents);
+    let code = new TextDecoder().decode(outputFile.contents);
+
+    // 如果使用 IIFE 格式且有 globalName，esbuild 会创建 var globalName = ...
+    // 但我们需要根据 platform 将其赋值给正确的全局对象（window/global/globalThis）
+    if (format === "iife" && options.globalName) {
+      const platform = options.platform || "browser";
+      let globalVar = "";
+
+      if (platform === "browser") {
+        globalVar = "window";
+      } else if (platform === "node") {
+        globalVar = "global";
+      } else {
+        globalVar = "globalThis";
+      }
+
+      // esbuild 的 IIFE 格式已经创建了 var globalName = ...
+      // 我们需要在代码末尾添加全局对象赋值
+      code +=
+        `\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = ${options.globalName};\n}`;
+    }
 
     // 如果有多个输出文件（代码 + sourcemap），提取 sourcemap
     let map: string | undefined;
@@ -301,26 +321,36 @@ export class BuilderBundle {
 
       // 如果需要 globalName 包装（IIFE 格式）
       if (needsGlobalNameWrapper) {
-        // Bun 的 IIFE 输出通常包含 exports 对象
-        // 根据平台选择正确的全局对象
+        // Bun 的 IIFE 输出中，exports 对象名称是基于文件名的（如 exports_test_entry）
+        // 我们需要从 IIFE 中提取 exports 对象并赋值给全局变量
         const platform = options.platform || "browser";
-        let globalAssignment = "";
+        let globalVar = "";
 
         if (platform === "browser") {
-          // 浏览器环境：使用 window
-          globalAssignment =
-            `if (typeof window !== 'undefined') {\n  window.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+          globalVar = "window";
         } else if (platform === "node") {
-          // Node.js 环境：使用 global
-          globalAssignment =
-            `if (typeof global !== 'undefined') {\n  global.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+          globalVar = "global";
         } else {
-          // neutral 或其他：使用 globalThis（最通用）
-          globalAssignment =
-            `if (typeof globalThis !== 'undefined') {\n  globalThis.${options.globalName} = typeof exports !== 'undefined' ? exports : {};\n}`;
+          globalVar = "globalThis";
         }
 
-        code += `\n${globalAssignment}`;
+        // 查找 Bun IIFE 中的 exports 对象（通常是 exports_xxx 格式）
+        const exportsMatch = code.match(/var\s+(exports_\w+)\s*=/);
+        if (exportsMatch) {
+          const exportsVar = exportsMatch[1];
+          // 在 IIFE 末尾添加返回语句，然后包装整个 IIFE 并赋值给全局变量
+          // 先移除末尾的 })();
+          const iifeContent = code.replace(/\}\s*\)\s*\(\)\s*;?\s*$/, "");
+          // 添加返回语句，然后包装并赋值给全局变量
+          code =
+            `${iifeContent}\n  return ${exportsVar};\n})();\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = (function() {\n${iifeContent}\n    return ${exportsVar};\n  })();\n}`;
+        } else {
+          // 如果没有找到 exports 对象，简单包装整个 IIFE
+          code = code.replace(
+            /}\s*\)\s*\(\)\s*;?\s*$/,
+            `})();\nif (typeof ${globalVar} !== 'undefined') {\n  ${globalVar}.${options.globalName} = {};\n}`,
+          );
+        }
       } else if (format === "esm" && options.globalName) {
         // ESM 格式 + globalName：将模块导出赋值给全局变量
         // 在 ESM 中，需要通过 import 然后赋值
