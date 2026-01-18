@@ -209,7 +209,7 @@ describe("CSSInjector", () => {
         ],
       };
 
-      const result = await injectCSSFromDependencies(html, dependencies);
+      const result = injectCSSFromDependencies(html, dependencies);
 
       expect(result).toContain('href="styles/main.css"');
       expect(result).toContain('href="styles/theme.css"');
@@ -218,7 +218,7 @@ describe("CSSInjector", () => {
     it("应该处理空的依赖列表", async () => {
       const html = "<html><head></head><body></body></html>";
       const dependencies = { styles: [] };
-      const result = await injectCSSFromDependencies(html, dependencies);
+      const result = injectCSSFromDependencies(html, dependencies);
       expect(result).toBe(html);
     });
 
@@ -236,7 +236,7 @@ describe("CSSInjector", () => {
         styles: [{ path: "styles/main.css", external: false }],
       };
 
-      const result = await injectCSSFromDependencies(html, dependencies, {
+      const result = injectCSSFromDependencies(html, dependencies, {
         publicPath: "/static/",
       });
 
