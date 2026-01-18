@@ -282,6 +282,7 @@ async function resolveBunProtocolPath(
       }
 
       if (filePath && existsSync(filePath)) {
+        // 返回文件路径，esbuild 会自动从文件路径推断 resolveDir
         return {
           path: filePath,
           namespace: "file",

@@ -352,7 +352,53 @@ export function denoResolverPlugin(
         },
       );
 
-      // 3. 添加 onLoad 钩子来处理 deno-protocol namespace 的模块加载
+      // 3. 处理 deno-protocol namespace 中的相对路径导入
+      // 当文件内部有相对路径导入（如 ../encryption/encryption-manager.ts）时，
+      // 需要从文件的 resolveDir 解析这些相对路径
+      build.onResolve(
+        { filter: /^\.\.?\/.*/, namespace: "deno-protocol" },
+        async (args): Promise<esbuild.OnResolveResult | undefined> => {
+          // 相对路径导入，需要从 importer 的目录解析
+          // 但是 importer 是协议路径（如 jsr:@dreamer/socket-io@1.0.0-beta.2/client），
+          // 需要先解析为实际文件路径
+          const importer = args.importer;
+          if (!importer) {
+            return undefined;
+          }
+
+          try {
+            // 解析 importer 为实际文件路径
+            const importerUrl = await import.meta.resolve(importer);
+            if (importerUrl.startsWith("file://")) {
+              let importerPath = importerUrl.slice(7);
+              try {
+                importerPath = decodeURIComponent(importerPath);
+              } catch {
+                // 忽略解码错误
+              }
+
+              if (existsSync(importerPath)) {
+                // 从 importer 的目录解析相对路径
+                const importerDir = dirname(importerPath);
+                const resolvedPath = join(importerDir, args.path);
+
+                if (existsSync(resolvedPath)) {
+                  return {
+                    path: resolvedPath,
+                    namespace: "file",
+                  };
+                }
+              }
+            }
+          } catch {
+            // 忽略错误
+          }
+
+          return undefined;
+        },
+      );
+
+      // 4. 添加 onLoad 钩子来处理 deno-protocol namespace 的模块加载
       // 统一处理 jsr: 和 npm: 协议的模块加载
       build.onLoad(
         { filter: /.*/, namespace: "deno-protocol" },
@@ -392,9 +438,13 @@ export function denoResolverPlugin(
                 // 根据文件扩展名确定 loader
                 const loader = getLoaderFromPath(filePath);
 
+                // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
+                const resolveDir = dirname(filePath);
+
                 return {
                   contents,
                   loader,
+                  resolveDir,
                 };
               }
             } else if (
