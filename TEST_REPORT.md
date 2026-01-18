@@ -15,11 +15,11 @@
 
 ### 总体统计
 
-- **总测试数**: 407
-- **通过**: 407 ✅
+- **总测试数**: 431
+- **通过**: 431 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~2分58秒（Deno 环境）
+- **测试执行时间**: ~26秒（Deno 环境）
 
 ### 测试文件统计
 
@@ -30,6 +30,7 @@
 | `build-analyzer-internal.test.ts` | 9 | ✅ 全部通过 | 构建分析器内部方法测试 |
 | `build-analyzer.test.ts` | 17 | ✅ 全部通过 | 构建分析器功能测试 |
 | `builder-build-validation.test.ts` | 6 | ✅ 全部通过 | 构建产物验证测试 |
+| `builder-bundle.test.ts` | 24 | ✅ 全部通过 | 简单打包器功能测试 |
 | `builder-config-validation.test.ts` | 9 | ✅ 全部通过 | 构建配置验证测试 |
 | `builder-error-handling.test.ts` | 6 | ✅ 全部通过 | 构建错误处理测试 |
 | `builder-internal-methods.test.ts` | 11 | ✅ 全部通过 | 构建器内部方法测试 |
@@ -41,9 +42,9 @@
 | `cache-manager-cleanup.test.ts` | 8 | ✅ 全部通过 | 缓存清理功能测试 |
 | `cache-manager.test.ts` | 16 | ✅ 全部通过 | 缓存管理器基础功能测试 |
 | `cli.test.ts` | 10 | ✅ 全部通过 | CLI 工具测试 |
-| `client-builder-advanced.test.ts` | 14 | ✅ 全部通过 | 客户端构建器高级功能测试 |
-| `client-builder-context.test.ts` | 8 | ✅ 全部通过 | 客户端构建上下文测试 |
-| `client-builder.test.ts` | 27 | ✅ 全部通过 | 客户端构建器功能测试 |
+| `builder-client-advanced.test.ts` | 14 | ✅ 全部通过 | 客户端构建器高级功能测试 |
+| `builder-client-context.test.ts` | 8 | ✅ 全部通过 | 客户端构建上下文测试 |
+| `builder-client.test.ts` | 27 | ✅ 全部通过 | 客户端构建器功能测试 |
 | `client-server-separation.test.ts` | 14 | ✅ 全部通过 | 客户端服务端代码分离测试 |
 | `css-import-handler.test.ts` | 16 | ✅ 全部通过 | CSS 导入处理插件测试 |
 | `css-injector.test.ts` | 28 | ✅ 全部通过 | CSS 注入工具测试 |
@@ -57,8 +58,8 @@
 | `integration.test.ts` | 8 | ✅ 全部通过 | 集成测试 |
 | `plugin-advanced.test.ts` | 5 | ✅ 全部通过 | 插件管理器高级功能测试 |
 | `plugin.test.ts` | 14 | ✅ 全部通过 | 插件管理器基础功能测试 |
-| `server-builder-advanced.test.ts` | 8 | ✅ 全部通过 | 服务端构建器高级功能测试 |
-| `server-builder.test.ts` | 16 | ✅ 全部通过 | 服务端构建器功能测试 |
+| `builder-server-advanced.test.ts` | 8 | ✅ 全部通过 | 服务端构建器高级功能测试 |
+| `builder-server.test.ts` | 16 | ✅ 全部通过 | 服务端构建器功能测试 |
 | `server-module-detector.test.ts` | 24 | ✅ 全部通过 | 服务端模块检测插件测试 |
 
 ## 功能测试详情
@@ -140,7 +141,35 @@
 
 **测试结果**: 6 个测试全部通过
 
-### 6. 构建配置验证 (builder-config-validation.test.ts) - 9 个测试
+### 6. 简单打包器 (builder-bundle.test.ts) - 24 个测试
+
+**测试场景**:
+- ✅ 应该能够实例化 BuilderBundle
+- ✅ 应该能够打包简单的 TypeScript 文件
+- ✅ 应该默认使用 IIFE 格式
+- ✅ 应该支持设置 globalName
+- ✅ 应该支持 platform: browser
+- ✅ 应该支持 platform: node
+- ✅ 应该支持 platform: neutral
+- ✅ 应该支持 format: esm
+- ✅ 应该支持 format: cjs
+- ✅ 应该支持 minify 压缩
+- ✅ 应该支持 target 设置
+- ✅ 应该支持 target 数组
+- ✅ 应该支持 external 排除依赖
+- ✅ 应该支持 define 替换
+- ✅ 应该支持 bundle: false 不打包依赖
+- ✅ buildBundle 函数应该能够打包简单的 TypeScript 文件
+- ✅ buildBundle 函数应该支持所有选项
+- ✅ buildBundle 函数应该与 BuilderBundle 类返回相同结果
+- ✅ 应该在入口文件不存在时抛出错误
+- ✅ 应该在语法错误时抛出错误
+- ✅ browser 平台应该正确处理浏览器 API
+- ✅ node 平台应该正确处理 Node API
+
+**测试结果**: 24 个测试全部通过
+
+### 7. 构建配置验证 (builder-config-validation.test.ts) - 9 个测试
 
 **测试场景**:
 - ✅ 应该验证服务端配置缺少入口文件
@@ -153,7 +182,7 @@
 
 **测试结果**: 9 个测试全部通过
 
-### 7. 构建错误处理 (builder-error-handling.test.ts) - 6 个测试
+### 8. 构建错误处理 (builder-error-handling.test.ts) - 6 个测试
 
 **测试场景**:
 - ✅ 应该获取错误统计信息
@@ -163,7 +192,7 @@
 
 **测试结果**: 6 个测试全部通过
 
-### 8. 构建器内部方法 (builder-internal-methods.test.ts) - 11 个测试
+### 9. 构建器内部方法 (builder-internal-methods.test.ts) - 11 个测试
 
 **测试场景**:
 - ✅ 应该生成性能报告
@@ -178,7 +207,7 @@
 
 **测试结果**: 11 个测试全部通过
 
-### 9. 多入口构建 (builder-multi-entry.test.ts) - 5 个测试
+### 10. 多入口构建 (builder-multi-entry.test.ts) - 5 个测试
 
 **测试场景**:
 - ✅ 应该支持多入口配置
@@ -187,7 +216,7 @@
 
 **测试结果**: 5 个测试全部通过
 
-### 10. 构建性能监控 (builder-performance.test.ts) - 7 个测试
+### 11. 构建性能监控 (builder-performance.test.ts) - 7 个测试
 
 **测试场景**:
 - ✅ 应该记录构建性能
@@ -198,7 +227,7 @@
 
 **测试结果**: 7 个测试全部通过
 
-### 11. Watch 模式 (builder-watch.test.ts) - 9 个测试
+### 12. Watch 模式 (builder-watch.test.ts) - 9 个测试
 
 **测试场景**:
 - ✅ 应该启动 Watch 模式
@@ -211,7 +240,7 @@
 
 **测试结果**: 9 个测试全部通过
 
-### 12. 构建器 (builder.test.ts) - 17 个测试
+### 13. 构建器 (builder.test.ts) - 17 个测试
 
 **测试场景**:
 - ✅ 应该创建构建器实例
@@ -232,7 +261,7 @@
 
 **测试结果**: 17 个测试全部通过
 
-### 13. 缓存管理器高级功能 (cache-manager-advanced.test.ts) - 5 个测试
+### 14. 缓存管理器高级功能 (cache-manager-advanced.test.ts) - 5 个测试
 
 **测试场景**:
 - ✅ 应该支持大文件压缩
@@ -241,7 +270,7 @@
 
 **测试结果**: 5 个测试全部通过
 
-### 14. 缓存清理功能 (cache-manager-cleanup.test.ts) - 8 个测试
+### 15. 缓存清理功能 (cache-manager-cleanup.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该删除指定的缓存
@@ -253,7 +282,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 15. 缓存管理器 (cache-manager.test.ts) - 16 个测试
+### 16. 缓存管理器 (cache-manager.test.ts) - 16 个测试
 
 **测试场景**:
 - ✅ 应该创建缓存管理器实例（启用缓存）
@@ -273,7 +302,7 @@
 
 **测试结果**: 16 个测试全部通过
 
-### 16. CLI 工具 (cli.test.ts) - 10 个测试
+### 17. CLI 工具 (cli.test.ts) - 10 个测试
 
 **测试场景**:
 - ✅ 应该查找 esbuild.config.json
@@ -287,7 +316,7 @@
 
 **测试结果**: 10 个测试全部通过
 
-### 17. 客户端构建器高级功能 (client-builder-advanced.test.ts) - 14 个测试
+### 18. 客户端构建器高级功能 (builder-client-advanced.test.ts) - 14 个测试
 
 **测试场景**:
 - ✅ 应该支持按路由分割
@@ -305,7 +334,7 @@
 
 **测试结果**: 14 个测试全部通过
 
-### 18. 客户端构建上下文 (client-builder-context.test.ts) - 8 个测试
+### 19. 客户端构建上下文 (builder-client-context.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该创建构建上下文
@@ -317,7 +346,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 19. 客户端构建器 (client-builder.test.ts) - 27 个测试
+### 20. 客户端构建器 (builder-client.test.ts) - 27 个测试
 
 **测试场景**:
 - ✅ 应该创建客户端构建器实例
@@ -353,7 +382,7 @@
 - ✅ 支持 `mode` 参数控制构建模式（dev/prod）
 - ✅ 内存模式返回编译后的代码内容
 
-### 20. 客户端服务端代码分离 (client-server-separation.test.ts) - 14 个测试
+### 21. 客户端服务端代码分离 (client-server-separation.test.ts) - 14 个测试
 
 **测试场景**:
 - ✅ 应该在构建时自动排除 Node.js 内置模块
@@ -371,7 +400,7 @@
 
 **测试结果**: 14 个测试全部通过
 
-### 21. CSS 导入处理插件 (css-import-handler.test.ts) - 16 个测试
+### 22. CSS 导入处理插件 (css-import-handler.test.ts) - 16 个测试
 
 **测试场景**:
 - ✅ 应该创建 CSS 导入处理插件
@@ -391,7 +420,7 @@
 
 **测试结果**: 16 个测试全部通过
 
-### 22. CSS 注入工具 (css-injector.test.ts) - 28 个测试
+### 23. CSS 注入工具 (css-injector.test.ts) - 28 个测试
 
 **测试场景**:
 - ✅ 应该生成基本的 CSS 标签
@@ -424,7 +453,7 @@
 
 **测试结果**: 28 个测试全部通过
 
-### 23. CSS 集成测试 (css-integration.test.ts) - 10 个测试
+### 24. CSS 集成测试 (css-integration.test.ts) - 10 个测试
 
 **测试场景**:
 - ✅ 应该能够创建 CSS 插件
@@ -438,7 +467,7 @@
 
 **测试结果**: 10 个测试全部通过
 
-### 24. CSS 优化器高级功能 (css-optimizer-advanced.test.ts) - 7 个测试
+### 25. CSS 优化器高级功能 (css-optimizer-advanced.test.ts) - 7 个测试
 
 **测试场景**:
 - ✅ 应该使用 PostCSS 处理 CSS
@@ -449,7 +478,7 @@
 
 **测试结果**: 7 个测试全部通过
 
-### 25. CSS 优化器 (css-optimizer.test.ts) - 11 个测试
+### 26. CSS 优化器 (css-optimizer.test.ts) - 11 个测试
 
 **测试场景**:
 - ✅ 应该创建 CSS 优化器实例
@@ -464,7 +493,7 @@
 
 **测试结果**: 11 个测试全部通过
 
-### 26. 边界情况和异常场景 (edge-cases.test.ts) - 11 个测试
+### 27. 边界情况和异常场景 (edge-cases.test.ts) - 11 个测试
 
 **测试场景**:
 - ✅ 应该处理完全空的配置
@@ -479,7 +508,7 @@
 
 **测试结果**: 11 个测试全部通过
 
-### 27. HTML 生成器高级功能 (html-generator-advanced.test.ts) - 8 个测试
+### 28. HTML 生成器高级功能 (html-generator-advanced.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该支持 immediate 预加载策略
@@ -491,7 +520,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 28. HTML 生成器内部方法 (html-generator-internal.test.ts) - 8 个测试
+### 29. HTML 生成器内部方法 (html-generator-internal.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该生成正确的相对路径
@@ -503,7 +532,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 29. HTML 生成器 (html-generator.test.ts) - 14 个测试
+### 30. HTML 生成器 (html-generator.test.ts) - 14 个测试
 
 **测试场景**:
 - ✅ 应该创建 HTML 生成器实例
@@ -521,19 +550,19 @@
 
 **测试结果**: 14 个测试全部通过
 
-### 30. 集成测试 (integration.test.ts) - 8 个测试
+### 31. 集成测试 (integration.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该完成完整的客户端构建流程
 - ✅ 应该完成包含缓存的构建流程
-- ✅ 应该协同使用 Builder、ClientBuilder、HTMLGenerator
+- ✅ 应该协同使用 Builder、BuilderClient、HTMLGenerator
 - ✅ 应该协同使用 Builder、CacheManager、BuildAnalyzer
 - ✅ 应该在构建失败后能够恢复
 - ✅ 应该处理静态资源
 
 **测试结果**: 8 个测试全部通过
 
-### 31. 插件管理器高级功能 (plugin-advanced.test.ts) - 5 个测试
+### 32. 插件管理器高级功能 (plugin-advanced.test.ts) - 5 个测试
 
 **测试场景**:
 - ✅ 应该转换为 esbuild 插件
@@ -543,7 +572,7 @@
 
 **测试结果**: 5 个测试全部通过
 
-### 32. 插件管理器 (plugin.test.ts) - 14 个测试
+### 33. 插件管理器 (plugin.test.ts) - 14 个测试
 
 **测试场景**:
 - ✅ 应该创建插件管理器实例
@@ -562,7 +591,7 @@
 
 **测试结果**: 14 个测试全部通过
 
-### 33. 服务端构建器高级功能 (server-builder-advanced.test.ts) - 8 个测试
+### 34. 服务端构建器高级功能 (builder-server-advanced.test.ts) - 8 个测试
 
 **测试场景**:
 - ✅ 应该支持 Linux 平台编译
@@ -574,7 +603,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 34. 服务端构建器 (server-builder.test.ts) - 16 个测试
+### 35. 服务端构建器 (builder-server.test.ts) - 16 个测试
 
 **测试场景**:
 - ✅ 应该创建服务端构建器实例
@@ -599,7 +628,7 @@
 - ✅ 支持 `mode` 参数控制构建模式（dev/prod）
 - ✅ 内存模式返回编译后的代码内容
 
-### 35. 服务端模块检测插件 (server-module-detector.test.ts) - 24 个测试
+### 36. 服务端模块检测插件 (server-module-detector.test.ts) - 24 个测试
 
 **测试场景**:
 - ✅ 应该创建服务端模块检测插件
@@ -639,11 +668,12 @@
 | `Builder` | `clean()` | 清理构建产物 | ✅ 2个测试 |
 | `Builder` | `watch()` | 启动 Watch 模式 | ✅ 9个测试 |
 | `Builder` | `stopWatch()` | 停止 Watch 模式 | ✅ 2个测试 |
-| `ClientBuilder` | `build()` | 构建客户端代码 | ✅ 27个测试 |
-| `ClientBuilder` | `createContext()` | 创建增量构建上下文 | ✅ 8个测试 |
-| `ClientBuilder` | `rebuild()` | 增量重新构建 | ✅ 4个测试 |
-| `ClientBuilder` | `dispose()` | 清理构建上下文 | ✅ 3个测试 |
-| `ServerBuilder` | `build()` | 构建服务端代码 | ✅ 16个测试 |
+| `BuilderBundle` | `build()` | 简单打包 | ✅ 24个测试 |
+| `BuilderClient` | `build()` | 构建客户端代码 | ✅ 27个测试 |
+| `BuilderClient` | `createContext()` | 创建增量构建上下文 | ✅ 8个测试 |
+| `BuilderClient` | `rebuild()` | 增量重新构建 | ✅ 4个测试 |
+| `BuilderClient` | `dispose()` | 清理构建上下文 | ✅ 3个测试 |
+| `BuilderServer` | `build()` | 构建服务端代码 | ✅ 16个测试 |
 | `CacheManager` | `get()` | 获取缓存 | ✅ 5个测试 |
 | `CacheManager` | `set()` | 设置缓存 | ✅ 5个测试 |
 | `CacheManager` | `clear()` | 清除缓存 | ✅ 4个测试 |
@@ -685,14 +715,18 @@
 
 | 功能 | 说明 | 测试覆盖 |
 |------|------|----------|
-| `ClientBuilder.build({ write: false })` | 内存模式，返回编译代码 | ✅ 4个测试 |
-| `ClientBuilder.build({ mode: "dev" })` | 开发模式构建 | ✅ 3个测试 |
-| `ClientBuilder.build({ mode: "prod" })` | 生产模式构建 | ✅ 3个测试 |
-| `ClientBuilder.createContext(mode)` | 增量构建上下文模式 | ✅ 2个测试 |
-| `ServerBuilder.build({ write: false })` | 内存模式，返回编译代码 | ✅ 1个测试 |
-| `ServerBuilder.build({ mode: "dev" })` | 开发模式构建 | ✅ 1个测试 |
-| `ServerBuilder.build({ mode: "prod" })` | 生产模式构建 | ✅ 1个测试 |
-| `ServerBuilder.build("prod")` | 字符串模式参数 | ✅ 1个测试 |
+| `BuilderBundle.build({ platform: "browser" })` | 浏览器平台打包 | ✅ 4个测试 |
+| `BuilderBundle.build({ platform: "node" })` | Node平台打包 | ✅ 2个测试 |
+| `BuilderBundle.build({ format: "esm" })` | ESM格式打包 | ✅ 2个测试 |
+| `BuilderBundle.build({ minify: true })` | 压缩打包 | ✅ 2个测试 |
+| `BuilderClient.build({ write: false })` | 内存模式，返回编译代码 | ✅ 4个测试 |
+| `BuilderClient.build({ mode: "dev" })` | 开发模式构建 | ✅ 3个测试 |
+| `BuilderClient.build({ mode: "prod" })` | 生产模式构建 | ✅ 3个测试 |
+| `BuilderClient.createContext(mode)` | 增量构建上下文模式 | ✅ 2个测试 |
+| `BuilderServer.build({ write: false })` | 内存模式，返回编译代码 | ✅ 1个测试 |
+| `BuilderServer.build({ mode: "dev" })` | 开发模式构建 | ✅ 1个测试 |
+| `BuilderServer.build({ mode: "prod" })` | 生产模式构建 | ✅ 1个测试 |
+| `BuilderServer.build("prod")` | 字符串模式参数 | ✅ 1个测试 |
 
 ## 优点
 

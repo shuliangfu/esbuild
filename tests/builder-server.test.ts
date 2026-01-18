@@ -4,11 +4,11 @@
 
 import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { assertRejects, describe, expect, it } from "@dreamer/test";
-import { ServerBuilder } from "../src/server-builder.ts";
+import { BuilderServer } from "../src/builder-server.ts";
 import type { ServerConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
-describe("ServerBuilder", () => {
+describe("BuilderServer", () => {
   let entryFile: string;
   let outputDir: string;
   let testDataDir: string;
@@ -37,7 +37,7 @@ describe("ServerBuilder", () => {
         entry: entryFile,
         output: outputDir,
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
       expect(builder).toBeTruthy();
     });
   });
@@ -49,7 +49,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "deno",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       // 注意：实际构建可能需要 Deno 或 Bun 运行时
       // 这里主要测试接口是否正确
@@ -71,7 +71,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "bun",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       expect(builder).toBeTruthy();
     });
@@ -87,7 +87,7 @@ describe("ServerBuilder", () => {
           platform: ["linux", "darwin"],
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       expect(builder).toBeTruthy();
     });
@@ -101,7 +101,7 @@ describe("ServerBuilder", () => {
           standalone: true,
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       expect(builder).toBeTruthy();
     });
@@ -114,7 +114,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "deno",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 使用字符串模式参数
@@ -133,7 +133,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "deno",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 使用对象形式的构建选项
@@ -153,7 +153,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "deno",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 使用 write: false，应该返回代码内容
@@ -178,7 +178,7 @@ describe("ServerBuilder", () => {
         target: "deno",
         // 不显式设置 minify，应该根据 mode 自动设置
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 生产模式应该启用 minify
@@ -197,7 +197,7 @@ describe("ServerBuilder", () => {
         target: "deno",
         // 不显式设置 minify，应该根据 mode 自动设置
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 开发模式应该禁用 minify
@@ -219,7 +219,7 @@ describe("ServerBuilder", () => {
           minify: false,
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         // 即使是生产模式，也应该禁用 minify
@@ -238,7 +238,7 @@ describe("ServerBuilder", () => {
         entry: join(testDataDir, "non-existent.ts"),
         output: outputDir,
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       await assertRejects(
         async () => await builder.build(),
@@ -252,7 +252,7 @@ describe("ServerBuilder", () => {
         output: outputDir,
         target: "node" as any, // 不支持的运行时
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       await assertRejects(
         async () => await builder.build(),
@@ -268,7 +268,7 @@ describe("ServerBuilder", () => {
         entry: emptyFile,
         output: outputDir,
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       // 应该能够构建（虽然可能没有输出）
       try {

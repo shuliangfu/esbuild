@@ -4,7 +4,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-407%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-431%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -163,9 +163,9 @@ await builder.build();
 使用 `write: false` 参数，可以直接获取编译后的代码而不写入文件，适用于服务端渲染等场景。
 
 ```typescript
-import { ClientBuilder } from "@dreamer/esbuild";
+import { BuilderClient } from "@dreamer/esbuild";
 
-const builder = new ClientBuilder({
+const builder = new BuilderClient({
   entry: "./src/client/mod.ts",
   output: "./dist",
   engine: "react",
@@ -182,9 +182,9 @@ console.log(code);
 ### 示例 2：服务端构建（内存模式）
 
 ```typescript
-import { ServerBuilder } from "@dreamer/esbuild";
+import { BuilderServer } from "@dreamer/esbuild";
 
-const builder = new ServerBuilder({
+const builder = new BuilderServer({
   entry: "./src/server.ts",
   output: "./dist/server",
   target: "deno",
@@ -257,9 +257,9 @@ await analyzer.generateHTMLReport(analysis, "./dist/build-report.html");
 ### 示例 5：使用插件
 
 ```typescript
-import { ClientBuilder, createServerModuleDetectorPlugin } from "@dreamer/esbuild";
+import { BuilderClient, createServerModuleDetectorPlugin } from "@dreamer/esbuild";
 
-const builder = new ClientBuilder({
+const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
   output: "./dist/client",
   engine: "react",
@@ -299,20 +299,20 @@ const builder = createBuilder(config);
 | `watch(options?)` | 启动 Watch 模式 |
 | `stopWatch()` | 停止 Watch 模式 |
 
-### ClientBuilder
+### BuilderClient
 
 客户端构建器，用于打包客户端代码。
 
 ```typescript
-import { ClientBuilder } from "@dreamer/esbuild";
+import { BuilderClient } from "@dreamer/esbuild";
 
-const builder = new ClientBuilder(config);
+const builder = new BuilderClient(config);
 ```
 
 #### 构造函数
 
 ```typescript
-new ClientBuilder(config: ClientConfig)
+new BuilderClient(config: ClientConfig)
 ```
 
 #### 方法
@@ -338,20 +338,20 @@ interface ClientBuildOptions {
 }
 ```
 
-### ServerBuilder
+### BuilderServer
 
 服务端构建器，用于编译服务端代码。
 
 ```typescript
-import { ServerBuilder } from "@dreamer/esbuild";
+import { BuilderServer } from "@dreamer/esbuild";
 
-const builder = new ServerBuilder(config);
+const builder = new BuilderServer(config);
 ```
 
 #### 构造函数
 
 ```typescript
-new ServerBuilder(config: ServerConfig)
+new BuilderServer(config: ServerConfig)
 ```
 
 #### 方法
@@ -369,6 +369,72 @@ interface ServerBuildOptions {
   mode?: "dev" | "prod";
   /** 是否写入文件（默认：true），设为 false 返回编译代码 */
   write?: boolean;
+}
+```
+
+### BuilderBundle
+
+简单打包器，用于快速将代码打包为浏览器可用格式。适用于浏览器测试、服务端渲染等场景。
+
+```typescript
+import { BuilderBundle, buildBundle } from "@dreamer/esbuild";
+
+// 使用类
+const bundler = new BuilderBundle();
+const result = await bundler.build({
+  entryPoint: "./src/client/mod.ts",
+  globalName: "MyClient",
+});
+
+// 使用函数
+const result = await buildBundle({
+  entryPoint: "./src/client/mod.ts",
+  format: "esm",
+  minify: true,
+});
+```
+
+#### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `build(options)` | 打包代码，返回打包结果 |
+
+#### BundleOptions
+
+```typescript
+interface BundleOptions {
+  /** 入口文件路径 */
+  entryPoint: string;
+  /** 全局变量名（IIFE 格式时使用） */
+  globalName?: string;
+  /** 目标平台（默认：browser） */
+  platform?: "browser" | "node" | "neutral";
+  /** 目标 ES 版本（默认：es2020） */
+  target?: string | string[];
+  /** 是否压缩（默认：false） */
+  minify?: boolean;
+  /** 输出格式（默认：iife） */
+  format?: "iife" | "esm" | "cjs";
+  /** 是否生成 sourcemap（默认：false） */
+  sourcemap?: boolean;
+  /** 外部依赖（不打包） */
+  external?: string[];
+  /** 定义替换 */
+  define?: Record<string, string>;
+  /** 是否打包依赖（默认：true） */
+  bundle?: boolean;
+}
+```
+
+#### BundleResult
+
+```typescript
+interface BundleResult {
+  /** 打包后的代码 */
+  code: string;
+  /** Source Map（如果启用） */
+  map?: string;
 }
 ```
 
@@ -405,7 +471,7 @@ interface OutputFileContent {
 ### 代码分割策略
 
 ```typescript
-const builder = new ClientBuilder({
+const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
   output: "./dist/client",
   engine: "react",
@@ -423,7 +489,7 @@ const builder = new ClientBuilder({
 ### Source Map 配置
 
 ```typescript
-const builder = new ClientBuilder({
+const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
   output: "./dist/client",
   engine: "react",
@@ -456,23 +522,24 @@ const builder = createBuilder({
 本库经过全面测试，所有 407 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
-- **总测试数**: 407
-- **通过**: 407 ✅
+- **总测试数**: 431
+- **通过**: 431 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~3分钟
+- **测试执行时间**: ~26秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理
 - **测试环境**: Deno 2.x
 
 **测试类型**：
-- ✅ 单元测试（约 350 个）
+- ✅ 单元测试（约 370 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 27 个）
+- ✅ 边界情况和错误处理测试（约 31 个）
 
 **测试亮点**：
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
 - ✅ 新增内存模式（write: false）功能完整测试
+- ✅ 新增 BuilderBundle 简单打包器完整测试（24 个）
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 

@@ -4,11 +4,11 @@
 
 import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
-import { ClientBuilder } from "../src/client-builder.ts";
+import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
-describe("ClientBuilder 高级功能", () => {
+describe("BuilderClient 高级功能", () => {
   let entryFile: string;
   let outputDir: string;
   let testDataDir: string;
@@ -44,7 +44,7 @@ describe("ClientBuilder 高级功能", () => {
           },
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -64,7 +64,7 @@ describe("ClientBuilder 高级功能", () => {
           },
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -83,7 +83,7 @@ describe("ClientBuilder 高级功能", () => {
           },
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -102,7 +102,7 @@ describe("ClientBuilder 高级功能", () => {
           },
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -121,7 +121,7 @@ describe("ClientBuilder 高级功能", () => {
           mode: "inline",
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -138,7 +138,7 @@ describe("ClientBuilder 高级功能", () => {
           mode: "external",
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -155,7 +155,7 @@ describe("ClientBuilder 高级功能", () => {
           mode: "both",
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -165,13 +165,13 @@ describe("ClientBuilder 高级功能", () => {
 
   describe("多入口构建", () => {
     it("应该支持单入口构建（多入口需要通过 Builder）", async () => {
-      // 注意：ClientBuilder 只支持单入口，多入口需要通过 Builder 处理
+      // 注意：BuilderClient 只支持单入口，多入口需要通过 Builder 处理
       const config: ClientConfig = {
         entry: entryFile,
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -190,7 +190,7 @@ describe("ClientBuilder 高级功能", () => {
           external: ["react", "react-dom", "react-router"],
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -208,7 +208,7 @@ describe("ClientBuilder 高级功能", () => {
           format: "esm",
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -225,7 +225,7 @@ describe("ClientBuilder 高级功能", () => {
           splitting: false, // CJS 格式不支持代码分割
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -242,7 +242,7 @@ describe("ClientBuilder 高级功能", () => {
           splitting: false, // IIFE 格式不支持代码分割
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 

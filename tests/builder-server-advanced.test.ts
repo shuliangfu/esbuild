@@ -4,11 +4,11 @@
 
 import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
-import { ServerBuilder } from "../src/server-builder.ts";
+import { BuilderServer } from "../src/builder-server.ts";
 import type { ServerConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
-describe("ServerBuilder 高级功能", () => {
+describe("BuilderServer 高级功能", () => {
   let entryFile: string;
   let outputDir: string;
   let testDataDir: string;
@@ -41,7 +41,7 @@ describe("ServerBuilder 高级功能", () => {
           platform: ["linux"],
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         const result = await builder.build();
@@ -61,7 +61,7 @@ describe("ServerBuilder 高级功能", () => {
           platform: ["darwin"],
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         const result = await builder.build();
@@ -81,7 +81,7 @@ describe("ServerBuilder 高级功能", () => {
           platform: ["windows"],
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         const result = await builder.build();
@@ -101,7 +101,7 @@ describe("ServerBuilder 高级功能", () => {
           platform: ["linux", "darwin"],
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         const result = await builder.build();
@@ -123,7 +123,7 @@ describe("ServerBuilder 高级功能", () => {
           standalone: true,
         },
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       try {
         const result = await builder.build();
@@ -142,7 +142,7 @@ describe("ServerBuilder 高级功能", () => {
         output: outputDir,
         target: "deno",
       };
-      const builder = new ServerBuilder(config);
+      const builder = new BuilderServer(config);
 
       const retrievedConfig = builder.getConfig();
 

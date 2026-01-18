@@ -101,7 +101,7 @@ describe("集成测试", () => {
   });
 
   describe("多模块协同", () => {
-    it("应该协同使用 Builder、ClientBuilder、HTMLGenerator", async () => {
+    it("应该协同使用 Builder、BuilderClient、HTMLGenerator", async () => {
       const config: BuilderConfig = {
         client: {
           entry: entryFile,

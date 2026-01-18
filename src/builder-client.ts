@@ -1,5 +1,5 @@
 /**
- * @module @dreamer/esbuild/client-builder
+ * @module @dreamer/esbuild/builder-client
  *
  * 客户端构建器
  *
@@ -37,7 +37,7 @@ export interface ClientBuildOptions {
 /**
  * 客户端构建器类
  */
-export class ClientBuilder {
+export class BuilderClient {
   private config: ClientConfig;
   private buildContext?: esbuild.BuildContext;
   private pluginManager: PluginManager;

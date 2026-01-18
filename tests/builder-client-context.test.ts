@@ -4,11 +4,11 @@
 
 import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
-import { ClientBuilder } from "../src/client-builder.ts";
+import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
-describe("ClientBuilder 上下文和资源管理", () => {
+describe("BuilderClient 上下文和资源管理", () => {
   let entryFile: string;
   let outputDir: string;
   let testDataDir: string;
@@ -38,7 +38,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const context = await builder.createContext("dev");
 
@@ -51,7 +51,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 创建上下文
       await builder.createContext("dev");
@@ -69,7 +69,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 创建上下文
       await builder.createContext("dev");
@@ -90,7 +90,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 创建上下文
       await builder.createContext("dev");
@@ -110,7 +110,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 直接释放（未创建上下文）
       await builder.dispose();
@@ -126,7 +126,7 @@ describe("ClientBuilder 上下文和资源管理", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 1. 创建上下文
       await builder.createContext("dev");

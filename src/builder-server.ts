@@ -1,5 +1,5 @@
 /**
- * @module @dreamer/esbuild/server-builder
+ * @module @dreamer/esbuild/builder-server
  *
  * 服务端构建器
  *
@@ -46,7 +46,7 @@ export interface ServerBuildOptions {
 /**
  * 服务端构建器类
  */
-export class ServerBuilder {
+export class BuilderServer {
   private config: ServerConfig;
 
   constructor(config: ServerConfig) {

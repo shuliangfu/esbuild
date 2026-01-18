@@ -20,10 +20,10 @@ import {
 import { AssetsProcessor } from "./assets-processor.ts";
 import { BuildAnalyzer } from "./build-analyzer.ts";
 import { CacheManager } from "./cache-manager.ts";
-import { ClientBuilder } from "./client-builder.ts";
+import { BuilderClient } from "./builder-client.ts";
 import { CSSOptimizer } from "./css-optimizer.ts";
 import { HTMLGenerator } from "./html-generator.ts";
-import { ServerBuilder } from "./server-builder.ts";
+import { BuilderServer } from "./builder-server.ts";
 import type {
   Builder as IBuilder,
   BuilderConfig,
@@ -43,8 +43,8 @@ import { logger } from "./utils/logger.ts";
  */
 export class Builder implements IBuilder {
   private config: BuilderConfig;
-  private clientBuilder?: ClientBuilder;
-  private serverBuilder?: ServerBuilder;
+  private clientBuilder?: BuilderClient;
+  private serverBuilder?: BuilderServer;
   private cacheManager?: CacheManager;
   private buildAnalyzer: BuildAnalyzer;
   private watcher?: FileWatcher;
@@ -85,12 +85,12 @@ export class Builder implements IBuilder {
 
     // 初始化客户端构建器
     if (config.client) {
-      this.clientBuilder = new ClientBuilder(config.client);
+      this.clientBuilder = new BuilderClient(config.client);
     }
 
     // 初始化服务端构建器
     if (config.server) {
-      this.serverBuilder = new ServerBuilder(config.server);
+      this.serverBuilder = new BuilderServer(config.server);
     }
   }
 
@@ -1201,7 +1201,7 @@ export class Builder implements IBuilder {
         output: outputDir,
       };
 
-      const entryBuilder = new ClientBuilder(entryClientConfig);
+      const entryBuilder = new BuilderClient(entryClientConfig);
       return {
         name,
         result: await entryBuilder.build(mode),

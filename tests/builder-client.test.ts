@@ -4,11 +4,11 @@
 
 import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { assertRejects, describe, expect, it } from "@dreamer/test";
-import { ClientBuilder } from "../src/client-builder.ts";
+import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
-describe("ClientBuilder", () => {
+describe("BuilderClient", () => {
   let entryFile: string;
   let outputDir: string;
   let testDataDir: string;
@@ -38,7 +38,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
       expect(builder).toBeTruthy();
     });
 
@@ -49,7 +49,7 @@ describe("ClientBuilder", () => {
       };
 
       // 注意：实际错误可能在 build 时抛出
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
       expect(builder).toBeTruthy();
     });
   });
@@ -65,7 +65,7 @@ describe("ClientBuilder", () => {
           sourcemap: false,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -83,7 +83,7 @@ describe("ClientBuilder", () => {
           minify: true,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("prod");
 
@@ -100,7 +100,7 @@ describe("ClientBuilder", () => {
           sourcemap: true,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -122,7 +122,7 @@ describe("ClientBuilder", () => {
           splitting: true,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -139,7 +139,7 @@ describe("ClientBuilder", () => {
           external: ["react", "react-dom"],
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build("dev");
 
@@ -154,7 +154,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const context = await builder.createContext("dev");
 
@@ -167,7 +167,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       await builder.createContext("dev");
       const result = await builder.rebuild();
@@ -182,7 +182,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       await assertRejects(
         async () => await builder.rebuild(),
@@ -196,7 +196,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       await builder.createContext("dev");
       await builder.dispose();
@@ -213,7 +213,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const plugin = {
         name: "test-plugin",
@@ -230,7 +230,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const pluginManager = builder.getPluginManager();
 
@@ -245,7 +245,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const retrievedConfig = builder.getConfig();
 
@@ -264,7 +264,7 @@ describe("ClientBuilder", () => {
           sourcemap: false,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "dev", write: false });
 
@@ -288,7 +288,7 @@ describe("ClientBuilder", () => {
           sourcemap: false,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "dev", write: true });
 
@@ -307,7 +307,7 @@ describe("ClientBuilder", () => {
           minify: true,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "prod", write: false });
 
@@ -325,7 +325,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 使用字符串模式，默认 write: true
       const result = await builder.build("dev");
@@ -344,7 +344,7 @@ describe("ClientBuilder", () => {
         engine: "react",
         // 不显式设置 minify，应该根据 mode 自动设置
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "dev", write: false });
 
@@ -362,7 +362,7 @@ describe("ClientBuilder", () => {
         engine: "react",
         // 不显式设置 minify，应该根据 mode 自动设置
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "prod", write: false });
 
@@ -383,7 +383,7 @@ describe("ClientBuilder", () => {
           minify: false,
         },
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       const result = await builder.build({ mode: "prod", write: false });
 
@@ -402,7 +402,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // dev 模式创建上下文
       const context = await builder.createContext("dev");
@@ -418,7 +418,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // prod 模式创建上下文
       const context = await builder.createContext("prod");
@@ -436,7 +436,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       await assertRejects(
         async () => await builder.build("dev"),
@@ -453,7 +453,7 @@ describe("ClientBuilder", () => {
         output: outputDir,
         engine: "react",
       };
-      const builder = new ClientBuilder(config);
+      const builder = new BuilderClient(config);
 
       // 应该能够构建（虽然可能没有输出）
       const result = await builder.build("dev");

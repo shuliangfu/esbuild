@@ -18,11 +18,11 @@ import type { ClientConfig } from "../src/types.ts";
 import { getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 /**
- * 动态导入 ClientBuilder（避免在模块加载时触发 esbuild）
+ * 动态导入 BuilderClient（避免在模块加载时触发 esbuild）
  */
-async function getClientBuilder() {
-  const { ClientBuilder } = await import("../src/client-builder.ts");
-  return ClientBuilder;
+async function getBuilderClient() {
+  const { BuilderClient } = await import("../src/builder-client.ts");
+  return BuilderClient;
 }
 
 describe("ServerModuleDetectorPlugin", () => {
@@ -76,7 +76,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -109,7 +109,7 @@ console.log(join("a", "b"));
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -131,7 +131,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -153,7 +153,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -177,7 +177,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -199,7 +199,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -223,7 +223,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -245,7 +245,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -267,7 +267,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -289,7 +289,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -323,7 +323,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -356,7 +356,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -385,7 +385,7 @@ console.log("test");
         ],
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -412,7 +412,7 @@ console.log("test");
         ],
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -446,7 +446,7 @@ console.log(clientFunction());
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -476,7 +476,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -505,7 +505,7 @@ console.log("test");
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -558,7 +558,7 @@ console.log(clientCode());
         engine: "react",
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       const result = await builder.build("dev");
 
@@ -586,7 +586,7 @@ console.log("test");
         ],
       };
 
-      const BuilderClass = await getClientBuilder();
+      const BuilderClass = await getBuilderClient();
       const builder = new BuilderClass(config);
       // 注意：禁用插件后，fs 模块可能会尝试被打包，可能导致构建失败
       // 这里主要测试插件可以正确禁用
