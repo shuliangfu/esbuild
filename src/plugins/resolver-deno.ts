@@ -429,6 +429,10 @@ export function denoResolverPlugin(
         },
       );
 
+      /** 调试日志前缀，便于过滤 */
+      const LOG_PREFIX_REL = "[resolver:relPath]";
+      const LOG_PREFIX_LOAD = "[resolver:onLoad]";
+
       // 3. 处理 deno-protocol namespace 中的相对路径导入
       // 当文件内部有相对路径导入（如 ../encryption/encryption-manager.ts）时，
       // 需要从文件的 resolveDir 解析这些相对路径
@@ -439,7 +443,9 @@ export function denoResolverPlugin(
           // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
           // 需要先提取协议路径（去掉 deno-protocol: 前缀），然后解析为实际文件路径
           const importer = args.importer;
+          console.log(`${LOG_PREFIX_REL} 进入 relative onResolve importer=${importer ?? "(null)"} path=${args.path}`);
           if (!importer) {
+            console.log(`${LOG_PREFIX_REL} 无 importer，返回 undefined`);
             return undefined;
           }
 
@@ -449,21 +455,26 @@ export function denoResolverPlugin(
             if (importer.startsWith("deno-protocol:")) {
               protocolPath = importer.slice("deno-protocol:".length);
             }
+            console.log(`${LOG_PREFIX_REL} 提取 protocolPath=${protocolPath}`);
 
             // 优先用 onLoad 已缓存的 resolveDir 从磁盘解析，避免子路径走 deno-protocol onLoad 返回空内容导致 "has no exports"
             const cachedDir = protocolResolveDirCache.get(protocolPath);
+            console.log(`${LOG_PREFIX_REL} 查缓存 protocolPath=${protocolPath} cachedDir=${cachedDir ?? "(未命中)"}`);
             if (cachedDir) {
               const resolvedPath = join(cachedDir, args.path);
               if (existsSync(resolvedPath)) {
+                console.log(`${LOG_PREFIX_REL} 缓存命中→file path=${resolvedPath}`);
                 return { path: resolvedPath, namespace: "file" };
               }
               // 无扩展名时尝试 .ts
               if (!resolvedPath.includes(".")) {
                 const withTs = resolvedPath + ".ts";
                 if (existsSync(withTs)) {
+                  console.log(`${LOG_PREFIX_REL} 缓存命中→file path=${withTs} (.ts)`);
                   return { path: withTs, namespace: "file" };
                 }
               }
+              console.log(`${LOG_PREFIX_REL} 缓存命中但路径不存在 resolvedPath=${resolvedPath} withTs 也不存在`);
             }
 
             // 先尝试直接解析协议路径为实际文件路径
@@ -510,6 +521,7 @@ export function denoResolverPlugin(
               } catch {
                 // 忽略解码错误
               }
+              console.log(`${LOG_PREFIX_REL} import.meta.resolve 得到 file:// importerPath=${importerPath}`);
 
               if (existsSync(importerPath)) {
                 // 从 importer 的目录解析相对路径
@@ -517,13 +529,18 @@ export function denoResolverPlugin(
                 const resolvedPath = join(importerDir, args.path);
 
                 if (existsSync(resolvedPath)) {
+                  console.log(`${LOG_PREFIX_REL} 从 file importer 解析成功 path=${resolvedPath}`);
                   return {
                     path: resolvedPath,
                     namespace: "file",
                   };
                 }
+                console.log(`${LOG_PREFIX_REL} 从 file importer 解析失败 resolvedPath 不存在=${resolvedPath}`);
+              } else {
+                console.log(`${LOG_PREFIX_REL} importerPath 不存在=${importerPath}`);
               }
             } else if (importerUrl && (importerUrl.startsWith("https://") || importerUrl.startsWith("http://"))) {
+              console.log(`${LOG_PREFIX_REL} import.meta.resolve 得到 http(s) importerUrl=${importerUrl?.slice(0, 80)}...`);
               // 如果 importer 是 HTTP URL，从 HTTP URL 解析相对路径
               // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/client/mod.ts
               // + ../encryption/encryption-manager.ts
@@ -551,6 +568,7 @@ export function denoResolverPlugin(
                     const normalizedPath = relativePath.replace(/^src\//, "");
                     const fullProtocolPath = `jsr:@dreamer/${packageName}@${version}/${normalizedPath}`;
                     // 返回 deno-protocol namespace，让 onLoad 钩子来处理
+                    console.log(`${LOG_PREFIX_REL} 从 http importer 推断协议路径 fullProtocolPath=${fullProtocolPath} → deno-protocol`);
                     return {
                       path: fullProtocolPath,
                       namespace: "deno-protocol",
@@ -561,6 +579,8 @@ export function denoResolverPlugin(
                 // 忽略错误
               }
             }
+
+            console.log(`${LOG_PREFIX_REL} 进入“构建完整协议路径”分支 protocolPath=${protocolPath} args.path=${args.path}`);
 
             // 如果无法通过文件路径解析，尝试构建完整的协议路径
             // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ../encryption/encryption-manager.ts
@@ -660,6 +680,7 @@ export function denoResolverPlugin(
                   }
 
                   if (existsSync(resolvedProtocolPath)) {
+                    console.log(`${LOG_PREFIX_REL} 从 fullProtocolPath 解析成功 path=${resolvedProtocolPath}`);
                     return {
                       path: resolvedProtocolPath,
                       namespace: "file",
@@ -669,6 +690,7 @@ export function denoResolverPlugin(
               } catch {
                 // 如果解析失败，返回一个 deno-protocol namespace 的结果
                 // 让 onLoad 钩子来处理
+                console.log(`${LOG_PREFIX_REL} fullProtocolPath 解析失败，返回 deno-protocol fullProtocolPath=${fullProtocolPath}`);
                 return {
                   path: fullProtocolPath,
                   namespace: "deno-protocol",
@@ -681,6 +703,7 @@ export function denoResolverPlugin(
             // 忽略错误
           }
 
+          console.log(`${LOG_PREFIX_REL} 所有分支未命中，返回 undefined importer=${importer} path=${args.path}`);
           return undefined;
         },
       );
@@ -691,13 +714,16 @@ export function denoResolverPlugin(
         { filter: /.*/, namespace: "deno-protocol" },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = args.path;
+          console.log(`${LOG_PREFIX_LOAD} 进入 onLoad protocolPath=${protocolPath}`);
 
           try {
             // 步骤 1: 先使用动态导入触发 Deno 下载和缓存模块
             // 这会确保模块被下载到 Deno 缓存中（适用于 jsr: 和 npm:）
             try {
               await import(protocolPath);
+              console.log(`${LOG_PREFIX_LOAD} 动态 import 成功 protocolPath=${protocolPath}`);
             } catch (_importError) {
+              console.log(`${LOG_PREFIX_LOAD} 动态 import 失败或忽略 protocolPath=${protocolPath}`);
               // 忽略导入错误，可能模块已经加载
             }
 
@@ -745,6 +771,8 @@ export function denoResolverPlugin(
               }
             }
 
+            console.log(`${LOG_PREFIX_LOAD} 主循环结束 protocolPath=${protocolPath} fileUrl=${fileUrl ? (fileUrl.startsWith("file://") ? fileUrl.slice(0, 80) + "..." : fileUrl.slice(0, 80) + "...") : "(undefined)"} retriesLeft=${retries}`);
+
             // 步骤 4: 如果 resolve 返回 file:// URL，读取文件内容
             if (fileUrl && fileUrl.startsWith("file://")) {
               let filePath = fileUrl.slice(7);
@@ -758,9 +786,11 @@ export function denoResolverPlugin(
               // 即使文件不存在，也要设置 resolveDir，这样 esbuild 才能正确解析相对路径
               const resolveDir = dirname(filePath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
+              console.log(`${LOG_PREFIX_LOAD} file:// 分支 写入缓存 protocolPath=${protocolPath} resolveDir=${resolveDir}`);
 
               if (existsSync(filePath)) {
                 const contents = await readTextFile(filePath);
+                console.log(`${LOG_PREFIX_LOAD} file:// 分支 返回内容 filePath=${filePath} len=${contents.length}`);
 
                 // 根据文件扩展名确定 loader
                 const loader = getLoaderFromPath(filePath);
@@ -774,6 +804,7 @@ export function denoResolverPlugin(
                 // 文件不存在，但仍然需要设置 resolveDir
                 // 这样 esbuild 才能正确解析文件内部的相对路径导入
                 // 返回一个空内容，让 esbuild 知道这个文件存在但为空
+                console.log(`${LOG_PREFIX_LOAD} file:// 分支 文件不存在，返回空内容 filePath=${filePath}`);
                 const loader = getLoaderFromPath(filePath);
                 return {
                   contents: "",
@@ -785,6 +816,7 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))
             ) {
+              console.log(`${LOG_PREFIX_LOAD} 进入 https/http 分支 protocolPath=${protocolPath} fileUrl=${fileUrl.slice(0, 60)}...`);
               // 步骤 5: 如果 resolve 返回 HTTP URL，使用 fetch 获取内容
               // 这种情况可能发生在 Deno 还没有完全缓存模块时
               // 注意：对于 JSR/NPM 的 HTTP URL，通常返回的是 HTML 页面，不是源代码
@@ -794,23 +826,25 @@ export function denoResolverPlugin(
                 if (response.ok) {
                   const contents = await response.text();
                   const loader = getLoaderFromPath(fileUrl);
-                  // 对于 HTTP URL，无法确定 resolveDir，但我们可以尝试从 URL 路径推断
-                  // 或者使用 cwd() 作为后备
                   const resolveDir = cwd();
                   protocolResolveDirCache.set(protocolPath, resolveDir);
+                  console.log(`${LOG_PREFIX_LOAD} https 分支 返回内容 len=${contents.length} resolveDir=${resolveDir}`);
                   return {
                     contents,
                     loader,
                     resolveDir,
                   };
                 }
+                console.log(`${LOG_PREFIX_LOAD} https 分支 fetch 非 ok status=${response.status}`);
               } catch (_fetchError) {
                   // 忽略 fetch 错误
+                  console.log(`${LOG_PREFIX_LOAD} https 分支 fetch 异常`);
               }
             } else if (
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
+              console.log(`${LOG_PREFIX_LOAD} 进入 jsr/npm 分支 protocolPath=${protocolPath} fileUrl=${fileUrl}`);
               // 步骤 6: 如果 resolve 返回的还是协议路径，说明 Deno 可能还没有完全缓存
               // 尝试多次解析，或者使用动态导入获取模块信息
               let resolvedFilePath: string | undefined;
@@ -850,6 +884,7 @@ export function denoResolverPlugin(
                 const loader = getLoaderFromPath(resolvedFilePath);
                 const resolveDir = dirname(resolvedFilePath);
                 protocolResolveDirCache.set(protocolPath, resolveDir);
+                console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 通过 retry resolve 得到文件 resolvedFilePath=${resolvedFilePath} len=${contents.length}`);
                 return {
                   contents,
                   loader,
@@ -863,6 +898,7 @@ export function denoResolverPlugin(
               const resolveDir = cwd();
               protocolResolveDirCache.set(protocolPath, resolveDir);
               const loader = getLoaderFromPath(protocolPath);
+              console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 无法得到文件，返回空内容 resolveDir=cwd()=${resolveDir}`);
               return {
                 contents: "",
                 loader,
@@ -875,6 +911,7 @@ export function denoResolverPlugin(
             const resolveDir = cwd();
             protocolResolveDirCache.set(protocolPath, resolveDir);
             const loader = getLoaderFromPath(protocolPath);
+            console.log(`${LOG_PREFIX_LOAD} 最终回退 返回空内容 protocolPath=${protocolPath} resolveDir=cwd()=${resolveDir}`);
             return {
               contents: "",
               loader,
@@ -882,6 +919,7 @@ export function denoResolverPlugin(
             };
           } catch (_error) {
             // 忽略错误，返回 undefined
+            console.log(`${LOG_PREFIX_LOAD} onLoad 异常 protocolPath=${protocolPath} error=${_error instanceof Error ? _error.message : String(_error)}`);
             return undefined;
           }
         },
