@@ -688,7 +688,7 @@ export function denoResolverPlugin(
 
               const fullProtocolPath = `${currentBasePath}/${normalizedPath}`;
 
-              // 在插件上下文中只做一次 resolve，拿不到 file:// 就返回 deno-protocol 交给 onLoad（含子进程 resolve）
+              // 在插件上下文中只做一次 resolve，拿不到 file:// 就返回 deno-protocol 交给 onLoad（含 fetchJsrSourceViaMeta）
               try {
                 let resolvedProtocolUrl: string | undefined;
                 try {
@@ -715,10 +715,15 @@ export function denoResolverPlugin(
                     };
                   }
                 }
-              } catch {
-                // 如果解析失败，返回一个 deno-protocol namespace 的结果
-                // 让 onLoad 钩子来处理
-                console.log(`${LOG_PREFIX_REL} fullProtocolPath 解析失败，返回 deno-protocol fullProtocolPath=${fullProtocolPath}`);
+                // 未得到 file:// 或本地文件不存在时，一律返回 deno-protocol，由 onLoad 用 fetchJsrSourceViaMeta 等拉取
+                console.log(`${LOG_PREFIX_REL} 构建完整协议路径 fullProtocolPath=${fullProtocolPath} → deno-protocol`);
+                return {
+                  path: fullProtocolPath,
+                  namespace: "deno-protocol",
+                };
+              } catch (innerError) {
+                // 若上述流程抛错，仍返回 deno-protocol，让 onLoad 尝试拉取
+                console.log(`${LOG_PREFIX_REL} fullProtocolPath 构建/解析异常，返回 deno-protocol fullProtocolPath=${fullProtocolPath} error=${innerError instanceof Error ? innerError.message : String(innerError)}`);
                 return {
                   path: fullProtocolPath,
                   namespace: "deno-protocol",
