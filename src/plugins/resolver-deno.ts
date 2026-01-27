@@ -146,6 +146,9 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
 const JSR_ACCEPT_JSON = "application/json";
 const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
 
+/** 调试日志前缀，便于过滤 fetchJsrSourceViaMeta 相关输出 */
+const LOG_PREFIX_JSR_META = "[resolver:jsrMeta]";
+
 /**
  * 用 JSR version_meta.json 的 manifest/exports 解析子路径，再 fetch 源码 URL 取内容。
  * 不猜路径：manifest 里是包内真实路径（如 /src/encryption/encryption-manager.ts），exports 是子路径→文件映射。
@@ -155,6 +158,7 @@ const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
  */
 async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | null> {
   if (!protocolPath.startsWith("jsr:")) {
+    console.log(`${LOG_PREFIX_JSR_META} 非 jsr: 协议，返回 null protocolPath=${protocolPath.slice(0, 60)}...`);
     return null;
   }
   // 格式 jsr:@scope/name@version/path：包名里含 @（如 @dreamer），只能用「最后一个 @」分隔包名与版本
@@ -163,20 +167,32 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
   const segment = slashIdx === -1 ? after : after.slice(0, slashIdx);
   const subpath = slashIdx === -1 ? "" : after.slice(slashIdx + 1);
   const atIdx = segment.lastIndexOf("@");
-  if (atIdx === -1) return null;
+  if (atIdx === -1) {
+    console.log(`${LOG_PREFIX_JSR_META} segment 中无 @，返回 null protocolPath=${protocolPath.slice(0, 60)}...`);
+    return null;
+  }
   const scopeAndName = segment.slice(0, atIdx);
   const version = segment.slice(atIdx + 1);
+  console.log(`${LOG_PREFIX_JSR_META} 解析 protocolPath scopeAndName=${scopeAndName} version=${version} subpath=${subpath || "(主入口)"}`);
 
   const base = `https://jsr.io/${scopeAndName}/${version}`;
   const metaUrl = `${base}_meta.json`;
   let meta: { manifest?: Record<string, unknown>; exports?: Record<string, string> };
   try {
     const r = await fetch(metaUrl, { headers: { Accept: JSR_ACCEPT_JSON } });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.log(`${LOG_PREFIX_JSR_META} _meta.json 请求非 ok status=${r.status} url=${metaUrl}`);
+      return null;
+    }
     const text = await r.text();
-    if (!text || text.trimStart().startsWith("<")) return null;
+    if (!text || text.trimStart().startsWith("<")) {
+      console.log(`${LOG_PREFIX_JSR_META} _meta.json 内容为空或为 HTML len=${text?.length ?? 0} startsWith=<`);
+      return null;
+    }
     meta = JSON.parse(text) as { manifest?: Record<string, unknown>; exports?: Record<string, string> };
-  } catch {
+    console.log(`${LOG_PREFIX_JSR_META} _meta.json 解析成功 manifestKeys=${Object.keys(meta.manifest ?? {}).length} exportKeys=${Object.keys(meta.exports ?? {}).length}`);
+  } catch (e) {
+    console.log(`${LOG_PREFIX_JSR_META} _meta.json 请求或解析异常 url=${metaUrl} error=${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 
@@ -191,16 +207,28 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
   if (pathFromExport && typeof manifest[`/${pathFromExport}`] === "object") {
     const fileUrl = `${base}/${pathFromExport}`;
     try {
-      const fr = await fetch(fileUrl, { headers: { Accept: JSR_ACCEPT_SOURCE } }); 
-      if (!fr.ok) return null;
-      const code = await fr.text();
-      if (code && !code.trimStart().startsWith("<")) return code;
-    } catch {
-      // ignore
+      const fr = await fetch(fileUrl, { headers: { Accept: JSR_ACCEPT_SOURCE } });
+      if (!fr.ok) {
+        console.log(`${LOG_PREFIX_JSR_META} exports 分支 fetch 非 ok status=${fr.status} pathFromExport=${pathFromExport}`);
+      } else {
+        const code = await fr.text();
+        if (code && !code.trimStart().startsWith("<")) {
+          console.log(`${LOG_PREFIX_JSR_META} exports 分支 返回源码 len=${code.length} exportKey=${exportKey}`);
+          return code;
+        }
+        console.log(`${LOG_PREFIX_JSR_META} exports 分支 响应为 HTML 或空 pathFromExport=${pathFromExport}`);
+      }
+    } catch (e) {
+      console.log(`${LOG_PREFIX_JSR_META} exports 分支 fetch 异常 pathFromExport=${pathFromExport} error=${e instanceof Error ? e.message : String(e)}`);
     }
+  } else {
+    console.log(`${LOG_PREFIX_JSR_META} exports 未命中或 manifest 无该 path exportKey=${exportKey} pathFromExport=${pathFromExport ?? "(无)"}`);
   }
   // 主入口只认 meta 里的 exports["."]，可能是 mod.ts、index.ts、main.ts 等，不写死
-  if (!subpath) return null;
+  if (!subpath) {
+    console.log(`${LOG_PREFIX_JSR_META} 主入口且 exports 未命中，返回 null`);
+    return null;
+  }
   // 子路径：仅按 meta 里 manifest 的 key 匹配，不假设目录结构；统一去掉 .ts 再比较，避免 import 带不带扩展名不一致
   const subpathNoExt = subpath.endsWith(".ts") ? subpath.slice(0, -3) : subpath;
   const manifestKeys = Object.keys(manifest);
@@ -215,13 +243,23 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
     const pathSlice = pathKey.slice(1);
     try {
       const fr = await fetch(`${base}/${pathSlice}`, { headers: { Accept: JSR_ACCEPT_SOURCE } });
-      if (!fr.ok) return null;
-      const code = await fr.text();
-      if (code && !code.trimStart().startsWith("<")) return code;
-    } catch {
-      // ignore
+      if (!fr.ok) {
+        console.log(`${LOG_PREFIX_JSR_META} manifest 分支 fetch 非 ok status=${fr.status} pathKey=${pathKey}`);
+      } else {
+        const code = await fr.text();
+        if (code && !code.trimStart().startsWith("<")) {
+          console.log(`${LOG_PREFIX_JSR_META} manifest 分支 返回源码 len=${code.length} subpathNoExt=${subpathNoExt} pathKey=${pathKey}`);
+          return code;
+        }
+        console.log(`${LOG_PREFIX_JSR_META} manifest 分支 响应为 HTML 或空 pathKey=${pathKey}`);
+      }
+    } catch (e) {
+      console.log(`${LOG_PREFIX_JSR_META} manifest 分支 fetch 异常 pathKey=${pathKey} error=${e instanceof Error ? e.message : String(e)}`);
     }
+  } else {
+    console.log(`${LOG_PREFIX_JSR_META} manifest 未匹配到 key subpathNoExt=${subpathNoExt} manifestKeysSample=${manifestKeys.slice(0, 5).join(",")}`);
   }
+  console.log(`${LOG_PREFIX_JSR_META} 全部未命中，返回 null protocolPath=${protocolPath.slice(0, 80)}...`);
   return null;
 }
 
