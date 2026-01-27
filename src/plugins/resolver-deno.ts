@@ -573,10 +573,13 @@ export function denoResolverPlugin(
                 normalizedPath = normalizedPath.slice(2);
               }
 
-              // 根据深度移除对应的路径段
-              // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client，depth=1 -> jsr:@dreamer/socket-io@1.0.0-beta.2
+              // 根据深度移除对应的路径段，但不能越过包根（jsr:@scope/name@version 只有 2 段）
+              // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client，depth=1 时 base 已是包根，不应再 strip
+              const segments = baseProtocolPath.split("/");
+              const maxDepth = Math.max(0, segments.length - 2);
+              const actualDepth = Math.min(depth, maxDepth);
               let currentBasePath = baseProtocolPath;
-              for (let i = 0; i < depth; i++) {
+              for (let i = 0; i < actualDepth; i++) {
                 currentBasePath = currentBasePath.replace(/\/[^/]+$/, "");
               }
 
