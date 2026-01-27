@@ -161,19 +161,55 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
     console.log(`${LOG_PREFIX_JSR_META} 非 jsr: 协议，返回 null protocolPath=${protocolPath.slice(0, 60)}...`);
     return null;
   }
-  // 格式 jsr:@scope/name@version/path：包名里含 @（如 @dreamer），只能用「最后一个 @」分隔包名与版本
+  // 格式 jsr:@scope/name@version/path 或 jsr:@scope/name/path（无版本号时从包级 meta 取 latest）
   const after = protocolPath.slice(4);
-  const slashIdx = after.indexOf("/");
-  const segment = slashIdx === -1 ? after : after.slice(0, slashIdx);
-  const subpath = slashIdx === -1 ? "" : after.slice(slashIdx + 1);
-  const atIdx = segment.lastIndexOf("@");
-  if (atIdx === -1) {
-    console.log(`${LOG_PREFIX_JSR_META} segment 中无 @，返回 null protocolPath=${protocolPath.slice(0, 60)}...`);
-    return null;
+  const lastAtIdx = after.lastIndexOf("@");
+  let scopeAndName: string;
+  let version: string;
+  let subpath: string;
+  if (lastAtIdx === -1) {
+    // 无 @：解析为 @scope/name 与可选的 subpath，再从包级 meta.json 取最新非 yanked 版本
+    const parts = after.split("/");
+    if (parts.length < 2) {
+      console.log(`${LOG_PREFIX_JSR_META} 无 @ 且不足两段(scope/name)，返回 null protocolPath=${protocolPath.slice(0, 60)}...`);
+      return null;
+    }
+    scopeAndName = `${parts[0]}/${parts[1]}`;
+    subpath = parts.length > 2 ? parts.slice(2).join("/") : "";
+    const pkgMetaUrl = `https://jsr.io/${scopeAndName}/meta.json`;
+    let pkgMeta: { versions?: Record<string, { yanked?: boolean }> };
+    try {
+      const pr = await fetch(pkgMetaUrl, { headers: { Accept: JSR_ACCEPT_JSON } });
+      if (!pr.ok) {
+        console.log(`${LOG_PREFIX_JSR_META} 无版本号时包级 meta 请求非 ok status=${pr.status} url=${pkgMetaUrl}`);
+        return null;
+      }
+      const pkgText = await pr.text();
+      if (!pkgText || pkgText.trimStart().startsWith("<")) {
+        console.log(`${LOG_PREFIX_JSR_META} 无版本号时包级 meta 内容为空或 HTML url=${pkgMetaUrl}`);
+        return null;
+      }
+      pkgMeta = JSON.parse(pkgText) as { versions?: Record<string, { yanked?: boolean }> };
+    } catch (e) {
+      console.log(`${LOG_PREFIX_JSR_META} 无版本号时包级 meta 请求或解析异常 url=${pkgMetaUrl} error=${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    }
+    const versions = pkgMeta.versions ?? {};
+    const nonYanked = Object.keys(versions).filter((k) => !versions[k]?.yanked).sort();
+    if (nonYanked.length === 0) {
+      console.log(`${LOG_PREFIX_JSR_META} 无版本号且无可用版本 scopeAndName=${scopeAndName}`);
+      return null;
+    }
+    version = nonYanked[nonYanked.length - 1];
+    console.log(`${LOG_PREFIX_JSR_META} 无 @，从包级 meta 取最新版本 scopeAndName=${scopeAndName} version=${version} subpath=${subpath || "(主入口)"}`);
+  } else {
+    scopeAndName = after.slice(0, lastAtIdx);
+    const versionAndPath = after.slice(lastAtIdx + 1);
+    const slashInRest = versionAndPath.indexOf("/");
+    version = slashInRest === -1 ? versionAndPath : versionAndPath.slice(0, slashInRest);
+    subpath = slashInRest === -1 ? "" : versionAndPath.slice(slashInRest + 1);
+    console.log(`${LOG_PREFIX_JSR_META} 解析 protocolPath scopeAndName=${scopeAndName} version=${version} subpath=${subpath || "(主入口)"}`);
   }
-  const scopeAndName = segment.slice(0, atIdx);
-  const version = segment.slice(atIdx + 1);
-  console.log(`${LOG_PREFIX_JSR_META} 解析 protocolPath scopeAndName=${scopeAndName} version=${version} subpath=${subpath || "(主入口)"}`);
 
   const base = `https://jsr.io/${scopeAndName}/${version}`;
   const metaUrl = `${base}_meta.json`;
