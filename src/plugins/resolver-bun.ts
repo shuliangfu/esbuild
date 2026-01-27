@@ -7,10 +7,12 @@
  * - 读取 package.json 的 imports 配置（路径别名和包导入映射）
  * - 读取 tsconfig.json 的 paths 配置（路径别名，作为后备）
  * - 解析 JSR 包的子路径导出（如 @dreamer/logger/client）
- * - 支持 jsr: 协议的模块引用（如 jsr:@dreamer/logger@^1.0.0）
+ *   - 注意：Bun 不支持直接使用 jsr: 协议，需要通过 package.json imports 映射
+ *   - 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+ *   - 然后代码中使用：import { x } from "@dreamer/logger/client"
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
  *
- * 注意：Bun 原生支持 jsr: 和 npm: 协议，可以直接解析
+ * 重要：Bun 不支持直接使用 jsr: 协议导入，必须通过 package.json 的 imports 字段映射
  */
 
 import {
@@ -18,6 +20,7 @@ import {
   dirname,
   existsSync,
   join,
+  readTextFile,
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
@@ -288,17 +291,37 @@ function resolvePathAlias(
 }
 
 /**
- * 解析 Bun 协议路径（jsr: 或 npm:）
- * Bun 原生支持这些协议，可以直接使用 import.meta.resolve
+ * 根据文件路径确定 esbuild loader
  *
- * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.4）
+ * @param filePath - 文件路径
+ * @returns esbuild loader 类型
+ */
+function getLoaderFromPath(filePath: string): "ts" | "tsx" | "js" | "jsx" {
+  if (filePath.endsWith(".tsx") || filePath.endsWith(".jsx")) {
+    return "tsx";
+  } else if (filePath.endsWith(".ts") || filePath.endsWith(".mts")) {
+    return "ts";
+  } else if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+    return "js";
+  }
+  // 默认返回 ts
+  return "ts";
+}
+
+/**
+ * 解析 Bun 协议路径（仅支持 npm:）
+ * Bun 原生支持 npm: 协议，可以直接使用 import.meta.resolve
+ * 注意：Bun 不支持 jsr: 协议，此函数不应被用于 jsr: 协议
+ *
+ * @param protocolPath - 协议路径（如 npm:esbuild@^0.27.2）
  * @returns 解析结果
  */
 async function resolveBunProtocolPath(
   protocolPath: string,
 ): Promise<esbuild.OnResolveResult | undefined> {
   try {
-    // Bun 原生支持 jsr: 和 npm: 协议，可以直接解析
+    // Bun 原生支持 npm: 协议，可以直接解析
+    // 注意：Bun 不支持 jsr: 协议，如果传入 jsr: 协议，resolve 会失败
     const resolvedUrl = await import.meta.resolve(protocolPath);
 
     // 如果返回的是 file:// URL，直接使用文件路径
@@ -316,14 +339,26 @@ async function resolveBunProtocolPath(
           path: filePath,
           namespace: "file",
         };
+      } else if (filePath) {
+        // 文件路径存在但文件不存在，使用 bun-protocol namespace
+        return {
+          path: protocolPath,
+          namespace: "bun-protocol",
+        };
       }
     }
 
-    // 如果返回的是其他格式（如协议路径本身），让 esbuild 使用默认解析
-    return undefined;
+    // 如果返回的是其他格式（如协议路径本身），使用 bun-protocol namespace
+    return {
+      path: protocolPath,
+      namespace: "bun-protocol",
+    };
   } catch {
-    // 如果 resolve 失败，让 esbuild 使用默认解析
-    return undefined;
+    // 如果 resolve 失败，使用 bun-protocol namespace
+    return {
+      path: protocolPath,
+      namespace: "bun-protocol",
+    };
   }
 }
 
@@ -384,12 +419,12 @@ export function bunResolverPlugin(
         },
       );
 
-      // 2. 处理直接的 jsr: 和 npm: 协议导入
-      // 例如：import { x } from "jsr:@dreamer/logger@1.0.0-beta.4"
+      // 2. 处理直接的 npm: 协议导入
       // 例如：import { x } from "npm:esbuild@^0.27.2"
-      // 注意：Bun 原生支持这些协议，但 esbuild 可能无法直接解析，所以需要插件帮助
+      // 注意：Bun 原生支持 npm: 协议，但 esbuild 可能无法直接解析，所以需要插件帮助
+      // 重要：Bun 不支持直接使用 jsr: 协议，必须通过 package.json imports 映射
       build.onResolve(
-        { filter: /^(jsr|npm):/ },
+        { filter: /^npm:/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
 
@@ -407,6 +442,25 @@ export function bunResolverPlugin(
           }
 
           return await resolveBunProtocolPath(path);
+        },
+      );
+
+      // 2.5. 处理直接的 jsr: 协议导入（Bun 不支持，但为了兼容性，转换为错误提示或跳过）
+      // 注意：Bun 不支持直接使用 jsr: 协议，应该通过 package.json imports 映射
+      // 这里返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
+      build.onResolve(
+        { filter: /^jsr:/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          // Bun 不支持直接使用 jsr: 协议
+          // 建议用户通过 package.json imports 映射来使用 JSR 包
+          // 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+          // 然后代码中使用：import { x } from "@dreamer/logger/client"
+          console.warn(
+            `[bun-resolver] Bun 不支持直接使用 jsr: 协议导入 "${args.path}"。` +
+              `请通过 package.json 的 imports 字段映射 JSR 包，然后使用不带 jsr: 前缀的导入。`,
+          );
+          // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
+          return undefined;
         },
       );
 
@@ -430,19 +484,46 @@ export function bunResolverPlugin(
             : (args.resolveDir || cwd());
           const projectPackageJsonPath = findProjectPackageJson(startDir);
 
-          if (!projectPackageJsonPath) {
-            // 如果没有 package.json，让 esbuild 使用默认解析
-            return undefined;
+          let packageImport: string | undefined;
+
+          if (projectPackageJsonPath) {
+            // 从项目的 package.json 的 imports 中获取包的导入映射
+            packageImport = getPackageImport(
+              projectPackageJsonPath,
+              packageName,
+            );
           }
 
-          // 从项目的 package.json 的 imports 中获取包的导入映射
-          const packageImport = getPackageImport(
-            projectPackageJsonPath,
-            packageName,
-          );
-
+          // 如果没有找到 package.json 或导入映射，尝试从 Bun 缓存读取
+          // Bun 可以从缓存读取之前安装过的依赖，即使没有 package.json
           if (!packageImport) {
-            // 如果没有找到导入映射，让 esbuild 使用默认解析
+            try {
+              // 尝试直接解析包路径，看看 Bun 是否能从缓存中解析
+              // 这对于 npm 包特别有用，因为 Bun 会缓存已安装的 npm 包
+              const resolvedUrl = await import.meta.resolve(path);
+              
+              // 如果成功解析为 file:// URL，说明 Bun 从缓存中找到了这个包
+              if (resolvedUrl && resolvedUrl.startsWith("file://")) {
+                let filePath = resolvedUrl.slice(7);
+                try {
+                  filePath = decodeURIComponent(filePath);
+                } catch {
+                  // 忽略解码错误
+                }
+
+                if (filePath && existsSync(filePath)) {
+                  return {
+                    path: filePath,
+                    namespace: "file",
+                  };
+                }
+              }
+            } catch {
+              // 如果 resolve 失败，说明缓存中也没有，继续后续处理
+            }
+
+            // 如果无法从缓存读取，让 esbuild 使用默认解析
+            // 注意：对于 JSR 包，如果没有 package.json 的映射，Bun 无法解析
             return undefined;
           }
 
@@ -465,8 +546,234 @@ export function bunResolverPlugin(
             }
           }
 
-          // 使用统一的协议路径解析函数
+          // 如果 packageImport 是 jsr: 协议，Bun 不支持直接解析
+          // 需要通过 package.json imports 映射，然后使用不带 jsr: 前缀的导入
+          if (packageImport.startsWith("jsr:")) {
+            console.warn(
+              `[bun-resolver] Bun 不支持直接使用 jsr: 协议 "${fullProtocolPath}"。` +
+                `请确保 package.json 的 imports 字段正确配置了 JSR 包映射。`,
+            );
+            // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
+            return undefined;
+          }
+
+          // 使用统一的协议路径解析函数（仅支持 npm: 协议）
           return await resolveBunProtocolPath(fullProtocolPath);
+        },
+      );
+
+      // 4. 处理 bun-protocol namespace 中的相对路径导入
+      // 当 npm 包内部有相对路径导入时，需要从文件的 resolveDir 解析这些相对路径
+      // 注意：Bun 不支持 jsr: 协议，所以这里主要处理 npm: 包的内部相对路径
+      build.onResolve(
+        { filter: /^\.\.?\/.*/, namespace: "bun-protocol" },
+        async (args): Promise<esbuild.OnResolveResult | undefined> => {
+          // 相对路径导入，需要从 importer 的目录解析
+          // importer 是协议路径（如 npm:lodash@^4.17.21/map）
+          const importer = args.importer;
+          if (!importer) {
+            return undefined;
+          }
+
+          try {
+            // 先尝试直接解析 importer 为实际文件路径
+            let importerUrl: string | undefined;
+            try {
+              importerUrl = await import.meta.resolve(importer);
+            } catch {
+              // 如果 resolve 失败，尝试通过动态导入触发模块下载和缓存
+              try {
+                await import(importer);
+                // 等待一小段时间，确保文件系统操作完成
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                // 再次尝试 resolve
+                importerUrl = await import.meta.resolve(importer);
+              } catch {
+                // 忽略错误
+              }
+            }
+
+            if (importerUrl && importerUrl.startsWith("file://")) {
+              let importerPath = importerUrl.slice(7);
+              try {
+                importerPath = decodeURIComponent(importerPath);
+              } catch {
+                // 忽略解码错误
+              }
+
+              if (existsSync(importerPath)) {
+                // 从 importer 的目录解析相对路径
+                const importerDir = dirname(importerPath);
+                const resolvedPath = join(importerDir, args.path);
+
+                if (existsSync(resolvedPath)) {
+                  return {
+                    path: resolvedPath,
+                    namespace: "file",
+                  };
+                }
+              }
+            }
+
+            // 如果无法通过文件路径解析，尝试构建完整的协议路径
+            // 例如：npm:lodash@^4.17.21/map + ../utils.ts
+            // -> npm:lodash@^4.17.21/utils.ts
+            // 注意：Bun 不支持 jsr: 协议，这里主要处理 npm: 包
+            try {
+              const importerProtocolPath = importer;
+              // 移除最后一个路径段（如 /client）
+              const baseProtocolPath = importerProtocolPath.replace(
+                /\/[^/]+$/,
+                "",
+              );
+              const relativePath = args.path;
+
+              // 规范化相对路径（处理 ../ 和 ./）
+              let normalizedPath = relativePath;
+              if (normalizedPath.startsWith("../")) {
+                normalizedPath = normalizedPath.slice(3);
+              } else if (normalizedPath.startsWith("./")) {
+                normalizedPath = normalizedPath.slice(2);
+              }
+
+              const fullProtocolPath = `${baseProtocolPath}/${normalizedPath}`;
+
+              // 尝试解析这个协议路径
+              try {
+                const resolvedProtocolUrl = await import.meta.resolve(
+                  fullProtocolPath,
+                );
+                if (resolvedProtocolUrl.startsWith("file://")) {
+                  let resolvedProtocolPath = resolvedProtocolUrl.slice(7);
+                  try {
+                    resolvedProtocolPath = decodeURIComponent(
+                      resolvedProtocolPath,
+                    );
+                  } catch {
+                    // 忽略解码错误
+                  }
+
+                  if (existsSync(resolvedProtocolPath)) {
+                    return {
+                      path: resolvedProtocolPath,
+                      namespace: "file",
+                    };
+                  }
+                }
+              } catch {
+                // 如果解析失败，返回一个 bun-protocol namespace 的结果
+                return {
+                  path: fullProtocolPath,
+                  namespace: "bun-protocol",
+                };
+              }
+            } catch {
+              // 忽略错误
+            }
+          } catch {
+            // 忽略错误
+          }
+
+          return undefined;
+        },
+      );
+
+      // 5. 添加 onLoad 钩子来处理 bun-protocol namespace 的模块加载
+      // 注意：Bun 不支持 jsr: 协议，这里主要处理 npm: 包的加载
+      build.onLoad(
+        { filter: /.*/, namespace: "bun-protocol" },
+        async (args): Promise<esbuild.OnLoadResult | undefined> => {
+          const protocolPath = args.path;
+
+          // 如果协议路径是 jsr:，Bun 不支持，返回 undefined
+          if (protocolPath.startsWith("jsr:")) {
+            console.warn(
+              `[bun-resolver] Bun 不支持直接使用 jsr: 协议 "${protocolPath}"。` +
+                `请通过 package.json 的 imports 字段映射 JSR 包。`,
+            );
+            return undefined;
+          }
+
+          try {
+            // 步骤 1: 先使用动态导入触发 Bun 下载和缓存模块（仅支持 npm: 协议）
+            try {
+              await import(protocolPath);
+            } catch (_importError) {
+              // 忽略导入错误，可能模块已经加载
+            }
+
+            // 步骤 2: 等待一小段时间，确保文件系统操作完成
+            await new Promise((resolve) => setTimeout(resolve, 200));
+
+            // 步骤 3: 多次尝试使用 import.meta.resolve 获取文件路径
+            let fileUrl: string | undefined;
+            let retries = 3;
+            while (retries > 0 && !fileUrl) {
+              try {
+                fileUrl = await import.meta.resolve(protocolPath);
+                // 如果返回的是 file:// URL，说明成功
+                if (fileUrl && fileUrl.startsWith("file://")) {
+                  break;
+                }
+              } catch (_resolveError) {
+                // 忽略 resolve 错误
+              }
+              // 如果 resolve 失败或返回协议路径，等待后重试
+              // 注意：Bun 不支持 jsr: 协议，这里主要处理 npm: 协议
+              if (
+                !fileUrl || fileUrl.startsWith("npm:")
+              ) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                retries--;
+              } else {
+                break;
+              }
+            }
+
+            // 步骤 4: 如果 resolve 返回 file:// URL，读取文件内容
+            if (fileUrl && fileUrl.startsWith("file://")) {
+              let filePath = fileUrl.slice(7);
+              try {
+                filePath = decodeURIComponent(filePath);
+              } catch {
+                // 忽略解码错误
+              }
+
+              // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
+              const resolveDir = dirname(filePath);
+
+              if (existsSync(filePath)) {
+                const contents = await readTextFile(filePath);
+                const loader = getLoaderFromPath(filePath);
+
+                return {
+                  contents,
+                  loader,
+                  resolveDir,
+                };
+              } else {
+                // 文件不存在，但仍然需要设置 resolveDir
+                const loader = getLoaderFromPath(filePath);
+                return {
+                  contents: "",
+                  loader,
+                  resolveDir,
+                };
+              }
+            }
+
+            // 如果所有方法都失败，至少设置 resolveDir
+            const resolveDir = cwd();
+            const loader = getLoaderFromPath(protocolPath);
+            return {
+              contents: "",
+              loader,
+              resolveDir,
+            };
+          } catch (_error) {
+            // 忽略错误，返回 undefined
+            return undefined;
+          }
         },
       );
     },

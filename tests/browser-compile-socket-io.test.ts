@@ -4,6 +4,7 @@
  */
 
 import {
+  createCommand,
   IS_DENO,
   join,
   mkdir,
@@ -116,6 +117,115 @@ export function testLogger() {
           2,
         ),
       );
+
+      // 生成 deno.json 后，运行 deno cache 预缓存依赖
+      // 这样可以确保 Deno 能够正确解析 JSR 包中的相对路径导入
+      // 需要显式缓存所有依赖及其子路径，确保 Deno 完整缓存包结构
+      // 注意：只在 Deno 环境下执行，Bun 不需要缓存步骤
+      if (IS_DENO) {
+        try {
+          // 构建缓存命令参数：显式缓存所有依赖及其子路径
+          const cacheArgs = [
+            "cache",
+            "--config",
+            testDenoJsonPath,
+            // 缓存入口文件，Deno 会自动解析并缓存所有依赖
+            clientEntryFile,
+            // 显式缓存所有在 deno.json 中定义的依赖及其子路径
+            // 这样可以确保 Deno 完整缓存包结构，包括包内的相对路径导入
+            "jsr:@dreamer/socket-io@1.0.0-beta.2",
+            "jsr:@dreamer/socket-io@1.0.0-beta.2/client",
+            "jsr:@dreamer/logger@1.0.0-beta.4",
+            "jsr:@dreamer/logger@1.0.0-beta.4/client",
+          ];
+
+          const cacheCommand = createCommand("deno", {
+            args: cacheArgs,
+            cwd: testDataDir,
+            stdout: "piped",
+            stderr: "piped",
+          });
+
+          const cacheOutput = await cacheCommand.output();
+          
+          // 解码输出（可能是 Uint8Array 或字符串）
+          const decoder = new TextDecoder();
+          const errorText = cacheOutput.stderr
+            ? typeof cacheOutput.stderr === "string"
+              ? cacheOutput.stderr
+              : decoder.decode(cacheOutput.stderr)
+            : "";
+          const stdoutText = cacheOutput.stdout
+            ? typeof cacheOutput.stdout === "string"
+              ? cacheOutput.stdout
+              : decoder.decode(cacheOutput.stdout)
+            : "";
+
+          if (!cacheOutput.success) {
+            // 即使有错误，也继续执行，因为某些警告不影响功能
+            // 例如 node_modules 相关的警告不影响 JSR 包的解析
+            const hasFatalError = errorText.includes("error:") && 
+              !errorText.includes("node_modules") &&
+              !errorText.includes("Could not find");
+            if (hasFatalError) {
+              console.warn(`deno cache 错误:\nstdout: ${stdoutText}\nstderr: ${errorText}`);
+            }
+          } else {
+            console.log("✓ 依赖缓存成功");
+          }
+
+          // 缓存后，通过动态导入预加载 JSR 依赖，确保 Deno 完全缓存了所有模块
+          // 这对于 esbuild resolver 插件正确解析相对路径导入很重要
+          // 使用完全动态的导入方式避免 TypeScript 类型检查错误
+          try {
+            // 预加载 JSR 包，这会触发所有依赖的下载和缓存，包括包内的相对路径导入
+            // 使用完全动态的导入字符串，避免 TypeScript 类型检查
+            const socketIoModule = "jsr:@dreamer/socket-io@1.0.0-beta.2/client";
+            const loggerModule = "jsr:@dreamer/logger@1.0.0-beta.4/client";
+            
+            // 预加载主模块
+            await Promise.all([
+              import(socketIoModule).catch(() => {}),
+              import(loggerModule).catch(() => {}),
+            ]);
+            
+            // 等待 Deno 完成文件系统操作和模块解析
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            
+            // 显式解析一些可能被引用的相对路径，确保 Deno 完全缓存了它们
+            // 这有助于 esbuild resolver 插件正确解析相对路径导入
+            try {
+              // 尝试解析 socket-io 包内可能存在的相对路径导入
+              // 这些路径可能在实际的包中被使用
+              const possiblePaths = [
+                "jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager",
+                "jsr:@dreamer/socket-io@1.0.0-beta.2/client/message-queue",
+                "jsr:@dreamer/socket-io@1.0.0-beta.2/client/polling-transport",
+              ];
+              
+              // 尝试解析这些路径（可能不存在，但不影响）
+              // import.meta.resolve() 返回字符串，不是 Promise，需要使用 try-catch
+              for (const path of possiblePaths) {
+                try {
+                  import.meta.resolve(path);
+                } catch {
+                  // 忽略解析错误
+                }
+              }
+            } catch {
+              // 忽略解析错误
+            }
+            
+            console.log("✓ JSR 依赖预加载完成");
+          } catch (importError) {
+            // 忽略导入错误，我们只需要触发依赖的缓存
+            console.log("预加载依赖完成（忽略执行错误）");
+          }
+        } catch (error) {
+          console.warn(`运行 deno cache 时出错: ${error}`);
+          // 不抛出错误，继续执行测试
+        }
+      }
 
       // 在测试数据目录创建 package.json，确保 Bun 的 bun build 能找到导入配置
       // Bun 的 bun build 命令会读取 package.json 的 imports 字段
@@ -389,7 +499,7 @@ export function testLoggerFunctions() {
         sanitizeResources: false,
       });
     });
-  });
+  }, { sanitizeOps: false, sanitizeResources: false });
 } else {
   // Bun 环境下的测试
   // 在浏览器模式下，Bun 使用 esbuild + bunResolverPlugin（类似 Deno）

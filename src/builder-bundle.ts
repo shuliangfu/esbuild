@@ -52,6 +52,12 @@ export interface BundleOptions {
   define?: Record<string, string>;
   /** 是否打包依赖（默认：true） */
   bundle?: boolean;
+  /**
+   * 是否将 JSR/npm 依赖标为 external 并用 CDN 加载（仅 browser 平台有效）。
+   * 默认 true：保持兼容，IIFE + external 在浏览器中会生成 require() 导致失败。
+   * 设为 false 时，会把 JSR 等依赖打进去，适合「在浏览器里真正执行」的测试。
+   */
+  browserMode?: boolean;
 }
 
 /**
@@ -131,19 +137,22 @@ export class BuilderBundle {
 
     // 在 Deno 或 Bun 环境下自动启用解析器插件
     // 用于解析 deno.json/package.json 的 exports 配置（如 @dreamer/logger/client）
-    // 浏览器平台：启用浏览器模式，将 jsr: 和 npm: 依赖转换为 CDN URL
+    // 浏览器平台：默认启用 browserMode（JSR 标为 external）；若传 browserMode: false 则把 JSR 打进去
     const isBrowserPlatform = (options.platform || "browser") === "browser";
+    const format = options.format || (options.globalName ? "iife" : "esm");
+    // 显式传 browserMode 时优先使用；否则在浏览器平台默认 true（external），避免破坏现有行为
+    const useBrowserMode = options.browserMode ?? isBrowserPlatform;
 
     if (IS_DENO) {
       plugins.push(denoResolverPlugin({
-        browserMode: isBrowserPlatform,
+        browserMode: useBrowserMode,
       }));
     } else if (IS_BUN) {
       // Bun 环境下使用 bunResolverPlugin
       const { bunResolverPlugin } = await import("./plugins/resolver-bun.ts");
       plugins.push(bunResolverPlugin({
         enabled: true,
-        browserMode: isBrowserPlatform,
+        browserMode: useBrowserMode,
       }));
     }
 
@@ -154,7 +163,7 @@ export class BuilderBundle {
 
     // 如果指定了 globalName 且格式为 iife，使用 IIFE 格式
     // 否则默认使用 ESM 格式（更现代，更简单）
-    const format = options.format || (options.globalName ? "iife" : "esm");
+    // 注意：format 已在上面计算过，这里直接使用
 
     const buildResult = await esbuild.build({
       entryPoints: [options.entryPoint],

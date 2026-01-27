@@ -21,6 +21,7 @@ out/
 .env.local
 
 # IDE
+.cursorignore
 .vscode/
 .cursor/
 .idea/

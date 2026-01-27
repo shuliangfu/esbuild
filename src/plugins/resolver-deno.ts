@@ -428,29 +428,55 @@ export function denoResolverPlugin(
         { filter: /^\.\.?\/.*/, namespace: "deno-protocol" },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           // 相对路径导入，需要从 importer 的目录解析
-          // 但是 importer 是协议路径（如 jsr:@dreamer/socket-io@1.0.0-beta.2/client），
-          // 需要先解析为实际文件路径
+          // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
+          // 需要先提取协议路径（去掉 deno-protocol: 前缀），然后解析为实际文件路径
           const importer = args.importer;
           if (!importer) {
             return undefined;
           }
 
           try {
-            // 先尝试直接解析 importer 为实际文件路径
+            // 提取协议路径（去掉 deno-protocol: 前缀）
+            let protocolPath = importer;
+            if (importer.startsWith("deno-protocol:")) {
+              protocolPath = importer.slice("deno-protocol:".length);
+            }
+
+            // 先尝试直接解析协议路径为实际文件路径
+            // 增加重试次数和延时，确保 Deno 完全解析模块路径
             let importerUrl: string | undefined;
-            try {
-              importerUrl = await import.meta.resolve(importer);
-            } catch {
-              // 如果 resolve 失败，尝试通过动态导入触发模块下载和缓存
+            let resolveRetries = 15;
+            while (resolveRetries > 0) {
               try {
-                await import(importer);
-                // 等待一小段时间，确保文件系统操作完成
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                // 再次尝试 resolve
-                importerUrl = await import.meta.resolve(importer);
+                importerUrl = await import.meta.resolve(protocolPath);
+                if (importerUrl && importerUrl.startsWith("file://")) {
+                  break;
+                }
+                // 如果返回的是 HTTP URL，说明模块还没有被 Deno 缓存
+                // 需要通过动态导入触发缓存，然后再次 resolve
+                if (importerUrl && (importerUrl.startsWith("https://") || importerUrl.startsWith("http://"))) {
+                  try {
+                    // 通过动态导入触发 Deno 下载和缓存模块
+                    await import(protocolPath);
+                    // 等待更长时间，确保 Deno 完全缓存模块
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                  } catch {
+                    // 忽略导入错误
+                  }
+                }
               } catch {
-                // 忽略错误
+                // 如果 resolve 失败，尝试通过动态导入触发模块下载和缓存
+                try {
+                  await import(protocolPath);
+                  // 等待更长时间，确保文件系统操作完成
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                } catch {
+                  // 忽略导入错误
+                }
               }
+              // 增加延时，给 Deno 更多时间完成文件系统操作
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              resolveRetries--;
             }
 
             if (importerUrl && importerUrl.startsWith("file://")) {
@@ -473,6 +499,43 @@ export function denoResolverPlugin(
                   };
                 }
               }
+            } else if (importerUrl && (importerUrl.startsWith("https://") || importerUrl.startsWith("http://"))) {
+              // 如果 importer 是 HTTP URL，从 HTTP URL 解析相对路径
+              // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/client/mod.ts
+              // + ../encryption/encryption-manager.ts
+              // -> https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/encryption/encryption-manager.ts
+              try {
+                const importerUrlObj = new URL(importerUrl);
+                const importerPathname = importerUrlObj.pathname;
+                const importerDir = importerPathname.substring(0, importerPathname.lastIndexOf("/"));
+                const resolvedPathname = new URL(args.path, `${importerUrlObj.protocol}//${importerUrlObj.host}${importerDir}/`).pathname;
+                const resolvedUrl = `${importerUrlObj.protocol}//${importerUrlObj.host}${resolvedPathname}`;
+                
+                // 返回一个 deno-protocol namespace 的结果，让 onLoad 钩子来处理
+                // 但是，我们需要构建一个协议路径，而不是直接使用 HTTP URL
+                // 尝试从 HTTP URL 推断协议路径
+                // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/encryption/encryption-manager.ts
+                // -> jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts
+                const match = importerPathname.match(/\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/);
+                if (match) {
+                  const [, packageName, version, path] = match;
+                  // 从 importer 路径推断相对路径的协议路径
+                  const relativeMatch = resolvedPathname.match(/\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/);
+                  if (relativeMatch) {
+                    const [, , , relativePath] = relativeMatch;
+                    // 移除 src/ 前缀（如果存在）
+                    const normalizedPath = relativePath.replace(/^src\//, "");
+                    const fullProtocolPath = `jsr:@dreamer/${packageName}@${version}/${normalizedPath}`;
+                    // 返回 deno-protocol namespace，让 onLoad 钩子来处理
+                    return {
+                      path: fullProtocolPath,
+                      namespace: "deno-protocol",
+                    };
+                  }
+                }
+              } catch {
+                // 忽略错误
+              }
             }
 
             // 如果无法通过文件路径解析，尝试构建完整的协议路径
@@ -480,8 +543,12 @@ export function denoResolverPlugin(
             // -> jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts
             try {
               // 从 importer 路径构建相对路径的协议路径
-              // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client -> jsr:@dreamer/socket-io@1.0.0-beta.2
-              const importerProtocolPath = importer;
+              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
+              // 需要先去掉 deno-protocol: 前缀
+              let importerProtocolPath = importer;
+              if (importerProtocolPath.startsWith("deno-protocol:")) {
+                importerProtocolPath = importerProtocolPath.slice("deno-protocol:".length);
+              }
               // 移除最后一个路径段（如 /client）
               const baseProtocolPath = importerProtocolPath.replace(
                 /\/[^/]+$/,
@@ -490,22 +557,75 @@ export function denoResolverPlugin(
               const relativePath = args.path;
 
               // 规范化相对路径（处理 ../ 和 ./）
-              // 简单处理：移除前导的 ../
+              // 处理多个 ../ 的情况，例如 ../../encryption/encryption-manager.ts
               let normalizedPath = relativePath;
-              if (normalizedPath.startsWith("../")) {
+              let depth = 0;
+              while (normalizedPath.startsWith("../")) {
                 normalizedPath = normalizedPath.slice(3);
-              } else if (normalizedPath.startsWith("./")) {
+                depth++;
+              }
+              if (normalizedPath.startsWith("./")) {
                 normalizedPath = normalizedPath.slice(2);
               }
 
-              const fullProtocolPath = `${baseProtocolPath}/${normalizedPath}`;
+              // 根据深度移除对应的路径段
+              // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client，depth=1 -> jsr:@dreamer/socket-io@1.0.0-beta.2
+              let currentBasePath = baseProtocolPath;
+              for (let i = 0; i < depth; i++) {
+                currentBasePath = currentBasePath.replace(/\/[^/]+$/, "");
+              }
+
+              const fullProtocolPath = `${currentBasePath}/${normalizedPath}`;
 
               // 尝试解析这个协议路径
               try {
-                const resolvedProtocolUrl = await import.meta.resolve(
-                  fullProtocolPath,
-                );
-                if (resolvedProtocolUrl.startsWith("file://")) {
+                // 先尝试通过动态导入触发 Deno 下载和缓存
+                // 增加重试次数和延时，确保 Deno 完全缓存模块
+                let importRetries = 3;
+                while (importRetries > 0) {
+                  try {
+                    await import(fullProtocolPath);
+                    // 等待更长时间，确保文件系统操作完成
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                    break;
+                  } catch {
+                    // 忽略导入错误，继续重试
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    importRetries--;
+                  }
+                }
+
+                // 多次尝试 resolve，直到得到 file:// URL
+                // 增加重试次数和延时，确保 Deno 完全解析模块路径
+                let resolvedProtocolUrl: string | undefined;
+                let retries = 15;
+                while (retries > 0) {
+                  try {
+                    resolvedProtocolUrl = await import.meta.resolve(
+                      fullProtocolPath,
+                    );
+                    if (resolvedProtocolUrl && resolvedProtocolUrl.startsWith("file://")) {
+                      break;
+                    }
+                    // 如果返回的是 HTTP URL，再次触发导入
+                    if (resolvedProtocolUrl && (resolvedProtocolUrl.startsWith("https://") || resolvedProtocolUrl.startsWith("http://"))) {
+                      try {
+                        await import(fullProtocolPath);
+                        // 等待更长时间，确保 Deno 完全缓存模块
+                        await new Promise((resolve) => setTimeout(resolve, 1000));
+                      } catch {
+                        // 忽略导入错误
+                      }
+                    }
+                  } catch {
+                    // 忽略错误
+                  }
+                  // 增加延时，给 Deno 更多时间完成文件系统操作
+                  await new Promise((resolve) => setTimeout(resolve, 500));
+                  retries--;
+                }
+
+                if (resolvedProtocolUrl && resolvedProtocolUrl.startsWith("file://")) {
                   let resolvedProtocolPath = resolvedProtocolUrl.slice(7);
                   try {
                     resolvedProtocolPath = decodeURIComponent(
@@ -559,28 +679,42 @@ export function denoResolverPlugin(
 
             // 步骤 2: 等待一小段时间，确保文件系统操作完成
             // 增加延时以确保 Deno 完全缓存模块
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
             // 步骤 3: 多次尝试使用 import.meta.resolve 获取文件路径
             // 动态导入后，Deno 应该已经缓存了模块，resolve 应该能返回文件路径
+            // 增加重试次数和延时，确保 Deno 完全解析模块路径
             let fileUrl: string | undefined;
-            let retries = 3;
-            while (retries > 0 && !fileUrl) {
+            let retries = 15;
+            while (retries > 0) {
               try {
                 fileUrl = await import.meta.resolve(protocolPath);
                 // 如果返回的是 file:// URL，说明成功
                 if (fileUrl && fileUrl.startsWith("file://")) {
                   break;
                 }
+                // 如果返回的是 HTTP URL，说明模块还没有被缓存，需要再次触发导入
+                if (fileUrl && (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))) {
+                  try {
+                    await import(protocolPath);
+                    // 增加延时，确保 Deno 完全缓存模块
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                  } catch {
+                    // 忽略导入错误
+                  }
+                }
               } catch (_resolveError) {
                 // 忽略 resolve 错误
               }
-              // 如果 resolve 失败或返回协议路径，等待后重试
+              // 如果 resolve 失败或返回协议路径/HTTP URL，等待后重试
+              // 增加延时，给 Deno 更多时间完成文件系统操作
               if (
                 !fileUrl || fileUrl.startsWith("jsr:") ||
-                fileUrl.startsWith("npm:")
+                fileUrl.startsWith("npm:") ||
+                fileUrl.startsWith("https://") ||
+                fileUrl.startsWith("http://")
               ) {
-                await new Promise((resolve) => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 500));
                 retries--;
               } else {
                 break;
