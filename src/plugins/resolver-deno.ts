@@ -8,9 +8,12 @@
  * - 解析 JSR 包的子路径导出（如 @dreamer/logger/client）
  * - 支持 jsr: 协议的模块引用（如 jsr:@dreamer/logger@^1.0.0）
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
- * - 自动处理 Deno 模块的下载和缓存
  *
- * 注意：Deno 和 Bun 都使用 npm:esbuild 进行构建，因此解析逻辑统一
+ * 与项目内 esbuild.ts 的 createImportReplacerPlugin 对比：
+ * - 彼处将 jsr/npm 转为 CDN URL（esm.sh）并 external，浏览器运行时加载已编译产物。
+ * - 本插件在 browserMode: false（打进 bundle）时，只用 Deno 在项目目录下 resolve 得到
+ *   file://，再读本地文件参与编译；不猜路径（不硬编码 src/）、不 fetch CDN。
+ * - 打进 bundle 必须用源码，故不走 esm.sh 等已编译 CDN。
  */
 
 import {
@@ -140,89 +143,32 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
 }
 
 /**
- * 解析 Deno 协议路径（jsr: 或 npm:）
- * 通过动态导入让 Deno 下载和缓存模块，然后从缓存中读取
+ * 打进 bundle 时只用 Deno 在项目目录解析得到的 file://，不猜路径、不 fetch。
+ * - esm.sh 等 CDN 返回的是已编译产物，不能当源码打进 bundle。
+ * - JSR 包的目录结构不一，有的无 src/，真实路径需从 version_meta.json 的 exports 解析，
+ *   不能硬编码 src/。本插件统一走「Deno 子进程 resolve → file:// → 读本地文件」。
+ */
+
+/**
+ * 解析 jsr: / npm: 协议路径：非浏览器模式一律走 deno-protocol，由 onLoad 用 https fetch 取内容并打包
  *
- * @param protocolPath - Deno 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.4）
- * @param browserMode - 是否使用浏览器模式（转换为 CDN URL）
+ * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.4）
+ * @param browserMode - 为 true 时标记为 external，由浏览器从 CDN 加载
  * @returns 解析结果
  */
-async function resolveDenoProtocolPath(
+function resolveDenoProtocolPath(
   protocolPath: string,
-  browserMode = false,
-): Promise<esbuild.OnResolveResult | undefined> {
-  // 浏览器模式：将 jsr: 和 npm: 依赖标记为 external，让浏览器从 CDN 加载
-  // 注意：在浏览器打包时，这些依赖不应该被打包进 bundle，而是作为外部依赖
+  browserMode: boolean,
+): esbuild.OnResolveResult | undefined {
   if (browserMode) {
-    // 返回 undefined，让 esbuild 使用默认处理（会尝试作为 external）
-    // 或者，我们可以返回一个特殊的标记，然后在插件中处理
-    // 实际上，最好的方式是让调用者将这些依赖添加到 external 列表中
-    // 但为了兼容性，我们返回一个标记，然后在 onResolve 中处理
-    return {
-      path: protocolPath,
-      namespace: "external",
-      external: true,
-    };
-  }
-  try {
-    // 使用 import.meta.resolve 尝试解析路径
-    const resolvedUrl = await import.meta.resolve(protocolPath);
-
-    // 如果返回的是 file:// URL，直接使用文件路径
-    if (resolvedUrl.startsWith("file://")) {
-      let filePath = resolvedUrl.slice(7);
-      try {
-        filePath = decodeURIComponent(filePath);
-      } catch {
-        // 忽略解码错误
-      }
-
-      // 确保文件路径不为空
-      if (filePath && existsSync(filePath)) {
-        return {
-          path: filePath,
-          namespace: "file",
-        };
-      } else if (filePath) {
-        // 文件路径存在但文件不存在，尝试使用 onLoad 钩子
-        return {
-          path: protocolPath,
-          namespace: "deno-protocol",
-        };
-      }
-    } else if (
-      resolvedUrl.startsWith("https://") ||
-      resolvedUrl.startsWith("http://")
-    ) {
-      // 如果返回的是 HTTP URL（如 JSR 的网页 URL），不能直接使用
-      // 因为 JSR 的 HTTP URL 返回的是 HTML 页面，不是源代码
-      // 应该使用 deno-protocol namespace 让 Deno 通过动态导入来处理
-      // 使用 deno-protocol namespace，让 Deno 通过动态导入来下载和缓存模块
-      return {
-        path: protocolPath,
-        namespace: "deno-protocol",
-      };
-    } else if (
-      resolvedUrl.startsWith("jsr:") ||
-      resolvedUrl.startsWith("npm:") ||
-      resolvedUrl === protocolPath
-    ) {
-      // 如果返回的还是协议路径，说明 Deno 还没有下载/缓存这个模块
-      // 这种情况下，我们需要使用 onLoad 钩子来触发下载并加载模块内容
-      return {
-        path: protocolPath,
-        namespace: "deno-protocol",
-      };
+    const browserUrl = convertSpecifierToBrowserUrl(protocolPath);
+    if (browserUrl) {
+      return { path: browserUrl, external: true };
     }
-  } catch (_error) {
-    // 如果 resolve 失败，尝试使用 onLoad 钩子
-    return {
-      path: protocolPath,
-      namespace: "deno-protocol",
-    };
+    return undefined;
   }
-
-  return undefined;
+  // 服务端或需要打进 bundle 的客户端：统一走 deno-protocol，onLoad 里用 https URL fetch 后返回内容
+  return { path: protocolPath, namespace: "deno-protocol" };
 }
 
 /**
@@ -370,7 +316,7 @@ export function denoResolverPlugin(
             }
           }
 
-          return await resolveDenoProtocolPath(path, browserMode);
+          return resolveDenoProtocolPath(path, browserMode);
         },
       );
 
@@ -425,8 +371,7 @@ export function denoResolverPlugin(
             }
           }
 
-          // 使用统一的协议路径解析函数
-          return await resolveDenoProtocolPath(fullProtocolPath, browserMode);
+          return resolveDenoProtocolPath(fullProtocolPath, browserMode);
         },
       );
 
@@ -678,9 +623,11 @@ export function denoResolverPlugin(
                 const projectDir =
                   (build.initialOptions.absWorkingDir as string | undefined) ||
                   cwd();
+                const projectDenoJson = findProjectDenoJson(projectDir);
                 const proc = createCommand("deno", {
                   args: [
                     "eval",
+                    ...(projectDenoJson ? ["--config", projectDenoJson] : []),
                     "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
                     protocolPath,
                   ],
@@ -755,8 +702,9 @@ export function denoResolverPlugin(
                   const contents = await response.text();
                   const loader = getLoaderFromPath(fileUrl);
                   const resolveDir = cwd();
-                  protocolResolveDirCache.set(protocolPath, resolveDir);
-                  console.log(`${LOG_PREFIX_LOAD} https 分支 返回内容 len=${contents.length} resolveDir=${resolveDir}`);
+                  // 不写入缓存：https 下 resolveDir 用的是 cwd()，会污染相对路径解析（如 ../encryption/ 被算成项目根/../encryption/）
+                  // 相对导入交由 relative onResolve 的「从 http importer 推断协议路径」处理
+                  console.log(`${LOG_PREFIX_LOAD} https 分支 返回内容 len=${contents.length} 不写缓存`);
                   return {
                     contents,
                     loader,
@@ -772,20 +720,13 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
-              // 步骤 6: resolve 返回协议路径时，在插件上下文中再 resolve 也拿不到 file://，直接回退空内容
-              console.log(`${LOG_PREFIX_LOAD} 进入 jsr/npm 分支 protocolPath=${protocolPath} fileUrl=${fileUrl}，不再 retry resolve，直接回退空内容`);
-              // 如果无法确定文件路径，至少设置一个 resolveDir
-              // 使用 cwd() 作为后备，这样 esbuild 至少能尝试解析相对路径
-              // 但这不是理想情况，因为 resolveDir 可能不正确
+              // 步骤 6: 子进程也未得到 file:// 时，不猜路径、不 fetch CDN（esm.sh 等为已编译产物）。
+              // 真实路径需由 JSR version_meta.json 的 exports 解析，且包结构未必有 src/。
+              // 相对导入由 relative onResolve 的「构建完整协议路径」处理；此处仅回退空内容并设 resolveDir。
               const resolveDir = cwd();
-              protocolResolveDirCache.set(protocolPath, resolveDir);
               const loader = getLoaderFromPath(protocolPath);
-              console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 无法得到文件，返回空内容 resolveDir=cwd()=${resolveDir}`);
-              return {
-                contents: "",
-                loader,
-                resolveDir,
-              };
+              console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 无 file://，不 fetch，返回空内容 不写缓存`);
+              return { contents: "", loader, resolveDir };
             }
 
             // 如果所有方法都失败，至少设置 resolveDir
