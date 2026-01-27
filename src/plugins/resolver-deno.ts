@@ -157,14 +157,15 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
   if (!protocolPath.startsWith("jsr:")) {
     return null;
   }
+  // 格式 jsr:@scope/name@version/path：包名里含 @（如 @dreamer），只能用「最后一个 @」分隔包名与版本
   const after = protocolPath.slice(4);
-  const atIdx = after.indexOf("@");
+  const slashIdx = after.indexOf("/");
+  const segment = slashIdx === -1 ? after : after.slice(0, slashIdx);
+  const subpath = slashIdx === -1 ? "" : after.slice(slashIdx + 1);
+  const atIdx = segment.lastIndexOf("@");
   if (atIdx === -1) return null;
-  const scopeAndName = after.slice(0, atIdx);
-  const versionAndPath = after.slice(atIdx + 1);
-  const slashIdx = versionAndPath.indexOf("/");
-  const version = slashIdx === -1 ? versionAndPath : versionAndPath.slice(0, slashIdx);
-  const subpath = slashIdx === -1 ? "" : versionAndPath.slice(slashIdx + 1);
+  const scopeAndName = segment.slice(0, atIdx);
+  const version = segment.slice(atIdx + 1);
 
   const base = `https://jsr.io/${scopeAndName}/${version}`;
   const metaUrl = `${base}_meta.json`;
