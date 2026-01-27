@@ -256,6 +256,14 @@ export function denoResolverPlugin(
         return;
       }
 
+      /**
+       * JSR/协议模块的 protocolPath → resolveDir 缓存。
+       * 在 onLoad 成功加载 deno-protocol 模块时写入；
+       * 在相对路径 onResolve 中优先用此缓存把 ../encryption/... 等解析到磁盘文件，
+       * 避免子路径走“协议路径 + onLoad”时返回空内容导致 "has no exports"。
+       */
+      const protocolResolveDirCache = new Map<string, string>();
+
       // 设置插件优先级，确保在其他解析器之前运行
       // 这样可以拦截 JSR 包和路径别名的解析
 
@@ -440,6 +448,22 @@ export function denoResolverPlugin(
             let protocolPath = importer;
             if (importer.startsWith("deno-protocol:")) {
               protocolPath = importer.slice("deno-protocol:".length);
+            }
+
+            // 优先用 onLoad 已缓存的 resolveDir 从磁盘解析，避免子路径走 deno-protocol onLoad 返回空内容导致 "has no exports"
+            const cachedDir = protocolResolveDirCache.get(protocolPath);
+            if (cachedDir) {
+              const resolvedPath = join(cachedDir, args.path);
+              if (existsSync(resolvedPath)) {
+                return { path: resolvedPath, namespace: "file" };
+              }
+              // 无扩展名时尝试 .ts
+              if (!resolvedPath.includes(".")) {
+                const withTs = resolvedPath + ".ts";
+                if (existsSync(withTs)) {
+                  return { path: withTs, namespace: "file" };
+                }
+              }
             }
 
             // 先尝试直接解析协议路径为实际文件路径
@@ -733,6 +757,7 @@ export function denoResolverPlugin(
               // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
               // 即使文件不存在，也要设置 resolveDir，这样 esbuild 才能正确解析相对路径
               const resolveDir = dirname(filePath);
+              protocolResolveDirCache.set(protocolPath, resolveDir);
 
               if (existsSync(filePath)) {
                 const contents = await readTextFile(filePath);
@@ -772,6 +797,7 @@ export function denoResolverPlugin(
                   // 对于 HTTP URL，无法确定 resolveDir，但我们可以尝试从 URL 路径推断
                   // 或者使用 cwd() 作为后备
                   const resolveDir = cwd();
+                  protocolResolveDirCache.set(protocolPath, resolveDir);
                   return {
                     contents,
                     loader,
@@ -779,7 +805,7 @@ export function denoResolverPlugin(
                   };
                 }
               } catch (_fetchError) {
-                // 忽略 fetch 错误
+                  // 忽略 fetch 错误
               }
             } else if (
               fileUrl &&
@@ -823,6 +849,7 @@ export function denoResolverPlugin(
                 const contents = await readTextFile(resolvedFilePath);
                 const loader = getLoaderFromPath(resolvedFilePath);
                 const resolveDir = dirname(resolvedFilePath);
+                protocolResolveDirCache.set(protocolPath, resolveDir);
                 return {
                   contents,
                   loader,
@@ -834,6 +861,7 @@ export function denoResolverPlugin(
               // 使用 cwd() 作为后备，这样 esbuild 至少能尝试解析相对路径
               // 但这不是理想情况，因为 resolveDir 可能不正确
               const resolveDir = cwd();
+              protocolResolveDirCache.set(protocolPath, resolveDir);
               const loader = getLoaderFromPath(protocolPath);
               return {
                 contents: "",
@@ -845,6 +873,7 @@ export function denoResolverPlugin(
             // 如果所有方法都失败，至少设置 resolveDir
             // 这样 esbuild 才能正确解析文件内部的相对路径导入
             const resolveDir = cwd();
+            protocolResolveDirCache.set(protocolPath, resolveDir);
             const loader = getLoaderFromPath(protocolPath);
             return {
               contents: "",
