@@ -14,6 +14,7 @@
  */
 
 import {
+  createCommand,
   cwd,
   dirname,
   existsSync,
@@ -477,41 +478,12 @@ export function denoResolverPlugin(
               console.log(`${LOG_PREFIX_REL} 缓存命中但路径不存在 resolvedPath=${resolvedPath} withTs 也不存在`);
             }
 
-            // 先尝试直接解析协议路径为实际文件路径
-            // 增加重试次数和延时，确保 Deno 完全解析模块路径
+            // 在插件上下文中 import.meta.resolve 用的是 esbuild 的 deno.json，拿不到项目的 file://，只做一次
             let importerUrl: string | undefined;
-            let resolveRetries = 15;
-            while (resolveRetries > 0) {
-              try {
-                importerUrl = await import.meta.resolve(protocolPath);
-                if (importerUrl && importerUrl.startsWith("file://")) {
-                  break;
-                }
-                // 如果返回的是 HTTP URL，说明模块还没有被 Deno 缓存
-                // 需要通过动态导入触发缓存，然后再次 resolve
-                if (importerUrl && (importerUrl.startsWith("https://") || importerUrl.startsWith("http://"))) {
-                  try {
-                    // 通过动态导入触发 Deno 下载和缓存模块
-                    await import(protocolPath);
-                    // 等待更长时间，确保 Deno 完全缓存模块
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                  } catch {
-                    // 忽略导入错误
-                  }
-                }
-              } catch {
-                // 如果 resolve 失败，尝试通过动态导入触发模块下载和缓存
-                try {
-                  await import(protocolPath);
-                  // 等待更长时间，确保文件系统操作完成
-                  await new Promise((resolve) => setTimeout(resolve, 1000));
-                } catch {
-                  // 忽略导入错误
-                }
-              }
-              // 增加延时，给 Deno 更多时间完成文件系统操作
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              resolveRetries--;
+            try {
+              importerUrl = await import.meta.resolve(protocolPath);
+            } catch {
+              // 忽略
             }
 
             if (importerUrl && importerUrl.startsWith("file://")) {
@@ -621,52 +593,13 @@ export function denoResolverPlugin(
 
               const fullProtocolPath = `${currentBasePath}/${normalizedPath}`;
 
-              // 尝试解析这个协议路径
+              // 在插件上下文中只做一次 resolve，拿不到 file:// 就返回 deno-protocol 交给 onLoad（含子进程 resolve）
               try {
-                // 先尝试通过动态导入触发 Deno 下载和缓存
-                // 增加重试次数和延时，确保 Deno 完全缓存模块
-                let importRetries = 3;
-                while (importRetries > 0) {
-                  try {
-                    await import(fullProtocolPath);
-                    // 等待更长时间，确保文件系统操作完成
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                    break;
-                  } catch {
-                    // 忽略导入错误，继续重试
-                    await new Promise((resolve) => setTimeout(resolve, 500));
-                    importRetries--;
-                  }
-                }
-
-                // 多次尝试 resolve，直到得到 file:// URL
-                // 增加重试次数和延时，确保 Deno 完全解析模块路径
                 let resolvedProtocolUrl: string | undefined;
-                let retries = 15;
-                while (retries > 0) {
-                  try {
-                    resolvedProtocolUrl = await import.meta.resolve(
-                      fullProtocolPath,
-                    );
-                    if (resolvedProtocolUrl && resolvedProtocolUrl.startsWith("file://")) {
-                      break;
-                    }
-                    // 如果返回的是 HTTP URL，再次触发导入
-                    if (resolvedProtocolUrl && (resolvedProtocolUrl.startsWith("https://") || resolvedProtocolUrl.startsWith("http://"))) {
-                      try {
-                        await import(fullProtocolPath);
-                        // 等待更长时间，确保 Deno 完全缓存模块
-                        await new Promise((resolve) => setTimeout(resolve, 1000));
-                      } catch {
-                        // 忽略导入错误
-                      }
-                    }
-                  } catch {
-                    // 忽略错误
-                  }
-                  // 增加延时，给 Deno 更多时间完成文件系统操作
-                  await new Promise((resolve) => setTimeout(resolve, 500));
-                  retries--;
+                try {
+                  resolvedProtocolUrl = await import.meta.resolve(fullProtocolPath);
+                } catch {
+                  // 忽略
                 }
 
                 if (resolvedProtocolUrl && resolvedProtocolUrl.startsWith("file://")) {
@@ -727,51 +660,46 @@ export function denoResolverPlugin(
               // 忽略导入错误，可能模块已经加载
             }
 
-            // 步骤 2: 等待一小段时间，确保文件系统操作完成
-            // 增加延时以确保 Deno 完全缓存模块
-            await new Promise((resolve) => setTimeout(resolve, 500));
-
-            // 步骤 3: 多次尝试使用 import.meta.resolve 获取文件路径
-            // 动态导入后，Deno 应该已经缓存了模块，resolve 应该能返回文件路径
-            // 增加重试次数和延时，确保 Deno 完全解析模块路径
+            // 步骤 2～3: 在插件上下文中 import.meta.resolve 用的是 esbuild 的 deno.json，拿不到项目的 file://，
+            // 只做一次 resolve，拿不到就交给步骤 3.5 子进程在项目目录下解析
             let fileUrl: string | undefined;
-            let retries = 15;
-            while (retries > 0) {
-              try {
-                fileUrl = await import.meta.resolve(protocolPath);
-                // 如果返回的是 file:// URL，说明成功
-                if (fileUrl && fileUrl.startsWith("file://")) {
-                  break;
-                }
-                // 如果返回的是 HTTP URL，说明模块还没有被缓存，需要再次触发导入
-                if (fileUrl && (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))) {
-                  try {
-                    await import(protocolPath);
-                    // 增加延时，确保 Deno 完全缓存模块
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                  } catch {
-                    // 忽略导入错误
-                  }
-                }
-              } catch (_resolveError) {
-                // 忽略 resolve 错误
-              }
-              // 如果 resolve 失败或返回协议路径/HTTP URL，等待后重试
-              // 增加延时，给 Deno 更多时间完成文件系统操作
-              if (
-                !fileUrl || fileUrl.startsWith("jsr:") ||
-                fileUrl.startsWith("npm:") ||
-                fileUrl.startsWith("https://") ||
-                fileUrl.startsWith("http://")
-              ) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-                retries--;
-              } else {
-                break;
-              }
+            try {
+              fileUrl = await import.meta.resolve(protocolPath);
+            } catch {
+              // 忽略
             }
 
-            console.log(`${LOG_PREFIX_LOAD} 主循环结束 protocolPath=${protocolPath} fileUrl=${fileUrl ? (fileUrl.startsWith("file://") ? fileUrl.slice(0, 80) + "..." : fileUrl.slice(0, 80) + "...") : "(undefined)"} retriesLeft=${retries}`);
+            console.log(`${LOG_PREFIX_LOAD} resolve 一次结束 protocolPath=${protocolPath} fileUrl=${fileUrl ? (fileUrl.startsWith("file://") ? fileUrl.slice(0, 80) + "..." : fileUrl.slice(0, 80) + "...") : "(undefined)"}`);
+
+            // 步骤 3.5: 插件里 import.meta.resolve 用的是 esbuild 的上下文，拿不到项目的 deno.json；
+            // 若未得到 file://，在项目目录下起子进程做 resolve，用项目的 deno.json 得到真实 file://
+            if (!fileUrl || !fileUrl.startsWith("file://")) {
+              try {
+                const projectDir =
+                  (build.initialOptions.absWorkingDir as string | undefined) ||
+                  cwd();
+                const proc = createCommand("deno", {
+                  args: [
+                    "eval",
+                    "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
+                    protocolPath,
+                  ],
+                  cwd: projectDir,
+                  stdout: "piped",
+                  stderr: "piped",
+                });
+                const out = await proc.output();
+                if (out.success && out.stdout && out.stdout.length > 0) {
+                  const line = new TextDecoder().decode(out.stdout).trim();
+                  if (line.startsWith("file://")) {
+                    fileUrl = line;
+                    console.log(`${LOG_PREFIX_LOAD} 子进程 resolve 得到 file:// protocolPath=${protocolPath}`);
+                  }
+                }
+              } catch (_e) {
+                console.log(`${LOG_PREFIX_LOAD} 子进程 resolve 失败 protocolPath=${protocolPath}`);
+              }
+            }
 
             // 步骤 4: 如果 resolve 返回 file:// URL，读取文件内容
             if (fileUrl && fileUrl.startsWith("file://")) {
@@ -844,54 +772,8 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
-              console.log(`${LOG_PREFIX_LOAD} 进入 jsr/npm 分支 protocolPath=${protocolPath} fileUrl=${fileUrl}`);
-              // 步骤 6: 如果 resolve 返回的还是协议路径，说明 Deno 可能还没有完全缓存
-              // 尝试多次解析，或者使用动态导入获取模块信息
-              let resolvedFilePath: string | undefined;
-              let retries = 3;
-
-              while (retries > 0 && !resolvedFilePath) {
-                try {
-                  // 尝试再次解析协议路径，看是否能获取文件路径
-                  const retryUrl = await import.meta.resolve(fileUrl);
-                  if (retryUrl && retryUrl.startsWith("file://")) {
-                    let filePath = retryUrl.slice(7);
-                    try {
-                      filePath = decodeURIComponent(filePath);
-                    } catch {
-                      // 忽略解码错误
-                    }
-
-                    if (existsSync(filePath)) {
-                      resolvedFilePath = filePath;
-                      break;
-                    }
-                  }
-                } catch {
-                  // 忽略错误
-                }
-
-                // 如果解析失败，等待后重试
-                if (!resolvedFilePath) {
-                  await new Promise((resolve) => setTimeout(resolve, 200));
-                  retries--;
-                }
-              }
-
-              // 如果找到了文件路径，读取文件内容
-              if (resolvedFilePath) {
-                const contents = await readTextFile(resolvedFilePath);
-                const loader = getLoaderFromPath(resolvedFilePath);
-                const resolveDir = dirname(resolvedFilePath);
-                protocolResolveDirCache.set(protocolPath, resolveDir);
-                console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 通过 retry resolve 得到文件 resolvedFilePath=${resolvedFilePath} len=${contents.length}`);
-                return {
-                  contents,
-                  loader,
-                  resolveDir,
-                };
-              }
-
+              // 步骤 6: resolve 返回协议路径时，在插件上下文中再 resolve 也拿不到 file://，直接回退空内容
+              console.log(`${LOG_PREFIX_LOAD} 进入 jsr/npm 分支 protocolPath=${protocolPath} fileUrl=${fileUrl}，不再 retry resolve，直接回退空内容`);
               // 如果无法确定文件路径，至少设置一个 resolveDir
               // 使用 cwd() 作为后备，这样 esbuild 至少能尝试解析相对路径
               // 但这不是理想情况，因为 resolveDir 可能不正确
