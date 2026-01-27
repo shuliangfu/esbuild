@@ -142,12 +142,87 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
   return null;
 }
 
+/** JSR 请求用 Accept 避免拿到 HTML 页面 */
+const JSR_ACCEPT_JSON = "application/json";
+const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
+
 /**
- * 打进 bundle 时只用 Deno 在项目目录解析得到的 file://，不猜路径、不 fetch。
- * - esm.sh 等 CDN 返回的是已编译产物，不能当源码打进 bundle。
- * - JSR 包的目录结构不一，有的无 src/，真实路径需从 version_meta.json 的 exports 解析，
- *   不能硬编码 src/。本插件统一走「Deno 子进程 resolve → file:// → 读本地文件」。
+ * 用 JSR version_meta.json 的 manifest/exports 解析子路径，再 fetch 源码 URL 取内容。
+ * 不猜路径：manifest 里是包内真实路径（如 /src/encryption/encryption-manager.ts），exports 是子路径→文件映射。
+ *
+ * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts）
+ * @returns 源码内容，失败返回 null
  */
+async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | null> {
+  if (!protocolPath.startsWith("jsr:")) {
+    return null;
+  }
+  const after = protocolPath.slice(4);
+  const atIdx = after.indexOf("@");
+  if (atIdx === -1) return null;
+  const scopeAndName = after.slice(0, atIdx);
+  const versionAndPath = after.slice(atIdx + 1);
+  const slashIdx = versionAndPath.indexOf("/");
+  const version = slashIdx === -1 ? versionAndPath : versionAndPath.slice(0, slashIdx);
+  const subpath = slashIdx === -1 ? "" : versionAndPath.slice(slashIdx + 1);
+
+  const base = `https://jsr.io/${scopeAndName}/${version}`;
+  const metaUrl = `${base}_meta.json`;
+  let meta: { manifest?: Record<string, unknown>; exports?: Record<string, string> };
+  try {
+    const r = await fetch(metaUrl, { headers: { Accept: JSR_ACCEPT_JSON } });
+    if (!r.ok) return null;
+    const text = await r.text();
+    if (!text || text.trimStart().startsWith("<")) return null;
+    meta = JSON.parse(text) as { manifest?: Record<string, unknown>; exports?: Record<string, string> };
+  } catch {
+    return null;
+  }
+
+  const manifest = meta.manifest ?? {};
+  const exports = meta.exports ?? {};
+  // 优先 exports："./client" -> "./src/client/mod.ts"，取掉 "./" 得 path
+  const exportKey = subpath ? `./${subpath}` : ".";
+  let pathFromExport = exports[exportKey];
+  if (pathFromExport && typeof pathFromExport === "string") {
+    pathFromExport = pathFromExport.replace(/^\.\//, "");
+  }
+  if (pathFromExport && typeof manifest[`/${pathFromExport}`] === "object") {
+    const fileUrl = `${base}/${pathFromExport}`;
+    try {
+      const fr = await fetch(fileUrl, { headers: { Accept: JSR_ACCEPT_SOURCE } }); 
+      if (!fr.ok) return null;
+      const code = await fr.text();
+      if (code && !code.trimStart().startsWith("<")) return code;
+    } catch {
+      // ignore
+    }
+  }
+  // 主入口只认 meta 里的 exports["."]，可能是 mod.ts、index.ts、main.ts 等，不写死
+  if (!subpath) return null;
+  // 子路径：仅按 meta 里 manifest 的 key 匹配，不假设目录结构；统一去掉 .ts 再比较，避免 import 带不带扩展名不一致
+  const subpathNoExt = subpath.endsWith(".ts") ? subpath.slice(0, -3) : subpath;
+  const manifestKeys = Object.keys(manifest);
+  const pathKey = manifestKeys.find(
+    (k) => {
+      if (typeof manifest[k] !== "object") return false;
+      const kNoExt = k.endsWith(".ts") ? k.slice(0, -3) : k;
+      return kNoExt === `/${subpathNoExt}` || kNoExt.endsWith(`/${subpathNoExt}`);
+    },
+  );
+  if (pathKey) {
+    const pathSlice = pathKey.slice(1);
+    try {
+      const fr = await fetch(`${base}/${pathSlice}`, { headers: { Accept: JSR_ACCEPT_SOURCE } });
+      if (!fr.ok) return null;
+      const code = await fr.text();
+      if (code && !code.trimStart().startsWith("<")) return code;
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
 
 /**
  * 解析 jsr: / npm: 协议路径：非浏览器模式一律走 deno-protocol，由 onLoad 用 https fetch 取内容并打包
@@ -720,12 +795,19 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
-              // 步骤 6: 子进程也未得到 file:// 时，不猜路径、不 fetch CDN（esm.sh 等为已编译产物）。
-              // 真实路径需由 JSR version_meta.json 的 exports 解析，且包结构未必有 src/。
-              // 相对导入由 relative onResolve 的「构建完整协议路径」处理；此处仅回退空内容并设 resolveDir。
+              // 步骤 6: 子进程也未得到 file:// 时，用 JSR _meta.json 的 manifest/exports 解析真实路径再 fetch 源码（非 CDN）
+              if (protocolPath.startsWith("jsr:")) {
+                const contents = await fetchJsrSourceViaMeta(protocolPath);
+                if (contents != null) {
+                  const loader = getLoaderFromPath(protocolPath);
+                  const resolveDir = cwd();
+                  console.log(`${LOG_PREFIX_LOAD} jsr 分支 通过 _meta.json fetch 源码 len=${contents.length} 不写缓存`);
+                  return { contents, loader, resolveDir };
+                }
+              }
               const resolveDir = cwd();
               const loader = getLoaderFromPath(protocolPath);
-              console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 无 file://，不 fetch，返回空内容 不写缓存`);
+              console.log(`${LOG_PREFIX_LOAD} jsr/npm 分支 无 file:// 且 jsr fetch 失败，返回空内容 不写缓存`);
               return { contents: "", loader, resolveDir };
             }
 

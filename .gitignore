@@ -32,3 +32,5 @@ out/
 # 测试数据
 tests/data/
 tests/output/
+
+meta.json
