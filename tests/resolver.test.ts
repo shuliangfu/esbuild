@@ -3,7 +3,7 @@
  *
  * Deno 环境测试：
  * - JSR 包的子路径导出（如 @dreamer/logger/client）
- * - 直接使用 jsr: 协议（如 jsr:@dreamer/logger@1.0.0-beta.4/client）
+ * - 直接使用 jsr: 协议（如 jsr:@dreamer/logger@1.0.0-beta.7/client）
  * - 直接使用 npm: 协议（如 npm:esbuild@^0.27.2）
  * - 相对路径导入（如 ./utils, ../config）
  * - 路径别名（如通过 deno.json imports 配置的别名）
@@ -72,7 +72,7 @@ export { logger };
       await writeTextFile(
         entryFileJsrDirect,
         `// 直接使用 jsr: 协议导入子路径
-import { createLogger } from "jsr:@dreamer/logger@1.0.0-beta.4/client";
+import { createLogger } from "jsr:@dreamer/logger@1.0.0-beta.7/client";
 
 const logger = createLogger("test-jsr-direct");
 logger.info("Test JSR protocol direct import");
@@ -198,8 +198,8 @@ export function multiply(a: number, b: number): number {
           "~utils/": "./utils/",
           "~config/": "./config/",
           // 同时保留原有的包导入映射
-          "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
-          "@dreamer/logger/client": "jsr:@dreamer/logger@1.0.0-beta.4/client",
+          "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+          "@dreamer/logger/client": "jsr:@dreamer/logger@1.0.0-beta.7/client",
         },
       };
       writeTextFileSync(
@@ -332,7 +332,7 @@ export { msg, sum, product, helper, config };
           const testFile = join(testDataDir, "test-jsr-subpath.ts");
           await writeTextFile(
             testFile,
-            `import { createLogger } from "jsr:@dreamer/logger@1.0.0-beta.4/client";
+            `import { createLogger } from "jsr:@dreamer/logger@1.0.0-beta.7/client";
 
 const logger = createLogger("test");
 logger.info("Test");
@@ -794,7 +794,7 @@ export { result };
   // Bun 环境测试：使用 bunResolverPlugin
   // 重要：Bun 不支持直接使用 jsr: 协议导入
   // JSR 包必须通过 package.json 的 imports 字段映射，然后使用不带 jsr: 前缀的导入
-  // 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+  // 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7"
   // 然后代码中使用：import { x } from "@dreamer/logger/client"
   describe("Bun 解析器插件", () => {
     let testDataDir: string = "";
@@ -1387,7 +1387,10 @@ export const testResult = result;
           const errorMessage = error instanceof Error
             ? error.message
             : String(error);
-          console.error("Bun 从缓存读取带子路径的 npm 包测试失败:", errorMessage);
+          console.error(
+            "Bun 从缓存读取带子路径的 npm 包测试失败:",
+            errorMessage,
+          );
           // 如果包不在缓存中，这是预期的，不抛出错误
           // 但至少验证了代码逻辑能够处理这种情况
           console.log("注意：如果 npm 包不在 Bun 缓存中，这个测试可能会失败");

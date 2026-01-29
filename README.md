@@ -3,7 +3,7 @@
 > 一个兼容 Deno 和 Bun 的构建工具库，提供服务端和客户端编译、打包、优化功能
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 [![Tests](https://img.shields.io/badge/tests-460%20(Bun)%20%7C%20469%20(Deno)%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
@@ -288,7 +288,7 @@ await builder.build("prod");
   "imports": {
     "@/": "./src/",
     "~/": "./",
-    "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+    "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7"
   }
 }
 ```

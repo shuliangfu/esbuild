@@ -110,7 +110,7 @@ export function testLogger() {
           {
             imports: {
               "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
+              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
             },
           },
           null,
@@ -135,8 +135,8 @@ export function testLogger() {
             // 这样可以确保 Deno 完整缓存包结构，包括包内的相对路径导入
             "jsr:@dreamer/socket-io@1.0.0-beta.2",
             "jsr:@dreamer/socket-io@1.0.0-beta.2/client",
-            "jsr:@dreamer/logger@1.0.0-beta.4",
-            "jsr:@dreamer/logger@1.0.0-beta.4/client",
+            "jsr:@dreamer/logger@1.0.0-beta.7",
+            "jsr:@dreamer/logger@1.0.0-beta.7/client",
           ];
 
           const cacheCommand = createCommand("deno", {
@@ -147,7 +147,7 @@ export function testLogger() {
           });
 
           const cacheOutput = await cacheCommand.output();
-          
+
           // 解码输出（可能是 Uint8Array 或字符串）
           const decoder = new TextDecoder();
           const errorText = cacheOutput.stderr
@@ -164,11 +164,13 @@ export function testLogger() {
           if (!cacheOutput.success) {
             // 即使有错误，也继续执行，因为某些警告不影响功能
             // 例如 node_modules 相关的警告不影响 JSR 包的解析
-            const hasFatalError = errorText.includes("error:") && 
+            const hasFatalError = errorText.includes("error:") &&
               !errorText.includes("node_modules") &&
               !errorText.includes("Could not find");
             if (hasFatalError) {
-              console.warn(`deno cache 错误:\nstdout: ${stdoutText}\nstderr: ${errorText}`);
+              console.warn(
+                `deno cache 错误:\nstdout: ${stdoutText}\nstderr: ${errorText}`,
+              );
             }
           } else {
             console.log("✓ 依赖缓存成功");
@@ -181,17 +183,17 @@ export function testLogger() {
             // 预加载 JSR 包，这会触发所有依赖的下载和缓存，包括包内的相对路径导入
             // 使用完全动态的导入字符串，避免 TypeScript 类型检查
             const socketIoModule = "jsr:@dreamer/socket-io@1.0.0-beta.2/client";
-            const loggerModule = "jsr:@dreamer/logger@1.0.0-beta.4/client";
-            
+            const loggerModule = "jsr:@dreamer/logger@1.0.0-beta.7/client";
+
             // 预加载主模块
             await Promise.all([
               import(socketIoModule).catch(() => {}),
               import(loggerModule).catch(() => {}),
             ]);
-            
+
             // 等待 Deno 完成文件系统操作和模块解析
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            
+
             // 显式解析一些可能被引用的相对路径，确保 Deno 完全缓存了它们
             // 这有助于 esbuild resolver 插件正确解析相对路径导入
             try {
@@ -202,7 +204,7 @@ export function testLogger() {
                 "jsr:@dreamer/socket-io@1.0.0-beta.2/client/message-queue",
                 "jsr:@dreamer/socket-io@1.0.0-beta.2/client/polling-transport",
               ];
-              
+
               // 尝试解析这些路径（可能不存在，但不影响）
               // import.meta.resolve() 返回字符串，不是 Promise，需要使用 try-catch
               for (const path of possiblePaths) {
@@ -215,7 +217,7 @@ export function testLogger() {
             } catch {
               // 忽略解析错误
             }
-            
+
             console.log("✓ JSR 依赖预加载完成");
           } catch (importError) {
             // 忽略导入错误，我们只需要触发依赖的缓存
@@ -242,9 +244,9 @@ export function testLogger() {
               "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
               "@dreamer/socket-io/client":
                 "jsr:@dreamer/socket-io@1.0.0-beta.2/client",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
+              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
               "@dreamer/logger/client":
-                "jsr:@dreamer/logger@1.0.0-beta.4/client",
+                "jsr:@dreamer/logger@1.0.0-beta.7/client",
             },
           },
           null,
@@ -596,7 +598,7 @@ export function testLogger() {
             type: "module",
             imports: {
               "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4",
+              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
             },
           },
           null,

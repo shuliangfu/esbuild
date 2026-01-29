@@ -8,7 +8,7 @@
  * - 读取 tsconfig.json 的 paths 配置（路径别名，作为后备）
  * - 解析 JSR 包的子路径导出（如 @dreamer/logger/client）
  *   - 注意：Bun 不支持直接使用 jsr: 协议，需要通过 package.json imports 映射
- *   - 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+ *   - 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7"
  *   - 然后代码中使用：import { x } from "@dreamer/logger/client"
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
  *
@@ -140,7 +140,7 @@ function findProjectTsconfig(startDir: string): string | undefined {
  *
  * @param projectPackageJsonPath - 项目的 package.json 路径
  * @param packageName - 包名（如 @dreamer/logger）
- * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.4），如果未找到返回 undefined
+ * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.7），如果未找到返回 undefined
  */
 function getPackageImport(
   projectPackageJsonPath: string,
@@ -453,7 +453,7 @@ export function bunResolverPlugin(
         (args): esbuild.OnResolveResult | undefined => {
           // Bun 不支持直接使用 jsr: 协议
           // 建议用户通过 package.json imports 映射来使用 JSR 包
-          // 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.4"
+          // 例如：package.json 中配置 "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7"
           // 然后代码中使用：import { x } from "@dreamer/logger/client"
           console.warn(
             `[bun-resolver] Bun 不支持直接使用 jsr: 协议导入 "${args.path}"。` +
@@ -501,7 +501,7 @@ export function bunResolverPlugin(
               // 尝试直接解析包路径，看看 Bun 是否能从缓存中解析
               // 这对于 npm 包特别有用，因为 Bun 会缓存已安装的 npm 包
               const resolvedUrl = await import.meta.resolve(path);
-              
+
               // 如果成功解析为 file:// URL，说明 Bun 从缓存中找到了这个包
               if (resolvedUrl && resolvedUrl.startsWith("file://")) {
                 let filePath = resolvedUrl.slice(7);
@@ -528,7 +528,7 @@ export function bunResolverPlugin(
           }
 
           // 拼接子路径到导入路径
-          // 例如：jsr:@dreamer/logger@1.0.0-beta.4 + /client -> jsr:@dreamer/logger@1.0.0-beta.4/client
+          // 例如：jsr:@dreamer/logger@1.0.0-beta.7 + /client -> jsr:@dreamer/logger@1.0.0-beta.7/client
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
