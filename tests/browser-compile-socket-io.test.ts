@@ -109,8 +109,8 @@ export function testLogger() {
         JSON.stringify(
           {
             imports: {
-              "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+              "@dreamer/socket-io": "jsr:@dreamer/socket-io@^1.0.0-beta.2",
+              "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
             },
           },
           null,
@@ -133,10 +133,10 @@ export function testLogger() {
             clientEntryFile,
             // 显式缓存所有在 deno.json 中定义的依赖及其子路径
             // 这样可以确保 Deno 完整缓存包结构，包括包内的相对路径导入
-            "jsr:@dreamer/socket-io@1.0.0-beta.2",
-            "jsr:@dreamer/socket-io@1.0.0-beta.2/client",
-            "jsr:@dreamer/logger@1.0.0-beta.7",
-            "jsr:@dreamer/logger@1.0.0-beta.7/client",
+            "jsr:@dreamer/socket-io@^1.0.0-beta.2",
+            "jsr:@dreamer/socket-io@^1.0.0-beta.2/client",
+            "jsr:@dreamer/logger@^1.0.0-beta.7",
+            "jsr:@dreamer/logger@^1.0.0-beta.7/client",
           ];
 
           const cacheCommand = createCommand("deno", {
@@ -182,8 +182,9 @@ export function testLogger() {
           try {
             // 预加载 JSR 包，这会触发所有依赖的下载和缓存，包括包内的相对路径导入
             // 使用完全动态的导入字符串，避免 TypeScript 类型检查
-            const socketIoModule = "jsr:@dreamer/socket-io@1.0.0-beta.2/client";
-            const loggerModule = "jsr:@dreamer/logger@1.0.0-beta.7/client";
+            const socketIoModule =
+              "jsr:@dreamer/socket-io@^1.0.0-beta.2/client";
+            const loggerModule = "jsr:@dreamer/logger@^1.0.0-beta.7/client";
 
             // 预加载主模块
             await Promise.all([
@@ -200,9 +201,9 @@ export function testLogger() {
               // 尝试解析 socket-io 包内可能存在的相对路径导入
               // 这些路径可能在实际的包中被使用
               const possiblePaths = [
-                "jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager",
-                "jsr:@dreamer/socket-io@1.0.0-beta.2/client/message-queue",
-                "jsr:@dreamer/socket-io@1.0.0-beta.2/client/polling-transport",
+                "jsr:@dreamer/socket-io@^1.0.0-beta.2/encryption/encryption-manager",
+                "jsr:@dreamer/socket-io@^1.0.0-beta.2/client/message-queue",
+                "jsr:@dreamer/socket-io@^1.0.0-beta.2/client/polling-transport",
               ];
 
               // 尝试解析这些路径（可能不存在，但不影响）
@@ -241,12 +242,12 @@ export function testLogger() {
             version: "1.0.0",
             type: "module",
             imports: {
-              "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
+              "@dreamer/socket-io": "jsr:@dreamer/socket-io@^1.0.0-beta.2",
               "@dreamer/socket-io/client":
-                "jsr:@dreamer/socket-io@1.0.0-beta.2/client",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+                "jsr:@dreamer/socket-io@^1.0.0-beta.2/client",
+              "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
               "@dreamer/logger/client":
-                "jsr:@dreamer/logger@1.0.0-beta.7/client",
+                "jsr:@dreamer/logger@^1.0.0-beta.7/client",
             },
           },
           null,
@@ -597,8 +598,8 @@ export function testLogger() {
             version: "1.0.0",
             type: "module",
             imports: {
-              "@dreamer/socket-io": "jsr:@dreamer/socket-io@1.0.0-beta.2",
-              "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+              "@dreamer/socket-io": "jsr:@dreamer/socket-io@^1.0.0-beta.2",
+              "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
             },
           },
           null,

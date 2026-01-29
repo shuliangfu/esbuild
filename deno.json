@@ -1,6 +1,6 @@
 {
   "name": "@dreamer/esbuild",
-  "version": "1.0.0-beta.26",
+  "version": "1.0.0-beta.27",
   "license": "MIT",
   "exports": {
     ".": "./src/mod.ts",
@@ -34,10 +34,10 @@
   },
   "imports": {
     "@dreamer/console": "jsr:@dreamer/console@1.0.3-beta.6",
-    "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
-    "@dreamer/runtime-adapter": "jsr:@dreamer/runtime-adapter@1.0.0-beta.20",
+    "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
+    "@dreamer/runtime-adapter": "jsr:@dreamer/runtime-adapter@^1.0.0-beta.20",
     "@dreamer/image": "jsr:@dreamer/image@^1.0.0-beta.2",
-    "@dreamer/test": "jsr:@dreamer/test@1.0.0-beta.38",
+    "@dreamer/test": "jsr:@dreamer/test@^1.0.0-beta.39",
     "esbuild": "npm:esbuild@^0.27.2",
     "postcss": "npm:postcss@8.4.39",
     "autoprefixer": "npm:autoprefixer@10.4.19",

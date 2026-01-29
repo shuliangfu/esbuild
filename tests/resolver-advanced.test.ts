@@ -108,9 +108,9 @@ export const testDynamicAlias = async () => {
             const denoJsonPath = join(testDataDir, "deno.json");
             const denoJson = {
               imports: {
-                "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+                "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
                 "@dreamer/logger/client":
-                  "jsr:@dreamer/logger@1.0.0-beta.7/client",
+                  "jsr:@dreamer/logger@^1.0.0-beta.7/client",
               },
             };
             writeTextFileSync(
@@ -166,7 +166,7 @@ export const testDynamicJsr = async () => {
               testFile,
               `// 测试动态导入中的协议路径
 const loadLogger = async () => {
-  const { createLogger } = await import("jsr:@dreamer/logger@1.0.0-beta.7/client");
+  const { createLogger } = await import("jsr:@dreamer/logger@^1.0.0-beta.7/client");
   return createLogger("dynamic-protocol-test");
 };
 
@@ -387,7 +387,7 @@ export const result = helperFunction();
               testFile,
               `// 测试浏览器模式下的协议导入
 // 在浏览器模式下，jsr: 和 npm: 协议应该被标记为 external
-import { createLogger } from "jsr:@dreamer/logger@1.0.0-beta.7/client";
+import { createLogger } from "jsr:@dreamer/logger@^1.0.0-beta.7/client";
 
 const logger = createLogger("browser-mode-test");
 logger.info("Test browser mode");
@@ -738,9 +738,9 @@ export const testBrowserMode = "bun-browser-mode-test";
               name: "bun-browser-mode-jsr-test",
               version: "1.0.0",
               imports: {
-                "@dreamer/logger": "jsr:@dreamer/logger@1.0.0-beta.7",
+                "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
                 "@dreamer/logger/client":
-                  "jsr:@dreamer/logger@1.0.0-beta.7/client",
+                  "jsr:@dreamer/logger@^1.0.0-beta.7/client",
               },
             };
             writeTextFileSync(

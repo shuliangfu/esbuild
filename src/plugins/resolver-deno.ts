@@ -27,8 +27,6 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 
-
-
 /** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
 const DEBUG_RESOLVER = false;
 const DEBUG_PREFIX = "[resolver-deno]";
@@ -119,7 +117,7 @@ function findProjectDenoJson(startDir: string): string | undefined {
  *
  * @param projectDenoJsonPath - 项目的 deno.json 路径
  * @param packageName - 包名（如 @dreamer/logger）
- * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.7），如果未找到返回 undefined
+ * @returns 包的导入路径（如 jsr:@scope/package@^1.0.0-beta.1），如果未找到返回 undefined
  */
 function getPackageImport(
   projectDenoJsonPath: string,
@@ -158,7 +156,6 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
 
   return null;
 }
-
 
 /**
  * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
@@ -208,7 +205,7 @@ async function fetchSourceFromUrl(url: string): Promise<string | null> {
  * 用 JSR version_meta.json 的 manifest/exports 解析子路径，再 fetch 源码 URL 取内容。
  * 不猜路径：manifest 里是包内真实路径（如 /src/encryption/encryption-manager.ts），exports 是子路径→文件映射。
  *
- * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts）
+ * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@^1.0.0-beta.2/encryption/encryption-manager.ts）
  * @returns 源码内容，失败返回 null
  */
 async function fetchJsrSourceViaMeta(
@@ -352,7 +349,7 @@ async function fetchJsrSourceViaMeta(
 /**
  * 解析 jsr: / npm: 协议路径：非浏览器模式一律走 deno-protocol，由 onLoad 用 https fetch 取内容并打包
  *
- * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.7）
+ * @param protocolPath - 协议路径（如 jsr:@scope/package@^1.0.0-beta.1）
  * @param browserMode - 为 true 时标记为 external，由浏览器从 CDN 加载
  * @returns 解析结果
  */
@@ -489,7 +486,7 @@ export function denoResolverPlugin(
       );
 
       // 2. 处理直接的 jsr: 和 npm: 协议导入
-      // 例如：import { x } from "jsr:@dreamer/logger@1.0.0-beta.7"
+      // 例如：import { x } from "jsr:@scope/package@^1.0.0-beta.1"
       // 例如：import { x } from "npm:esbuild@^0.27.2"
       build.onResolve(
         { filter: /^(jsr|npm):/ },
@@ -532,7 +529,7 @@ export function denoResolverPlugin(
           }
 
           // 拼接子路径到导入路径
-          // 例如：jsr:@dreamer/logger@1.0.0-beta.7 + /client -> jsr:@dreamer/logger@1.0.0-beta.7/client
+          // 例如：jsr:@scope/package@^1.0.0-beta.1 + /client -> jsr:@scope/package@^1.0.0-beta.1/client
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
@@ -547,7 +544,7 @@ export function denoResolverPlugin(
         { filter: /^\.\.?\/.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           // 相对路径导入，需要从 importer 的目录解析
-          // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
+          // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@^1.0.0-beta.2/client
           // 需要先提取协议路径（去掉 deno-protocol: 前缀），然后解析为实际文件路径
           const importer = args.importer;
           if (!importer) {
@@ -631,7 +628,7 @@ export function denoResolverPlugin(
                 // 但是，我们需要构建一个协议路径，而不是直接使用 HTTP URL
                 // 尝试从 HTTP URL 推断协议路径
                 // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/encryption/encryption-manager.ts
-                // -> jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts
+                // -> jsr:@dreamer/socket-io@^1.0.0-beta.2/encryption/encryption-manager.ts
                 const match = importerPathname.match(
                   /\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/,
                 );
@@ -660,11 +657,11 @@ export function denoResolverPlugin(
             }
 
             // 如果无法通过文件路径解析，尝试构建完整的协议路径
-            // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ./socket.ts -> .../client/socket.ts
-            // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ../encryption/encryption-manager.ts -> .../encryption/encryption-manager.ts
+            // 例如：jsr:@dreamer/socket-io@^1.0.0-beta.2/client + ./socket.ts -> .../client/socket.ts
+            // 例如：jsr:@dreamer/socket-io@^1.0.0-beta.2/client + ../encryption/encryption-manager.ts -> .../encryption/encryption-manager.ts
             try {
               // 从 importer 路径构建相对路径的协议路径
-              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client（子路径即“目录”）
+              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@^1.0.0-beta.2/client（子路径即“目录”）
               let importerProtocolPath = importer;
               const prefix = `${NAMESPACE_DENO_PROTOCOL}:`;
               if (importerProtocolPath.startsWith(prefix)) {
