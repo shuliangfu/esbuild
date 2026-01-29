@@ -3,12 +3,7 @@
  */
 
 import { describe, expect, it } from "@dreamer/test";
-import {
-  join,
-  mkdir,
-  remove,
-  writeTextFile,
-} from "@dreamer/runtime-adapter";
+import { join, mkdir, remove, writeTextFile } from "@dreamer/runtime-adapter";
 import { CacheManager } from "../src/cache-manager.ts";
 import type { BuildOptions, BuildResult } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";

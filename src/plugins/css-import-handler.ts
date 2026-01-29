@@ -23,7 +23,7 @@ export interface CSSImportHandlerOptions {
 
 /**
  * CSS 导入处理插件实例
- * 
+ *
  * 注意：为了兼容 BuildPlugin 接口，插件可以直接使用
  * 如果需要访问 CSS 文件列表，可以使用此接口
  */

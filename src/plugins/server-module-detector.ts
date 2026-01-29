@@ -20,9 +20,9 @@ export interface ServerModuleDetectorOptions {
 
 /**
  * 创建服务端模块检测插件
- * 
+ *
  * 自动检测并标记服务端模块为 external，防止被打包进客户端 bundle
- * 
+ *
  * @param options 插件选项
  * @returns 服务端模块检测插件
  */

@@ -2,7 +2,7 @@
  * @fileoverview HTMLGenerator 高级功能测试
  */
 
-import { mkdir, readTextFile} from "@dreamer/runtime-adapter";
+import { mkdir, readTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { HTMLGenerator } from "../src/html-generator.ts";
 import type { HTMLConfig } from "../src/types.ts";

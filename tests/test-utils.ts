@@ -12,7 +12,7 @@ import {
   remove,
   resolve,
   stat,
-} from "@dreamer/runtime-adapter"
+} from "@dreamer/runtime-adapter";
 
 /**
  * 是否在测试完成后清理测试数据

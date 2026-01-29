@@ -353,7 +353,10 @@ describe("BuildAnalyzer", () => {
       };
 
       const analysis = analyzer.analyze(metafile);
-      const suggestions = analyzer.generateOptimizationSuggestions(analysis, { stages: {}, total: 0 });
+      const suggestions = analyzer.generateOptimizationSuggestions(analysis, {
+        stages: {},
+        total: 0,
+      });
 
       expect(suggestions).toBeTruthy();
       expect(Array.isArray(suggestions)).toBe(true);
@@ -397,11 +400,15 @@ describe("BuildAnalyzer", () => {
       };
 
       const analysis = analyzer.analyze(metafile);
-      const suggestions = analyzer.generateOptimizationSuggestions(analysis, { stages: {}, total: 0 });
+      const suggestions = analyzer.generateOptimizationSuggestions(analysis, {
+        stages: {},
+        total: 0,
+      });
 
       // 检查是否有关于大文件的建议（中文或英文）
       const largeFileWarning = suggestions.find((s: any) =>
-        s.title.includes("过大") || s.title.includes("large") || s.title.includes("较大")
+        s.title.includes("过大") || s.title.includes("large") ||
+        s.title.includes("较大")
       );
       // 10MB 文件应该触发警告
       expect(suggestions.length).toBeGreaterThan(0);
