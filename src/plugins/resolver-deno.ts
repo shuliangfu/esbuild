@@ -27,6 +27,12 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 
+
+
+/** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
+const DEBUG_RESOLVER = false;
+const DEBUG_PREFIX = "[resolver-deno]";
+
 /**
  * 解析器选项
  */
@@ -153,9 +159,6 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
   return null;
 }
 
-/** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
-const DEBUG_RESOLVER = true;
-const DEBUG_PREFIX = "[resolver-deno]";
 
 /**
  * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
