@@ -32,6 +32,14 @@ const DEBUG_RESOLVER = false;
 const DEBUG_PREFIX = "[resolver-deno]";
 
 /**
+ * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
+ * - JSON：拉取 meta.json / _meta.json
+ * - 源码：拉取模块 .ts/.js 时用 JSR_ACCEPT_SOURCE，可拿到原始源码
+ */
+const JSR_ACCEPT_JSON = "application/json";
+const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
+
+/**
  * 解析器选项
  */
 export interface ResolverOptions {
@@ -156,14 +164,6 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
 
   return null;
 }
-
-/**
- * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
- * - JSON：拉取 meta.json / _meta.json
- * - 源码：拉取模块 .ts/.js 时用 JSR_ACCEPT_SOURCE，可拿到原始源码
- */
-const JSR_ACCEPT_JSON = "application/json";
-const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
 
 /**
  * 从 URL 拉取 JSON 并解析（避免拿到 HTML 时误解析）
