@@ -56,33 +56,33 @@ if (IS_DENO) {
  * 测试 esbuild resolver 插件能否正确解析 JSR 包的相对路径导入
  */
 
-// 导入 JSR 包（这会触发 resolver 插件解析包内的相对路径导入）
-import { ClientSocket } from "@dreamer/socket-io/client";
+// 导入 JSR 包（@dreamer/socket-io/client 导出 Client，会触发 resolver 解析包内相对路径）
+import { Client } from "@dreamer/socket-io/client";
 
 // 导出测试函数
 export function testResolver() {
   try {
-    // 检查 ClientSocket 是否已加载
-    if (typeof ClientSocket === "undefined") {
+    // 检查 Client 是否已加载
+    if (typeof Client === "undefined") {
       return {
         success: false,
-        error: "ClientSocket 未定义",
+        error: "Client 未定义",
       };
     }
 
-    // 尝试创建 ClientSocket 实例（不实际连接）
-    const socket = new ClientSocket({
+    // 尝试创建 Client 实例（不实际连接）
+    const client = new Client({
       url: "http://localhost:30000",
       autoConnect: false,
     });
 
     return {
       success: true,
-      hasSocket: socket !== null && socket !== undefined,
-      hasConnect: typeof socket.connect === "function",
-      hasDisconnect: typeof socket.disconnect === "function",
-      hasOn: typeof socket.on === "function",
-      hasEmit: typeof socket.emit === "function",
+      hasClient: client !== null && client !== undefined,
+      hasConnect: typeof client.connect === "function",
+      hasDisconnect: typeof client.disconnect === "function",
+      hasOn: typeof client.on === "function",
+      hasEmit: typeof client.emit === "function",
     };
   } catch (error: any) {
     return {
@@ -206,9 +206,10 @@ export function testResolver() {
         expect(result.code).toBeDefined();
         expect(result.code.length).toBeGreaterThan(0);
         expect(result.code).toContain("EsbuildResolverTest");
-        // 验证代码中包含了打包的依赖（不是 external）
-        // 如果 resolver 插件正确工作，相对路径导入应该被打包进 bundle
-        expect(result.code).not.toContain("jsr:@dreamer/socket-io");
+        // 验证依赖已打进 bundle：不应出现对 jsr: 的 require/import（出现则说明被 external）
+        // 注：打包产物中可能仍含 "jsr:..." 字符串（如 source map 路径），故只检查 require/import 形式
+        expect(result.code).not.toMatch(/require\s*\(\s*["']jsr:/);
+        expect(result.code).not.toMatch(/from\s+["']jsr:/);
         console.log("打包成功，代码长度:", result.code.length);
       } catch (error) {
         const errorMessage = error instanceof Error
@@ -241,16 +242,15 @@ export function testResolver() {
         expect(result.code).toBeDefined();
         expect(result.code.length).toBeGreaterThan(0);
         expect(result.code).toContain("EsbuildResolverTest");
-        
-        // 验证代码中不包含 jsr: 协议（应该被打包进 bundle）
-        expect(result.code).not.toContain("jsr:@dreamer/socket-io");
-        
+        // 验证依赖已打进 bundle（不应出现对 jsr: 的 require/import）
+        expect(result.code).not.toMatch(/require\s*\(\s*["']jsr:/);
+        expect(result.code).not.toMatch(/from\s+["']jsr:/);
         // 验证代码中包含了打包的依赖内容（不是 external）
         // 如果 resolver 插件正确工作，相对路径导入应该被打包进 bundle
         // 检查代码中是否包含一些 socket-io 相关的函数或类
-        const hasSocketContent = result.code.includes("connect") || 
+        const hasSocketContent = result.code.includes("connect") ||
                                  result.code.includes("disconnect") ||
-                                 result.code.includes("ClientSocket");
+                                 result.code.includes("Client");
         
         expect(hasSocketContent).toBe(true);
         console.log("✓ 打包成功，依赖已正确打包进 bundle");
@@ -284,10 +284,9 @@ export function testResolver() {
         expect(result.code).toBeDefined();
         expect(result.code.length).toBeGreaterThan(0);
         expect(result.code).toContain("EsbuildResolverTest");
-        
-        // 验证代码中不包含 jsr: 协议（应该被打包进 bundle）
-        expect(result.code).not.toContain("jsr:@dreamer/socket-io");
-        
+        // 验证依赖已打进 bundle（不应出现对 jsr: 的 require/import）
+        expect(result.code).not.toMatch(/require\s*\(\s*["']jsr:/);
+        expect(result.code).not.toMatch(/from\s+["']jsr:/);
         // 验证代码中包含了打包的依赖内容
         const hasSocketContent = result.code.includes("connect") || 
                                  result.code.includes("disconnect") ||

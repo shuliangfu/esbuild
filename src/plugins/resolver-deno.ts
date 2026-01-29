@@ -44,6 +44,24 @@ interface DenoConfig {
   imports?: Record<string, string>;
 }
 
+/** deno-protocol namespace，用于 onLoad 通过 fetch 取内容并打包 */
+const NAMESPACE_DENO_PROTOCOL = "deno-protocol";
+
+/**
+ * 读取并解析 deno.json 配置
+ *
+ * @param denoJsonPath - deno.json 文件路径
+ * @returns 解析后的配置，失败或文件不存在返回 undefined
+ */
+function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
+  try {
+    const content = readTextFileSync(denoJsonPath);
+    return JSON.parse(content) as DenoConfig;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 根据文件路径确定 esbuild loader
  *
@@ -95,24 +113,17 @@ function findProjectDenoJson(startDir: string): string | undefined {
  *
  * @param projectDenoJsonPath - 项目的 deno.json 路径
  * @param packageName - 包名（如 @dreamer/logger）
- * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.4），如果未找到返回 undefined
+ * @returns 包的导入路径（如 jsr:@dreamer/logger@1.0.0-beta.7），如果未找到返回 undefined
  */
 function getPackageImport(
   projectDenoJsonPath: string,
   packageName: string,
 ): string | undefined {
-  try {
-    const content = readTextFileSync(projectDenoJsonPath);
-    const config: DenoConfig = JSON.parse(content);
-
-    if (!config.imports) {
-      return undefined;
-    }
-
-    return config.imports[packageName];
-  } catch {
+  const config = getDenoConfig(projectDenoJsonPath);
+  if (!config?.imports) {
     return undefined;
   }
+  return config.imports[packageName];
 }
 
 /**
@@ -142,9 +153,53 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
   return null;
 }
 
-/** JSR 请求用 Accept 避免拿到 HTML 页面 */
+/** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
+const DEBUG_RESOLVER = true;
+const DEBUG_PREFIX = "[resolver-deno]";
+
+/**
+ * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
+ * - JSON：拉取 meta.json / _meta.json
+ * - 源码：拉取模块 .ts/.js 时用 JSR_ACCEPT_SOURCE，可拿到原始源码
+ */
 const JSR_ACCEPT_JSON = "application/json";
 const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
+
+/**
+ * 从 URL 拉取 JSON 并解析（避免拿到 HTML 时误解析）
+ *
+ * @param url - 请求 URL
+ * @returns 解析后的对象，失败或非 JSON 返回 null
+ */
+async function fetchJsonFromUrl(url: string): Promise<unknown | null> {
+  try {
+    const r = await fetch(url, { headers: { Accept: JSR_ACCEPT_JSON } });
+    if (!r.ok) return null;
+    const text = await r.text();
+    if (!text || text.trimStart().startsWith("<")) return null;
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 从 URL 拉取源码文本（避免拿到 HTML）
+ *
+ * @param url - 请求 URL
+ * @returns 源码内容，失败或疑似 HTML 返回 null
+ */
+async function fetchSourceFromUrl(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { Accept: JSR_ACCEPT_SOURCE } });
+    if (!r.ok) return null;
+    const text = await r.text();
+    if (!text || text.trimStart().startsWith("<")) return null;
+    return text;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 用 JSR version_meta.json 的 manifest/exports 解析子路径，再 fetch 源码 URL 取内容。
@@ -153,8 +208,20 @@ const JSR_ACCEPT_SOURCE = "application/typescript, text/plain, */*";
  * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts）
  * @returns 源码内容，失败返回 null
  */
-async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | null> {
+async function fetchJsrSourceViaMeta(
+  protocolPath: string,
+): Promise<string | null> {
+  if (DEBUG_RESOLVER) {
+    console.log(
+      `${DEBUG_PREFIX} fetchJsrSourceViaMeta 入参 protocolPath=${protocolPath}`,
+    );
+  }
   if (!protocolPath.startsWith("jsr:")) {
+    if (DEBUG_RESOLVER) {
+      console.log(
+        `${DEBUG_PREFIX} fetchJsrSourceViaMeta 非 jsr: 协议，返回 null`,
+      );
+    }
     return null;
   }
   // 格式 jsr:@scope/name@version/path 或 jsr:@scope/name/path（无版本号时从包级 meta 取 latest）
@@ -172,22 +239,21 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
     scopeAndName = `${parts[0]}/${parts[1]}`;
     subpath = parts.length > 2 ? parts.slice(2).join("/") : "";
     const pkgMetaUrl = `https://jsr.io/${scopeAndName}/meta.json`;
-    let pkgMeta: { versions?: Record<string, { yanked?: boolean }> };
-    try {
-      const pr = await fetch(pkgMetaUrl, { headers: { Accept: JSR_ACCEPT_JSON } });
-      if (!pr.ok) {
-        return null;
-      }
-      const pkgText = await pr.text();
-      if (!pkgText || pkgText.trimStart().startsWith("<")) {
-        return null;
-      }
-      pkgMeta = JSON.parse(pkgText) as { versions?: Record<string, { yanked?: boolean }> };
-    } catch {
-      return null;
+    const pkgMetaRaw = await fetchJsonFromUrl(pkgMetaUrl);
+    if (DEBUG_RESOLVER) {
+      console.log(
+        `${DEBUG_PREFIX} fetchJsrSourceViaMeta 无版本号分支 pkgMetaUrl=${pkgMetaUrl} pkgMetaRaw=${
+          pkgMetaRaw == null ? "null" : "ok"
+        }`,
+      );
     }
+    const pkgMeta = pkgMetaRaw as {
+      versions?: Record<string, { yanked?: boolean }>;
+    } | null;
+    if (!pkgMeta) return null;
     const versions = pkgMeta.versions ?? {};
-    const nonYanked = Object.keys(versions).filter((k) => !versions[k]?.yanked).sort();
+    const nonYanked = Object.keys(versions).filter((k) => !versions[k]?.yanked)
+      .sort();
     if (nonYanked.length === 0) {
       return null;
     }
@@ -196,26 +262,29 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
     scopeAndName = after.slice(0, lastAtIdx);
     const versionAndPath = after.slice(lastAtIdx + 1);
     const slashInRest = versionAndPath.indexOf("/");
-    version = slashInRest === -1 ? versionAndPath : versionAndPath.slice(0, slashInRest);
+    version = slashInRest === -1
+      ? versionAndPath
+      : versionAndPath.slice(0, slashInRest);
     subpath = slashInRest === -1 ? "" : versionAndPath.slice(slashInRest + 1);
   }
 
-  const base = `https://jsr.io/${scopeAndName}/${version}`;
+  // JSR _meta.json URL 只接受具体版本，不接受 ^ 或 ~ 等范围；去掉前缀后用该版本请求
+  const concreteVersion = version.replace(/^[\^~]/, "");
+  const base = `https://jsr.io/${scopeAndName}/${concreteVersion}`;
   const metaUrl = `${base}_meta.json`;
-  let meta: { manifest?: Record<string, unknown>; exports?: Record<string, string> };
-  try {
-    const r = await fetch(metaUrl, { headers: { Accept: JSR_ACCEPT_JSON } });
-    if (!r.ok) {
-      return null;
-    }
-    const text = await r.text();
-    if (!text || text.trimStart().startsWith("<")) {
-      return null;
-    }
-    meta = JSON.parse(text) as { manifest?: Record<string, unknown>; exports?: Record<string, string> };
-  } catch {
-    return null;
+  const metaRaw = await fetchJsonFromUrl(metaUrl);
+  if (DEBUG_RESOLVER) {
+    console.log(
+      `${DEBUG_PREFIX} fetchJsrSourceViaMeta scopeAndName=${scopeAndName} version=${version} subpath=${subpath} metaUrl=${metaUrl} metaRaw=${
+        metaRaw == null ? "null" : "ok"
+      }`,
+    );
   }
+  const meta = metaRaw as {
+    manifest?: Record<string, unknown>;
+    exports?: Record<string, string>;
+  } | null;
+  if (!meta) return null;
 
   const manifest = meta.manifest ?? {};
   const exports = meta.exports ?? {};
@@ -225,21 +294,24 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
   if (pathFromExport && typeof pathFromExport === "string") {
     pathFromExport = pathFromExport.replace(/^\.\//, "");
   }
+  if (DEBUG_RESOLVER) {
+    console.log(
+      `${DEBUG_PREFIX} fetchJsrSourceViaMeta exportKey=${exportKey} pathFromExport=${pathFromExport} manifestHasPath=${
+        pathFromExport ? typeof manifest[`/${pathFromExport}`] : "n/a"
+      }`,
+    );
+  }
   if (pathFromExport && typeof manifest[`/${pathFromExport}`] === "object") {
     const fileUrl = `${base}/${pathFromExport}`;
-    try {
-      const fr = await fetch(fileUrl, { headers: { Accept: JSR_ACCEPT_SOURCE } });
-      if (!fr.ok) {
-        // 不缓存失败结果
-      } else {
-        const code = await fr.text();
-        if (code && !code.trimStart().startsWith("<")) {
-          return code;
-        }
-      }
-    } catch {
-      // 忽略
+    const code = await fetchSourceFromUrl(fileUrl);
+    if (DEBUG_RESOLVER) {
+      console.log(
+        `${DEBUG_PREFIX} fetchJsrSourceViaMeta 第一路径 fileUrl=${fileUrl} code=${
+          code != null ? `${code.length} chars` : "null"
+        }`,
+      );
     }
+    if (code != null) return code;
   }
   // 主入口只认 meta 里的 exports["."]，可能是 mod.ts、index.ts、main.ts 等，不写死
   if (!subpath) {
@@ -252,24 +324,24 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
     (k) => {
       if (typeof manifest[k] !== "object") return false;
       const kNoExt = k.endsWith(".ts") ? k.slice(0, -3) : k;
-      return kNoExt === `/${subpathNoExt}` || kNoExt.endsWith(`/${subpathNoExt}`);
+      return kNoExt === `/${subpathNoExt}` ||
+        kNoExt.endsWith(`/${subpathNoExt}`);
     },
   );
   if (pathKey) {
     const pathSlice = pathKey.slice(1);
-    try {
-      const fr = await fetch(`${base}/${pathSlice}`, { headers: { Accept: JSR_ACCEPT_SOURCE } });
-      if (!fr.ok) {
-        // 不缓存失败结果
-      } else {
-        const code = await fr.text();
-        if (code && !code.trimStart().startsWith("<")) {
-          return code;
-        }
-      }
-    } catch {
-      // 忽略
+    const code = await fetchSourceFromUrl(`${base}/${pathSlice}`);
+    if (DEBUG_RESOLVER) {
+      console.log(
+        `${DEBUG_PREFIX} fetchJsrSourceViaMeta 第二路径 pathKey=${pathKey} url=${base}/${pathSlice} code=${
+          code != null ? `${code.length} chars` : "null"
+        }`,
+      );
     }
+    if (code != null) return code;
+  }
+  if (DEBUG_RESOLVER) {
+    console.log(`${DEBUG_PREFIX} fetchJsrSourceViaMeta 未取到源码，返回 null`);
   }
   return null;
 }
@@ -277,7 +349,7 @@ async function fetchJsrSourceViaMeta(protocolPath: string): Promise<string | nul
 /**
  * 解析 jsr: / npm: 协议路径：非浏览器模式一律走 deno-protocol，由 onLoad 用 https fetch 取内容并打包
  *
- * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.4）
+ * @param protocolPath - 协议路径（如 jsr:@dreamer/logger@1.0.0-beta.7）
  * @param browserMode - 为 true 时标记为 external，由浏览器从 CDN 加载
  * @returns 解析结果
  */
@@ -293,7 +365,7 @@ function resolveDenoProtocolPath(
     return undefined;
   }
   // 服务端或需要打进 bundle 的客户端：统一走 deno-protocol，onLoad 里用 https URL fetch 后返回内容
-  return { path: protocolPath, namespace: "deno-protocol" };
+  return { path: protocolPath, namespace: NAMESPACE_DENO_PROTOCOL };
 }
 
 /**
@@ -360,60 +432,53 @@ export function denoResolverPlugin(
           }
 
           // 从项目的 deno.json 的 imports 中查找路径别名
-          try {
-            const content = readTextFileSync(projectDenoJsonPath);
-            const config: DenoConfig = JSON.parse(content);
+          const config = getDenoConfig(projectDenoJsonPath);
+          if (!config?.imports) {
+            return undefined;
+          }
 
-            if (!config.imports) {
-              return undefined;
-            }
+          // 查找匹配的别名
+          // 优先匹配最长的前缀（如 @/lib/ 优先于 @/）
+          const sortedKeys = Object.keys(config.imports).sort((a, b) =>
+            b.length - a.length
+          );
 
-            // 查找匹配的别名
-            // 优先匹配最长的前缀（如 @/lib/ 优先于 @/）
-            const sortedKeys = Object.keys(config.imports).sort((a, b) =>
-              b.length - a.length
-            );
+          for (const alias of sortedKeys) {
+            if (path.startsWith(alias)) {
+              const aliasValue = config.imports[alias];
+              if (aliasValue) {
+                // 替换别名前缀
+                const remainingPath = path.slice(alias.length);
+                let resolvedPath: string;
 
-            for (const alias of sortedKeys) {
-              if (path.startsWith(alias)) {
-                const aliasValue = config.imports[alias];
-                if (aliasValue) {
-                  // 替换别名前缀
-                  const remainingPath = path.slice(alias.length);
-                  let resolvedPath: string;
+                // 如果别名值以 ./ 或 ../ 开头，是相对路径
+                if (
+                  aliasValue.startsWith("./") || aliasValue.startsWith("../")
+                ) {
+                  const denoJsonDir = dirname(projectDenoJsonPath);
+                  resolvedPath = join(denoJsonDir, aliasValue, remainingPath);
+                } else {
+                  // 如果别名值是绝对路径或其他格式
+                  resolvedPath = aliasValue + remainingPath;
+                }
 
-                  // 如果别名值以 ./ 或 ../ 开头，是相对路径
-                  if (
-                    aliasValue.startsWith("./") || aliasValue.startsWith("../")
-                  ) {
-                    const denoJsonDir = dirname(projectDenoJsonPath);
-                    resolvedPath = join(denoJsonDir, aliasValue, remainingPath);
-                  } else {
-                    // 如果别名值是绝对路径或其他格式
-                    resolvedPath = aliasValue + remainingPath;
-                  }
-
-                  // 检查文件是否存在
-                  if (existsSync(resolvedPath)) {
-                    return {
-                      path: resolvedPath,
-                      namespace: "file",
-                    };
-                  } else {
-                    // 尝试添加 .ts 扩展名
-                    const withExt = resolvedPath + ".ts";
-                    if (existsSync(withExt)) {
-                      return {
-                        path: withExt,
-                        namespace: "file",
-                      };
-                    }
-                  }
+                // 检查文件是否存在
+                if (existsSync(resolvedPath)) {
+                  return {
+                    path: resolvedPath,
+                    namespace: "file",
+                  };
+                }
+                // 尝试添加 .ts 扩展名
+                const withExt = resolvedPath + ".ts";
+                if (existsSync(withExt)) {
+                  return {
+                    path: withExt,
+                    namespace: "file",
+                  };
                 }
               }
             }
-          } catch (_error) {
-            // 忽略错误，返回 undefined
           }
 
           return undefined;
@@ -421,35 +486,19 @@ export function denoResolverPlugin(
       );
 
       // 2. 处理直接的 jsr: 和 npm: 协议导入
-      // 例如：import { x } from "jsr:@dreamer/logger@1.0.0-beta.4"
+      // 例如：import { x } from "jsr:@dreamer/logger@1.0.0-beta.7"
       // 例如：import { x } from "npm:esbuild@^0.27.2"
       build.onResolve(
         { filter: /^(jsr|npm):/ },
-        async (args): Promise<esbuild.OnResolveResult | undefined> => {
-          const path = args.path;
-
-          // 浏览器模式：将依赖标记为 external，让浏览器从 CDN 加载
-          if (browserMode) {
-            const browserUrl = convertSpecifierToBrowserUrl(path);
-            if (browserUrl) {
-              // 返回 external，让 esbuild 不打包这个依赖
-              // 浏览器会在运行时从 CDN 加载
-              return {
-                path: browserUrl,
-                external: true,
-              };
-            }
-          }
-
-          return resolveDenoProtocolPath(path, browserMode);
-        },
+        (args): esbuild.OnResolveResult | undefined =>
+          resolveDenoProtocolPath(args.path, browserMode),
       );
 
       // 2. 匹配带有子路径的 @scope/package/subpath 模式
       // 例如：@dreamer/logger/client
       build.onResolve(
         { filter: /^@[^/]+\/[^/]+\/.+$/ },
-        async (args): Promise<esbuild.OnResolveResult | undefined> => {
+        (args): esbuild.OnResolveResult | undefined => {
           const path = args.path;
 
           // 解析包名和子路径
@@ -480,22 +529,10 @@ export function denoResolverPlugin(
           }
 
           // 拼接子路径到导入路径
-          // 例如：jsr:@dreamer/logger@1.0.0-beta.4 + /client -> jsr:@dreamer/logger@1.0.0-beta.4/client
+          // 例如：jsr:@dreamer/logger@1.0.0-beta.7 + /client -> jsr:@dreamer/logger@1.0.0-beta.7/client
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
-
-          // 浏览器模式：将依赖转换为 CDN URL 并标记为 external
-          if (browserMode) {
-            const browserUrl = convertSpecifierToBrowserUrl(fullProtocolPath);
-            if (browserUrl) {
-              return {
-                path: browserUrl,
-                external: true,
-              };
-            }
-          }
-
           return resolveDenoProtocolPath(fullProtocolPath, browserMode);
         },
       );
@@ -504,7 +541,7 @@ export function denoResolverPlugin(
       // 当文件内部有相对路径导入（如 ../encryption/encryption-manager.ts）时，
       // 需要从文件的 resolveDir 解析这些相对路径
       build.onResolve(
-        { filter: /^\.\.?\/.*/, namespace: "deno-protocol" },
+        { filter: /^\.\.?\/.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           // 相对路径导入，需要从 importer 的目录解析
           // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
@@ -517,8 +554,9 @@ export function denoResolverPlugin(
           try {
             // 提取协议路径（去掉 deno-protocol: 前缀）
             let protocolPath = importer;
-            if (importer.startsWith("deno-protocol:")) {
-              protocolPath = importer.slice("deno-protocol:".length);
+            const protocolPrefix = `${NAMESPACE_DENO_PROTOCOL}:`;
+            if (importer.startsWith(protocolPrefix)) {
+              protocolPath = importer.slice(protocolPrefix.length);
             }
 
             // 优先用 onLoad 已缓存的 resolveDir 从磁盘解析，避免子路径走 deno-protocol onLoad 返回空内容导致 "has no exports"
@@ -565,7 +603,11 @@ export function denoResolverPlugin(
                   };
                 }
               }
-            } else if (importerUrl && (importerUrl.startsWith("https://") || importerUrl.startsWith("http://"))) {
+            } else if (
+              importerUrl &&
+              (importerUrl.startsWith("https://") ||
+                importerUrl.startsWith("http://"))
+            ) {
               // 如果 importer 是 HTTP URL，从 HTTP URL 解析相对路径
               // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/client/mod.ts
               // + ../encryption/encryption-manager.ts
@@ -573,29 +615,39 @@ export function denoResolverPlugin(
               try {
                 const importerUrlObj = new URL(importerUrl);
                 const importerPathname = importerUrlObj.pathname;
-                const importerDir = importerPathname.substring(0, importerPathname.lastIndexOf("/"));
-                const resolvedPathname = new URL(args.path, `${importerUrlObj.protocol}//${importerUrlObj.host}${importerDir}/`).pathname;
-                const resolvedUrl = `${importerUrlObj.protocol}//${importerUrlObj.host}${resolvedPathname}`;
-                
+                const importerDir = importerPathname.substring(
+                  0,
+                  importerPathname.lastIndexOf("/"),
+                );
+                const resolvedPathname = new URL(
+                  args.path,
+                  `${importerUrlObj.protocol}//${importerUrlObj.host}${importerDir}/`,
+                ).pathname;
+
                 // 返回一个 deno-protocol namespace 的结果，让 onLoad 钩子来处理
                 // 但是，我们需要构建一个协议路径，而不是直接使用 HTTP URL
                 // 尝试从 HTTP URL 推断协议路径
                 // 例如：https://jsr.io/@dreamer/socket-io/1.0.0-beta.2/src/encryption/encryption-manager.ts
                 // -> jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts
-                const match = importerPathname.match(/\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/);
+                const match = importerPathname.match(
+                  /\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/,
+                );
                 if (match) {
-                  const [, packageName, version, path] = match;
+                  const [, packageName, version] = match;
                   // 从 importer 路径推断相对路径的协议路径
-                  const relativeMatch = resolvedPathname.match(/\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/);
+                  const relativeMatch = resolvedPathname.match(
+                    /\/@dreamer\/([^\/]+)\/([^\/]+)\/(.+)/,
+                  );
                   if (relativeMatch) {
                     const [, , , relativePath] = relativeMatch;
                     // 移除 src/ 前缀（如果存在）
                     const normalizedPath = relativePath.replace(/^src\//, "");
-                    const fullProtocolPath = `jsr:@dreamer/${packageName}@${version}/${normalizedPath}`;
+                    const fullProtocolPath =
+                      `jsr:@dreamer/${packageName}@${version}/${normalizedPath}`;
                     // 返回 deno-protocol namespace，让 onLoad 钩子来处理
                     return {
                       path: fullProtocolPath,
-                      namespace: "deno-protocol",
+                      namespace: NAMESPACE_DENO_PROTOCOL,
                     };
                   }
                 }
@@ -605,25 +657,27 @@ export function denoResolverPlugin(
             }
 
             // 如果无法通过文件路径解析，尝试构建完整的协议路径
-            // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ../encryption/encryption-manager.ts
-            // -> jsr:@dreamer/socket-io@1.0.0-beta.2/encryption/encryption-manager.ts
+            // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ./socket.ts -> .../client/socket.ts
+            // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client + ../encryption/encryption-manager.ts -> .../encryption/encryption-manager.ts
             try {
               // 从 importer 路径构建相对路径的协议路径
-              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client
-              // 需要先去掉 deno-protocol: 前缀
+              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@1.0.0-beta.2/client（子路径即“目录”）
               let importerProtocolPath = importer;
-              if (importerProtocolPath.startsWith("deno-protocol:")) {
-                importerProtocolPath = importerProtocolPath.slice("deno-protocol:".length);
+              const prefix = `${NAMESPACE_DENO_PROTOCOL}:`;
+              if (importerProtocolPath.startsWith(prefix)) {
+                importerProtocolPath = importerProtocolPath.slice(
+                  prefix.length,
+                );
               }
-              // 移除最后一个路径段（如 /client）
-              const baseProtocolPath = importerProtocolPath.replace(
-                /\/[^/]+$/,
-                "",
-              );
+              // 基准路径：若 importer 为文件（最后一段含扩展名如 .ts），则用其所在目录；否则用完整路径（子路径如 client 对应 mod 所在目录）
+              const lastSegment = importerProtocolPath.replace(/.*\//, "");
+              const isFile = lastSegment.includes(".");
+              let currentBasePath = isFile
+                ? importerProtocolPath.replace(/\/[^/]+$/, "")
+                : importerProtocolPath;
               const relativePath = args.path;
 
               // 规范化相对路径（处理 ../ 和 ./）
-              // 处理多个 ../ 的情况，例如 ../../encryption/encryption-manager.ts
               let normalizedPath = relativePath;
               let depth = 0;
               while (normalizedPath.startsWith("../")) {
@@ -634,9 +688,8 @@ export function denoResolverPlugin(
                 normalizedPath = normalizedPath.slice(2);
               }
 
-              // 根据深度移除对应的路径段
-              // 例如：jsr:@dreamer/socket-io@1.0.0-beta.2/client，depth=1 -> jsr:@dreamer/socket-io@1.0.0-beta.2
-              let currentBasePath = baseProtocolPath;
+              // 仅对 ../ 向上回退：每层 ../ 从 currentBasePath 去掉最后一段
+              // 例如 jsr:.../client，depth=1 -> jsr:...@1.0.0-beta.2
               for (let i = 0; i < depth; i++) {
                 currentBasePath = currentBasePath.replace(/\/[^/]+$/, "");
               }
@@ -647,12 +700,17 @@ export function denoResolverPlugin(
               try {
                 let resolvedProtocolUrl: string | undefined;
                 try {
-                  resolvedProtocolUrl = await import.meta.resolve(fullProtocolPath);
+                  resolvedProtocolUrl = await import.meta.resolve(
+                    fullProtocolPath,
+                  );
                 } catch {
                   // 忽略
                 }
 
-                if (resolvedProtocolUrl && resolvedProtocolUrl.startsWith("file://")) {
+                if (
+                  resolvedProtocolUrl &&
+                  resolvedProtocolUrl.startsWith("file://")
+                ) {
                   let resolvedProtocolPath = resolvedProtocolUrl.slice(7);
                   try {
                     resolvedProtocolPath = decodeURIComponent(
@@ -672,13 +730,13 @@ export function denoResolverPlugin(
                 // 未得到 file:// 或本地文件不存在时，一律返回 deno-protocol，由 onLoad 用 fetchJsrSourceViaMeta 等拉取
                 return {
                   path: fullProtocolPath,
-                  namespace: "deno-protocol",
+                  namespace: NAMESPACE_DENO_PROTOCOL,
                 };
               } catch {
                 // 若上述流程抛错，仍返回 deno-protocol，让 onLoad 尝试拉取
                 return {
                   path: fullProtocolPath,
-                  namespace: "deno-protocol",
+                  namespace: NAMESPACE_DENO_PROTOCOL,
                 };
               }
             } catch {
@@ -695,9 +753,14 @@ export function denoResolverPlugin(
       // 4. 添加 onLoad 钩子来处理 deno-protocol namespace 的模块加载
       // 统一处理 jsr: 和 npm: 协议的模块加载
       build.onLoad(
-        { filter: /.*/, namespace: "deno-protocol" },
+        { filter: /.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = args.path;
+          if (DEBUG_RESOLVER) {
+            console.log(
+              `${DEBUG_PREFIX} onLoad 入参 protocolPath=${protocolPath}`,
+            );
+          }
 
           try {
             // 步骤 1: 先使用动态导入触发 Deno 下载和缓存模块
@@ -713,6 +776,13 @@ export function denoResolverPlugin(
             let fileUrl: string | undefined;
             try {
               fileUrl = await import.meta.resolve(protocolPath);
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad import.meta.resolve 结果 fileUrl=${
+                    fileUrl ?? "undefined"
+                  }`,
+                );
+              }
             } catch {
               // 忽略
             }
@@ -720,6 +790,11 @@ export function denoResolverPlugin(
             // 步骤 3.5: 插件里 import.meta.resolve 用的是 esbuild 的上下文，拿不到项目的 deno.json；
             // 若未得到 file://，在项目目录下起子进程做 resolve，用项目的 deno.json 得到真实 file://
             if (!fileUrl || !fileUrl.startsWith("file://")) {
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 未得到 file://，尝试子进程 resolve`,
+                );
+              }
               try {
                 const projectDir =
                   (build.initialOptions.absWorkingDir as string | undefined) ||
@@ -741,6 +816,11 @@ export function denoResolverPlugin(
                   const line = new TextDecoder().decode(out.stdout).trim();
                   if (line.startsWith("file://")) {
                     fileUrl = line;
+                    if (DEBUG_RESOLVER) {
+                      console.log(
+                        `${DEBUG_PREFIX} onLoad 子进程 resolve 得到 fileUrl=${fileUrl}`,
+                      );
+                    }
                   }
                 }
               } catch {
@@ -764,18 +844,33 @@ export function denoResolverPlugin(
 
               if (existsSync(filePath)) {
                 const contents = await readTextFile(filePath);
-
+                if (DEBUG_RESOLVER) {
+                  console.log(
+                    `${DEBUG_PREFIX} onLoad 分支 file:// 文件存在 path=${filePath} contentsLen=${contents.length}`,
+                  );
+                }
                 // 根据文件扩展名确定 loader
                 const loader = getLoaderFromPath(filePath);
-
                 return {
                   contents,
                   loader,
                   resolveDir,
                 };
+              }
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 分支 file:// 文件不存在 path=${filePath}，对 jsr: 尝试 fetchJsrSourceViaMeta`,
+                );
+              }
+              // 文件不存在（如缓存路径在另一台机器或已清理）：对 jsr: 回退到 fetchJsrSourceViaMeta，避免返回空内容导致 "No matching export"
+              if (protocolPath.startsWith("jsr:")) {
+                const contents = await fetchJsrSourceViaMeta(protocolPath);
+                if (contents != null) {
+                  const loader = getLoaderFromPath(protocolPath);
+                  return { contents, loader, resolveDir };
+                }
               } else {
-                // 文件不存在，但仍然需要设置 resolveDir
-                // 这样 esbuild 才能正确解析文件内部的相对路径导入
+                // 非 jsr: 且文件不存在时仍设置 resolveDir，返回空内容
                 const loader = getLoaderFromPath(filePath);
                 return {
                   contents: "",
@@ -787,23 +882,44 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))
             ) {
-              // 步骤 5: 如果 resolve 返回 HTTP URL，使用 fetch 获取内容
-              // 这种情况可能发生在 Deno 还没有完全缓存模块时
-              // 注意：对于 JSR/NPM 的 HTTP URL，通常返回的是 HTML 页面，不是源代码
-              // 所以这里应该尽量避免使用
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 分支 https fileUrl=${fileUrl}`,
+                );
+              }
+              // 步骤 5: 如果 resolve 返回 HTTP URL
+              // 对 jsr: 优先用 fetchJsrSourceViaMeta（内部带 Accept: JSR_ACCEPT_SOURCE），避免运行时自动加 Sec-Fetch-Dest: document 导致 JSR 仍回 HTML
+              if (protocolPath.startsWith("jsr:")) {
+                const contents = await fetchJsrSourceViaMeta(protocolPath);
+                if (DEBUG_RESOLVER) {
+                  console.log(
+                    `${DEBUG_PREFIX} onLoad 步骤5(https+jsr) fetchJsrSourceViaMeta 结果 contents=${
+                      contents != null ? `${contents.length} chars` : "null"
+                    }`,
+                  );
+                }
+                if (contents != null) {
+                  const loader = getLoaderFromPath(protocolPath);
+                  // 不设 resolveDir：否则 esbuild 会把模块内 "./socket" 等解析为 cwd()/socket，加载到项目文件导致 "No matching export"
+                  return { contents, loader };
+                }
+              }
+              // 非 jsr: 或 fetchJsr 失败时：直接 fetch，带 Accept 避免 JSR 回 HTML
               try {
-                const response = await fetch(fileUrl);
+                const response = await fetch(fileUrl, {
+                  headers: { Accept: JSR_ACCEPT_SOURCE },
+                });
                 if (response.ok) {
                   const contents = await response.text();
-                  const loader = getLoaderFromPath(fileUrl);
-                  const resolveDir = cwd();
-                  // 不写入缓存：https 下 resolveDir 用的是 cwd()，会污染相对路径解析（如 ../encryption/ 被算成项目根/../encryption/）
-                  // 相对导入交由 relative onResolve 的「从 http importer 推断协议路径」处理
-                  return {
-                    contents,
-                    loader,
-                    resolveDir,
-                  };
+                  if (!contents.trimStart().startsWith("<")) {
+                    const loader = getLoaderFromPath(fileUrl);
+                    const resolveDir = cwd();
+                    return {
+                      contents,
+                      loader,
+                      resolveDir,
+                    };
+                  }
                 }
               } catch {
                 // 忽略 fetch 错误
@@ -812,21 +928,44 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 分支 fileUrl=jsr/npm fileUrl=${fileUrl}`,
+                );
+              }
               // 步骤 6: 子进程也未得到 file:// 时，用 JSR _meta.json 的 manifest/exports 解析真实路径再 fetch 源码（非 CDN）
               if (protocolPath.startsWith("jsr:")) {
                 const contents = await fetchJsrSourceViaMeta(protocolPath);
+                if (DEBUG_RESOLVER) {
+                  console.log(
+                    `${DEBUG_PREFIX} onLoad 步骤6 fetchJsrSourceViaMeta 结果 contents=${
+                      contents != null ? `${contents.length} chars` : "null"
+                    }`,
+                  );
+                }
                 if (contents != null) {
                   const loader = getLoaderFromPath(protocolPath);
-                  const resolveDir = cwd();
-                  return { contents, loader, resolveDir };
+                  // 不设 resolveDir，相对导入走 deno-protocol onResolve
+                  return { contents, loader };
                 }
               }
-              const resolveDir = cwd();
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 步骤6 返回空内容 (fileUrl=jsr/npm 且 fetchJsr 为 null)`,
+                );
+              }
               const loader = getLoaderFromPath(protocolPath);
-              return { contents: "", loader, resolveDir };
+              return { contents: "", loader };
             }
 
             // 如果所有方法都失败，至少设置 resolveDir
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} onLoad 落入最终分支 返回空内容 fileUrl=${
+                  fileUrl ?? "undefined"
+                }`,
+              );
+            }
             // 这样 esbuild 才能正确解析文件内部的相对路径导入
             const resolveDir = cwd();
             protocolResolveDirCache.set(protocolPath, resolveDir);
