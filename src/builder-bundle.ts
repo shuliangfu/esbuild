@@ -58,6 +58,28 @@ export interface BundleOptions {
    * 设为 false 时，会把 JSR 等依赖打进去，适合「在浏览器里真正执行」的测试。
    */
   browserMode?: boolean;
+  /**
+   * JSX 模式
+   * - "transform": 转换为函数调用（需要配合 jsxFactory/jsxFragment）
+   * - "automatic": 自动导入 JSX 运行时（需要配合 jsxImportSource）
+   * - "preserve": 保持原样
+   */
+  jsx?: "transform" | "automatic" | "preserve";
+  /**
+   * JSX 导入源（用于 "automatic" 模式）
+   * 如 "preact"、"react" 等
+   */
+  jsxImportSource?: string;
+  /**
+   * JSX 工厂函数（用于 "transform" 模式）
+   * 如 "h"（Preact）、"React.createElement"（React）
+   */
+  jsxFactory?: string;
+  /**
+   * JSX Fragment 工厂（用于 "transform" 模式）
+   * 如 "Fragment"（Preact）、"React.Fragment"（React）
+   */
+  jsxFragment?: string;
 }
 
 /**
@@ -165,6 +187,21 @@ export class BuilderBundle {
     // 否则默认使用 ESM 格式（更现代，更简单）
     // 注意：format 已在上面计算过，这里直接使用
 
+    // 构建 JSX 配置
+    const jsxConfig: Partial<esbuild.BuildOptions> = {};
+    if (options.jsx) {
+      jsxConfig.jsx = options.jsx;
+    }
+    if (options.jsxImportSource) {
+      jsxConfig.jsxImportSource = options.jsxImportSource;
+    }
+    if (options.jsxFactory) {
+      jsxConfig.jsxFactory = options.jsxFactory;
+    }
+    if (options.jsxFragment) {
+      jsxConfig.jsxFragment = options.jsxFragment;
+    }
+
     const buildResult = await esbuild.build({
       entryPoints: [options.entryPoint],
       bundle: options.bundle !== false,
@@ -178,6 +215,8 @@ export class BuilderBundle {
       plugins: plugins.length > 0 ? plugins : undefined,
       define: options.define,
       write: false,
+      // JSX 配置
+      ...jsxConfig,
     });
 
     // 获取打包后的代码
@@ -316,6 +355,27 @@ export class BuilderBundle {
         for (const [key, value] of Object.entries(options.define)) {
           args.push("--define", `${key}=${value}`);
         }
+      }
+
+      // JSX 配置（Bun 使用 --jsx-* 参数）
+      // 注意：Bun 的 JSX 参数格式与 esbuild 略有不同
+      if (options.jsx) {
+        // Bun 的 jsx 参数值需要转换
+        const jsxValue = options.jsx === "automatic"
+          ? "automatic"
+          : options.jsx === "preserve"
+          ? "preserve"
+          : "transform";
+        args.push("--jsx", jsxValue);
+      }
+      if (options.jsxImportSource) {
+        args.push("--jsx-import-source", options.jsxImportSource);
+      }
+      if (options.jsxFactory) {
+        args.push("--jsx-factory", options.jsxFactory);
+      }
+      if (options.jsxFragment) {
+        args.push("--jsx-fragment", options.jsxFragment);
       }
 
       // 全局变量名（IIFE 格式）
