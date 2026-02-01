@@ -154,6 +154,18 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
+    // 根据渲染引擎配置 JSX
+    // Preact/React 使用自动模式，Vue3 不需要 JSX 配置
+    const jsxConfig: Partial<esbuild.BuildOptions> = {};
+    if (this.config.engine === "preact") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "preact";
+    } else if (this.config.engine === "react") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "react";
+    }
+    // Vue3 使用模板语法，不需要 JSX 配置
+
     // esbuild 构建选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -169,6 +181,8 @@ export class BuilderClient {
       metafile: true,
       // 根据 write 选项决定是否写入文件
       write,
+      // JSX 配置（根据渲染引擎）
+      ...jsxConfig,
     };
 
     // 如果写入文件，需要设置输出目录和 chunk 名称
@@ -267,6 +281,16 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
+    // 根据渲染引擎配置 JSX
+    const jsxConfig: Partial<esbuild.BuildOptions> = {};
+    if (this.config.engine === "preact") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "preact";
+    } else if (this.config.engine === "react") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "react";
+    }
+
     // esbuild 构建上下文选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -282,6 +306,8 @@ export class BuilderClient {
       chunkNames,
       treeShaking: true,
       metafile: true,
+      // JSX 配置（根据渲染引擎）
+      ...jsxConfig,
       // 注意：incremental 选项已废弃，使用 context() API 即可实现增量编译
     };
 
