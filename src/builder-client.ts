@@ -185,6 +185,10 @@ export class BuilderClient {
       write,
       // JSX 配置（根据渲染引擎）
       ...jsxConfig,
+      // 禁用 node_modules 自动查找，防止扫描到系统目录
+      nodePaths: [],
+      // 只显示错误，忽略所有警告
+      logLevel: "error",
     };
 
     // 如果写入文件，需要设置输出目录和 chunk 名称
@@ -206,7 +210,8 @@ export class BuilderClient {
       buildOptions,
     );
     // 在插件列表开头添加 denoResolverPlugin，优先级最高
-    plugins.unshift(denoResolverPlugin({ moduleCache }));
+    // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
+    plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     buildOptions.plugins = plugins;
 
     // 执行构建
@@ -320,6 +325,10 @@ export class BuilderClient {
       metafile: true,
       // JSX 配置（根据渲染引擎）
       ...jsxConfig,
+      // 禁用 node_modules 自动查找，防止扫描到系统目录
+      nodePaths: [],
+      // 只显示错误，忽略所有警告
+      logLevel: "error",
       // 注意：incremental 选项已废弃，使用 context() API 即可实现增量编译
     };
 
@@ -334,7 +343,8 @@ export class BuilderClient {
       esbuild,
       buildOptions,
     );
-    plugins.unshift(denoResolverPlugin({ moduleCache }));
+    // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
+    plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     buildOptions.plugins = plugins;
 
     // 创建构建上下文

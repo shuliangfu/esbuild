@@ -84,6 +84,17 @@ export interface ServerConfig {
    * 默认 false（输出 JS 文件）
    */
   useNativeCompile?: boolean;
+  /**
+   * 排除的路径模式列表
+   *
+   * 匹配这些模式的路径会被标记为 external，不会被 esbuild 扫描。
+   * 可用于阻止 esbuild 扫描全局缓存目录（如 .bun/install, .npm/ 等）。
+   *
+   * 默认值：["node_modules"]
+   *
+   * @example [".bun/install", ".npm/", "yarn/global"]
+   */
+  excludePaths?: string[];
 }
 
 /**

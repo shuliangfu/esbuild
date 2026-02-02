@@ -24,10 +24,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
-import {
-  buildModuleCache,
-  denoResolverPlugin,
-} from "./plugins/resolver-deno.ts";
+import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -35,7 +32,7 @@ import type {
   ServerConfig,
 } from "./types.ts";
 
-const DEBUG = true; // 调试开关
+const DEBUG = false; // 调试开关
 
 /**
  * 服务端构建选项
@@ -319,37 +316,37 @@ export class BuilderServer {
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-      if (DEBUG) console.log("[esbuild] 使用 denoResolverPlugin");
-
-      // 构建模块缓存：一次性获取所有依赖的本地缓存路径
-      // 这避免了在解析每个模块时都启动子进程或发送 HTTP 请求
-      if (DEBUG) console.log("[esbuild] 构建模块缓存...");
-      const moduleCache = await buildModuleCache(
-        entryPoint,
-        dirname(entryPoint),
-      );
       if (DEBUG) {
-        console.log(`[esbuild] 模块缓存完成: ${moduleCache.size} 个模块`);
+        console.log("[esbuild] 使用 denoResolverPlugin (服务端构建模式)");
       }
 
-      plugins.push(denoResolverPlugin({ moduleCache }));
+      // 服务端构建模式：npm:/jsr: 依赖直接标记为 external，让 Deno 在运行时解析
+      // 这样不需要扫描缓存目录，构建速度更快，也避免了缓存目录中损坏文件的问题
+      // 参考旧项目 (dweb) 的设计思想
+      plugins.push(denoResolverPlugin({
+        isServerBuild: true, // 服务端构建模式
+        excludePaths: this.config.excludePaths,
+        // 注意：不需要 moduleCache，因为服务端构建时依赖由 Deno 运行时解析
+      }));
     }
 
     // 输出文件名
     const outfile = join(outputDir, "server.js");
 
-    // 处理外部依赖配置
-    const externalModules = this.config.external || [];
-
-    // 获取入口文件所在目录作为工作目录，限制 esbuild 的扫描范围
+    // 获取入口文件所在目录作为工作目录
     const absWorkingDir = dirname(entryPoint);
 
     // esbuild 构建选项
+    // 使用 platform: "node" 会自动将 Node.js 内置模块标记为 external
+    // 模块解析由 denoResolverPlugin 处理：
+    // 1. 服务端构建模式下，npm:/jsr: 依赖直接标记为 external
+    // 2. 从 deno.json 读取 imports 配置解析别名
+    // 3. Deno 运行时负责解析 external 依赖
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
       bundle: true,
       format: "esm",
-      platform: "node", // 服务端使用 node 平台
+      platform: "node", // Node 平台，自动将内置模块标记为 external
       target: "es2022", // 现代 Node.js/Deno/Bun 都支持 ES2022
       minify: compileOptions.minify,
       sourcemap: !isProd, // 开发模式生成 sourcemap
@@ -357,10 +354,12 @@ export class BuilderServer {
       metafile: true,
       write,
       plugins: plugins.length > 0 ? plugins : undefined,
-      // 外部依赖不打包
-      external: externalModules.length > 0 ? externalModules : undefined,
-      // 限制工作目录，防止扫描到项目之外的文件
+      // 用户自定义的外部依赖（Node.js 内置模块由 platform: "node" 自动处理）
+      external: this.config.external,
+      // 工作目录
       absWorkingDir,
+      // 只显示错误
+      logLevel: "error",
     };
 
     // 如果写入文件，设置输出文件路径
@@ -369,7 +368,7 @@ export class BuilderServer {
     }
 
     if (DEBUG) console.log("[esbuild] 开始执行 esbuild.build()...");
-    if (DEBUG) console.log("[esbuild] external:", externalModules);
+    if (DEBUG) console.log("[esbuild] external:", this.config.external);
 
     // 执行构建
     const result = await esbuild.build(buildOptions);

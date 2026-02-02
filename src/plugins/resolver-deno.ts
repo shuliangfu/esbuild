@@ -28,7 +28,7 @@ import {
 import * as esbuild from "esbuild";
 
 /** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
-const DEBUG_RESOLVER = true;
+const DEBUG_RESOLVER = false;
 const DEBUG_PREFIX = "[resolver-deno]";
 
 /**
@@ -194,10 +194,34 @@ export interface ResolverOptions {
   /** 浏览器模式：将 jsr: 和 npm: 依赖转换为 CDN URL（如 esm.sh） */
   browserMode?: boolean;
   /**
+   * 服务端构建模式（默认：true）
+   *
+   * 当为 true 时（服务端构建）：
+   * - npm: 和 jsr: 协议的依赖直接标记为 external，让 Deno 在运行时解析
+   * - 不需要扫描缓存目录，构建速度快
+   * - 适用于服务端代码编译
+   *
+   * 当为 false 时（客户端构建或需要打包依赖）：
+   * - 使用 moduleCache 从 Deno 缓存读取依赖
+   * - 将依赖打包进 bundle
+   */
+  isServerBuild?: boolean;
+  /**
    * 预构建的模块缓存（由 buildModuleCache 生成）
+   * 仅在 isServerBuild: false 时有效
    * 如果提供，将优先使用缓存中的本地文件路径，避免每个模块都启动子进程或发送 HTTP 请求
    */
   moduleCache?: ModuleCache;
+  /**
+   * 排除的路径模式列表
+   * 匹配这些模式的路径会被标记为 external，不会被 esbuild 扫描
+   * 默认值包含常见的包管理器缓存目录和测试目录：
+   * - node_modules：Node.js 包目录
+   * - .bun/install：Bun 包缓存目录（可能包含损坏的测试文件）
+   * - .npm：npm 缓存目录
+   * - /test/：测试目录（避免扫描测试用的故意损坏文件）
+   */
+  excludePaths?: string[];
 }
 
 /**
@@ -542,13 +566,60 @@ function resolveDenoProtocolPath(
 export function denoResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
-  const { enabled = true, browserMode = false, moduleCache } = options;
+  const {
+    enabled = true,
+    browserMode = false,
+    // 服务端构建模式：默认为 true
+    // 当为 true 时，npm:/jsr: 依赖直接标记为 external，让 Deno 在运行时解析
+    // 当为 false 时，使用 moduleCache 从 Deno 缓存读取依赖并打包
+    isServerBuild = true,
+    moduleCache,
+    // 排除路径（可选）：服务端构建模式下通常不需要
+    excludePaths = [],
+  } = options;
 
   return {
     name: "resolver",
     setup(build) {
       if (!enabled) {
         return;
+      }
+
+      // 处理 Node.js 内置模块（node:fs, node:path 等）
+      // 使用 platform: "neutral" 时需要显式处理这些模块
+      build.onResolve({ filter: /^node:/ }, (args) => {
+        // 标记为 external，让运行时解析
+        return { path: args.path, external: true };
+      });
+
+      // 排除匹配 excludePaths 的模块路径（仅在有配置时启用）
+      // 这可以避免 esbuild 扫描测试目录或包管理器缓存中的损坏文件
+      // 注意：服务端构建模式下通常不需要，因为 npm:/jsr: 依赖已标记为 external
+      if (excludePaths.length > 0) {
+        build.onResolve({ filter: /.*/ }, (args) => {
+          // 需要检查的路径列表（包括导入路径、解析目录、导入者路径）
+          const pathsToCheck = [
+            args.path, // 导入路径
+            args.resolveDir || "", // 解析目录
+            args.importer || "", // 导入者路径
+          ];
+
+          // 检查任何路径是否匹配排除模式
+          for (const pathToCheck of pathsToCheck) {
+            if (!pathToCheck) continue;
+            for (const excludePattern of excludePaths) {
+              if (pathToCheck.includes(excludePattern)) {
+                if (DEBUG_RESOLVER) {
+                  console.log(
+                    `${DEBUG_PREFIX} 排除路径匹配: ${pathToCheck} (模式: ${excludePattern})`,
+                  );
+                }
+                return { path: args.path, external: true };
+              }
+            }
+          }
+          return undefined;
+        });
       }
 
       /**
@@ -585,18 +656,72 @@ export function denoResolverPlugin(
             let version = slashIdx === -1
               ? versionAndPath
               : versionAndPath.slice(0, slashIdx);
-            const path = slashIdx === -1 ? "" : versionAndPath.slice(slashIdx);
+            const subpath = slashIdx === -1
+              ? ""
+              : versionAndPath.slice(slashIdx + 1);
             // 去掉版本号前缀 ^ 或 ~
             version = version.replace(/^[\^~]/, "");
-            const httpsUrl = `https://jsr.io/${scopeAndName}/${version}${path}`;
-            localPath = moduleCache.get(httpsUrl);
-            if (localPath && existsSync(localPath)) {
-              if (DEBUG_RESOLVER) {
-                console.log(
-                  `${DEBUG_PREFIX} getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
-                );
+
+            // 尝试多种路径变体
+            const pathVariants: string[] = [];
+            if (subpath) {
+              // 原始路径
+              pathVariants.push(`/${subpath}`);
+              // 添加 src/ 前缀
+              pathVariants.push(`/src/${subpath}`);
+              // 尝试 .ts 扩展名
+              if (!subpath.endsWith(".ts")) {
+                pathVariants.push(`/${subpath}.ts`);
+                pathVariants.push(`/src/${subpath}.ts`);
+                // 尝试 /mod.ts 后缀（JSR 包常用模式）
+                pathVariants.push(`/${subpath}/mod.ts`);
+                pathVariants.push(`/src/${subpath}/mod.ts`);
+                // 尝试 adapters 目录（渲染器常用模式）
+                pathVariants.push(`/src/client/adapters/${subpath}.ts`);
               }
-              return localPath;
+            } else {
+              // 主入口
+              pathVariants.push("/src/mod.ts");
+              pathVariants.push("/mod.ts");
+            }
+
+            // 遍历所有路径变体尝试匹配
+            for (const pathVariant of pathVariants) {
+              const httpsUrl =
+                `https://jsr.io/${scopeAndName}/${version}${pathVariant}`;
+              localPath = moduleCache.get(httpsUrl);
+              if (localPath && existsSync(localPath)) {
+                if (DEBUG_RESOLVER) {
+                  console.log(
+                    `${DEBUG_PREFIX} getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
+                  );
+                }
+                return localPath;
+              }
+            }
+
+            // 如果以上都不匹配，遍历缓存查找包含该路径的条目
+            const baseUrl = `https://jsr.io/${scopeAndName}/${version}/`;
+            for (const [key, value] of moduleCache.entries()) {
+              if (key.startsWith(baseUrl) && subpath) {
+                // 检查缓存键是否以子路径结尾（忽略 src/ 前缀和扩展名差异）
+                const keyPath = key.slice(baseUrl.length);
+                const normalizedKey = keyPath.replace(/^src\//, "").replace(
+                  /\.ts$/,
+                  "",
+                );
+                const normalizedSubpath = subpath.replace(/\.ts$/, "");
+                if (
+                  normalizedKey.endsWith(normalizedSubpath) && existsSync(value)
+                ) {
+                  if (DEBUG_RESOLVER) {
+                    console.log(
+                      `${DEBUG_PREFIX} getLocalPathFromCache 模糊匹配 ${specifier} -> ${key} -> ${value}`,
+                    );
+                  }
+                  return value;
+                }
+              }
             }
           }
         }
@@ -686,8 +811,20 @@ export function denoResolverPlugin(
       // 例如：import { x } from "npm:esbuild@^0.27.2"
       build.onResolve(
         { filter: /^(jsr|npm):/ },
-        (args): esbuild.OnResolveResult | undefined =>
-          resolveDenoProtocolPath(args.path, browserMode),
+        (args): esbuild.OnResolveResult | undefined => {
+          // 服务端构建：直接标记为 external，让 Deno 在运行时解析
+          // 这是参考旧项目的方式，避免扫描缓存目录
+          if (isServerBuild) {
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${args.path}`,
+              );
+            }
+            return { path: args.path, external: true };
+          }
+          // 客户端构建或需要打包依赖：使用原有逻辑
+          return resolveDenoProtocolPath(args.path, browserMode);
+        },
       );
 
       // 2.5 匹配不带子路径的 @scope/package 模式
@@ -717,7 +854,21 @@ export function denoResolverPlugin(
             return undefined;
           }
 
-          // 直接返回协议路径解析结果
+          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          if (
+            isServerBuild &&
+            (packageImport.startsWith("jsr:") ||
+              packageImport.startsWith("npm:"))
+          ) {
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
+              );
+            }
+            return { path: packageImport, external: true };
+          }
+
+          // 客户端构建或本地路径：使用原有逻辑
           return resolveDenoProtocolPath(packageImport, browserMode);
         },
       );
@@ -761,11 +912,133 @@ export function denoResolverPlugin(
           // 例如：npm:lodash@^4.17.21 + /map -> npm:lodash@^4.17.21/map
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
+
+          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          if (
+            isServerBuild &&
+            (packageImport.startsWith("jsr:") ||
+              packageImport.startsWith("npm:"))
+          ) {
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${fullProtocolPath}`,
+              );
+            }
+            return { path: fullProtocolPath, external: true };
+          }
+
+          // 客户端构建或本地路径：使用原有逻辑
           return resolveDenoProtocolPath(fullProtocolPath, browserMode);
         },
       );
 
-      // 3. 处理 deno-protocol namespace 中的相对路径导入
+      // 3.1 匹配不带子路径的普通包名（非 @scope/ 前缀）
+      // 例如：preact、lodash、react
+      // 这些包需要在 deno.json 的 imports 中配置为 npm:package@version
+      build.onResolve(
+        { filter: /^[a-zA-Z][a-zA-Z0-9_-]*$/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          const packageName = args.path;
+
+          // 查找项目的 deno.json 文件
+          const startDir = args.importer
+            ? dirname(args.importer)
+            : (args.resolveDir || cwd());
+          const projectDenoJsonPath = findProjectDenoJson(startDir);
+
+          if (!projectDenoJsonPath) {
+            return undefined;
+          }
+
+          // 从项目的 deno.json 的 imports 中获取包的导入映射
+          const packageImport = getPackageImport(
+            projectDenoJsonPath,
+            packageName,
+          );
+
+          if (!packageImport) {
+            return undefined;
+          }
+
+          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          if (
+            isServerBuild &&
+            (packageImport.startsWith("jsr:") ||
+              packageImport.startsWith("npm:"))
+          ) {
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
+              );
+            }
+            return { path: packageImport, external: true };
+          }
+
+          // 客户端构建或本地路径：使用原有逻辑
+          return resolveDenoProtocolPath(packageImport, browserMode);
+        },
+      );
+
+      // 3.2 匹配带子路径的普通包名（非 @scope/ 前缀）
+      // 例如：preact/jsx-runtime、lodash/map、react/jsx-runtime
+      // 这些包需要在 deno.json 的 imports 中配置
+      build.onResolve(
+        { filter: /^[a-zA-Z][a-zA-Z0-9_-]*\/.+$/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          const path = args.path;
+
+          // 解析包名和子路径
+          // preact/jsx-runtime -> packageName: preact, subpath: jsx-runtime
+          const slashIndex = path.indexOf("/");
+          const packageName = path.slice(0, slashIndex);
+          const subpath = path.slice(slashIndex + 1);
+
+          // 查找项目的 deno.json 文件
+          const startDir = args.importer
+            ? dirname(args.importer)
+            : (args.resolveDir || cwd());
+          const projectDenoJsonPath = findProjectDenoJson(startDir);
+
+          if (!projectDenoJsonPath) {
+            return undefined;
+          }
+
+          // 先尝试完整路径匹配（如 preact/jsx-runtime）
+          let packageImport = getPackageImport(projectDenoJsonPath, path);
+
+          // 如果完整路径没有匹配，尝试主包名
+          if (!packageImport) {
+            packageImport = getPackageImport(projectDenoJsonPath, packageName);
+            if (packageImport) {
+              // 拼接子路径
+              packageImport = `${packageImport}/${subpath}`;
+            }
+          }
+
+          if (!packageImport) {
+            return undefined;
+          }
+
+          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          if (
+            isServerBuild &&
+            (packageImport.startsWith("jsr:") ||
+              packageImport.startsWith("npm:"))
+          ) {
+            if (DEBUG_RESOLVER) {
+              console.log(
+                `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
+              );
+            }
+            return { path: packageImport, external: true };
+          }
+
+          // 客户端构建或本地路径：使用原有逻辑
+          return resolveDenoProtocolPath(packageImport, browserMode);
+        },
+      );
+
+      // 3.3 处理 deno-protocol namespace 中的相对路径导入
       // 当文件内部有相对路径导入（如 ../encryption/encryption-manager.ts）时，
       // 需要从文件的 resolveDir 解析这些相对路径
       build.onResolve(
@@ -977,6 +1250,41 @@ export function denoResolverPlugin(
           return undefined;
         },
       );
+
+      // 3.5 兜底的 onResolve 钩子：阻止 esbuild 使用默认的模块解析算法
+      // 当所有其他 onResolve 钩子都无法处理模块时，这个钩子会拦截并标记为 external
+      // 这可以防止 esbuild 向上遍历目录查找 node_modules（可能扫描到 .bun/install 等全局缓存）
+      // 注意：这个钩子只处理 file namespace（默认 namespace）中未被处理的模块
+      build.onResolve({ filter: /.*/ }, (args) => {
+        // 跳过已经被处理的 namespace（如 deno-protocol）
+        if (args.namespace && args.namespace !== "file") {
+          return undefined;
+        }
+
+        // 跳过入口文件
+        if (args.kind === "entry-point") {
+          return undefined;
+        }
+
+        // 跳过相对路径导入（./xxx 或 ../xxx），这些应该由 esbuild 正常解析
+        if (args.path.startsWith("./") || args.path.startsWith("../")) {
+          return undefined;
+        }
+
+        // 跳过绝对路径
+        if (args.path.startsWith("/")) {
+          return undefined;
+        }
+
+        // 对于其他未被处理的模块（如 node_modules 中的包），标记为 external
+        // 这可以防止 esbuild 尝试解析它们，避免扫描全局缓存目录
+        if (DEBUG_RESOLVER) {
+          console.log(
+            `${DEBUG_PREFIX} 兜底 onResolve: 将未知模块标记为 external: ${args.path} (kind=${args.kind}, importer=${args.importer})`,
+          );
+        }
+        return { path: args.path, external: true };
+      });
 
       // 4. 添加 onLoad 钩子来处理 deno-protocol namespace 的模块加载
       // 统一处理 jsr: 和 npm: 协议的模块加载
