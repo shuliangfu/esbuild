@@ -494,7 +494,39 @@ export function denoResolverPlugin(
           resolveDenoProtocolPath(args.path, browserMode),
       );
 
-      // 2. 匹配带有子路径的 @scope/package/subpath 模式
+      // 2.5 匹配不带子路径的 @scope/package 模式
+      // 例如：@dreamer/config、@dreamer/service
+      build.onResolve(
+        { filter: /^@[^/]+\/[^/]+$/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          const packageName = args.path;
+
+          // 查找项目的 deno.json 文件
+          const startDir = args.importer
+            ? dirname(args.importer)
+            : (args.resolveDir || cwd());
+          const projectDenoJsonPath = findProjectDenoJson(startDir);
+
+          if (!projectDenoJsonPath) {
+            return undefined;
+          }
+
+          // 从项目的 deno.json 的 imports 中获取包的导入映射
+          const packageImport = getPackageImport(
+            projectDenoJsonPath,
+            packageName,
+          );
+
+          if (!packageImport) {
+            return undefined;
+          }
+
+          // 直接返回协议路径解析结果
+          return resolveDenoProtocolPath(packageImport, browserMode);
+        },
+      );
+
+      // 3. 匹配带有子路径的 @scope/package/subpath 模式
       // 例如：@dreamer/logger/client
       build.onResolve(
         { filter: /^@[^/]+\/[^/]+\/.+$/ },
