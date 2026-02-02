@@ -6,11 +6,14 @@
  * 使用 esbuild 进行客户端代码打包
  */
 
-import { mkdir, resolve } from "@dreamer/runtime-adapter";
+import { dirname, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
-import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
+import {
+  buildModuleCache,
+  denoResolverPlugin,
+} from "./plugins/resolver-deno.ts";
 import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 import type {
   BuildMode,
@@ -47,8 +50,7 @@ export class BuilderClient {
     this.config = config;
     this.pluginManager = new PluginManager();
 
-    // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-    this.pluginManager.registerNative(denoResolverPlugin());
+    // 注意：denoResolverPlugin 在 build 方法中动态注册，以支持模块缓存
 
     // 方案一：自动注册服务端模块检测插件
     this.pluginManager.register(createServerModuleDetectorPlugin());
@@ -191,11 +193,21 @@ export class BuilderClient {
       buildOptions.chunkNames = chunkNames;
     }
 
-    // 添加插件
-    buildOptions.plugins = this.pluginManager.toEsbuildPlugins(
+    // 构建模块缓存：一次性获取所有依赖的本地缓存路径
+    // 这避免了在解析每个模块时都启动子进程或发送 HTTP 请求
+    const moduleCache = await buildModuleCache(
+      entryPoint,
+      dirname(entryPoint),
+    );
+
+    // 添加插件（包括 denoResolverPlugin，传递模块缓存）
+    const plugins = this.pluginManager.toEsbuildPlugins(
       esbuild,
       buildOptions,
     );
+    // 在插件列表开头添加 denoResolverPlugin，优先级最高
+    plugins.unshift(denoResolverPlugin({ moduleCache }));
+    buildOptions.plugins = plugins;
 
     // 执行构建
     const result = await esbuild.build(buildOptions);
@@ -311,11 +323,19 @@ export class BuilderClient {
       // 注意：incremental 选项已废弃，使用 context() API 即可实现增量编译
     };
 
-    // 添加插件
-    buildOptions.plugins = this.pluginManager.toEsbuildPlugins(
+    // 构建模块缓存：一次性获取所有依赖的本地缓存路径
+    const moduleCache = await buildModuleCache(
+      entryPoint,
+      dirname(entryPoint),
+    );
+
+    // 添加插件（包括 denoResolverPlugin，传递模块缓存）
+    const plugins = this.pluginManager.toEsbuildPlugins(
       esbuild,
       buildOptions,
     );
+    plugins.unshift(denoResolverPlugin({ moduleCache }));
+    buildOptions.plugins = plugins;
 
     // 创建构建上下文
     this.buildContext = await esbuild.context(buildOptions);

@@ -262,7 +262,22 @@ export class BuilderServer {
 
     // 确保输出目录存在（仅在写入文件时）
     if (write) {
-      await mkdir(outputDir, { recursive: true });
+      // 尝试创建目录，如果失败可能是因为存在同名文件（之前生成的可执行文件）
+      try {
+        await mkdir(outputDir, { recursive: true });
+      } catch (err) {
+        // 如果是 EEXIST 错误，可能是同名文件存在，尝试删除后重新创建
+        if (
+          err && typeof err === "object" && "code" in err &&
+          (err as { code: string }).code === "EEXIST"
+        ) {
+          if (DEBUG) console.log(`[esbuild] 删除旧的同名文件: ${outputDir}`);
+          await remove(outputDir);
+          await mkdir(outputDir, { recursive: true });
+        } else {
+          throw err;
+        }
+      }
     }
 
     // 解析入口文件路径
