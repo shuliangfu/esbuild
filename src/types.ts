@@ -44,7 +44,7 @@ export interface ServerCompileOptions {
 }
 
 /**
- * 服务端配置
+ * 服务端配置（完整配置，用于 BuilderServer）
  */
 export interface ServerConfig {
   /** 入口文件 */
@@ -53,7 +53,7 @@ export interface ServerConfig {
   output: string;
   /** 目标运行时 */
   target?: TargetRuntime;
-  /** 编译选项 */
+  /** 编译选项（压缩、sourcemap 等） */
   compile?: ServerCompileOptions;
   /**
    * 外部依赖（不打包，保留 import 语句）
