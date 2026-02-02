@@ -32,6 +32,8 @@ import type {
   ServerConfig,
 } from "./types.ts";
 
+const DEBUG = true; // 调试开关
+
 /**
  * 服务端构建选项
  */
@@ -229,6 +231,8 @@ export class BuilderServer {
   ): Promise<BuildResult> {
     const startTime = Date.now();
 
+    if (DEBUG) console.log("[esbuild] 开始构建...");
+
     // 解析选项
     const mode: BuildMode = typeof options === "string"
       ? options
@@ -268,16 +272,22 @@ export class BuilderServer {
       minify: this.config.compile?.minify ?? isProd,
     };
 
+    if (DEBUG) console.log("[esbuild] 入口文件:", entryPoint);
+    if (DEBUG) console.log("[esbuild] 输出目录:", outputDir);
+    if (DEBUG) console.log("[esbuild] 工作目录:", dirname(entryPoint));
+
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
 
     // 如果启用 externalNpm，添加插件将所有 npm 包标记为 external
     if (this.config.externalNpm) {
+      if (DEBUG) console.log("[esbuild] 启用 externalNpm");
       plugins.push({
         name: "external-npm",
         setup(build) {
           // 匹配 npm: 协议的导入
           build.onResolve({ filter: /^npm:/ }, (args) => {
+            if (DEBUG) console.log("[esbuild] external npm:", args.path);
             return { path: args.path, external: true };
           });
         },
@@ -291,6 +301,7 @@ export class BuilderServer {
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
+      if (DEBUG) console.log("[esbuild] 使用 denoResolverPlugin");
       plugins.push(denoResolverPlugin());
     }
 
@@ -327,8 +338,13 @@ export class BuilderServer {
       buildOptions.outfile = outfile;
     }
 
+    if (DEBUG) console.log("[esbuild] 开始执行 esbuild.build()...");
+    if (DEBUG) console.log("[esbuild] external:", externalModules);
+
     // 执行构建
     const result = await esbuild.build(buildOptions);
+
+    if (DEBUG) console.log("[esbuild] esbuild.build() 完成");
 
     const duration = Date.now() - startTime;
 

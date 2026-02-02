@@ -28,7 +28,7 @@ import {
 import * as esbuild from "esbuild";
 
 /** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta 的调试日志 */
-const DEBUG_RESOLVER = false;
+const DEBUG_RESOLVER = true;
 const DEBUG_PREFIX = "[resolver-deno]";
 
 /**
