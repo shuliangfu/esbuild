@@ -300,6 +300,9 @@ export class BuilderServer {
     // 处理外部依赖配置
     const externalModules = this.config.external || [];
 
+    // 获取入口文件所在目录作为工作目录，限制 esbuild 的扫描范围
+    const absWorkingDir = dirname(entryPoint);
+
     // esbuild 构建选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -315,6 +318,8 @@ export class BuilderServer {
       plugins: plugins.length > 0 ? plugins : undefined,
       // 外部依赖不打包
       external: externalModules.length > 0 ? externalModules : undefined,
+      // 限制工作目录，防止扫描到项目之外的文件
+      absWorkingDir,
     };
 
     // 如果写入文件，设置输出文件路径
