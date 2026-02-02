@@ -5,7 +5,7 @@
 - **测试库版本**: @dreamer/test@^1.0.0-beta.14
 - **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.17
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-01-18
+- **测试时间**: 2026-02-02
 - **测试环境**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
@@ -15,14 +15,16 @@
 
 ### 总体统计
 
-- **Bun 环境测试数**: 460
-- **Deno 环境测试数**: 469
+- **Deno 环境测试数**: 501
+- **Bun 环境测试数**: 484
 - **通过**: 全部通过 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
 - **测试执行时间**:
-  - Bun 环境: ~4.01秒
-  - Deno 环境: ~46秒
+  - Deno 环境: ~37秒
+  - Bun 环境: ~2.69秒
+
+> **注意**: Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等），这些测试仅在 Deno 环境下运行。
 
 ### 测试文件统计
 
@@ -61,7 +63,7 @@
 | `integration.test.ts`               | 8      | ✅ 全部通过 | 集成测试                 |
 | `plugin-advanced.test.ts`           | 5      | ✅ 全部通过 | 插件管理器高级功能测试   |
 | `plugin.test.ts`                    | 14     | ✅ 全部通过 | 插件管理器基础功能测试   |
-| `builder-server-advanced.test.ts`   | 8      | ✅ 全部通过 | 服务端构建器高级功能测试 |
+| `builder-server-advanced.test.ts`   | 19     | ✅ 全部通过 | 服务端构建器高级功能测试 |
 | `builder-server.test.ts`            | 16     | ✅ 全部通过 | 服务端构建器功能测试     |
 | `server-module-detector.test.ts`    | 24     | ✅ 全部通过 | 服务端模块检测插件测试   |
 | `resolver.test.ts`                  | 10     | ✅ 全部通过 | 解析器插件测试           |
@@ -636,7 +638,7 @@
 
 **测试结果**: 14 个测试全部通过
 
-### 34. 服务端构建器高级功能 (builder-server-advanced.test.ts) - 8 个测试
+### 34. 服务端构建器高级功能 (builder-server-advanced.test.ts) - 19 个测试
 
 **测试场景**:
 
@@ -646,8 +648,19 @@
 - ✅ 应该支持多平台编译
 - ✅ 应该支持 Standalone 打包
 - ✅ 应该获取配置
+- ✅ 应该支持 external 配置
+- ✅ 应该在 esbuild 模式下正确处理 external 配置
+- ✅ 应该支持通配符 external 配置
+- ✅ 应该在空 external 配置时正常工作
+- ✅ 应该支持 useNativeCompile 配置
+- ✅ 应该默认禁用 useNativeCompile
+- ✅ 应该在 useNativeCompile 模式下执行原生编译
+- ✅ 应该在 useNativeCompile 模式下支持 external 配置
+- ✅ 应该在缺少输出路径时抛出错误
+- ✅ 应该在 Bun 原生编译模式下处理 external
+- ✅ 应该在 Deno 原生编译模式下记录 external 警告
 
-**测试结果**: 8 个测试全部通过
+**测试结果**: 19 个测试全部通过
 
 ### 35. 服务端构建器 (builder-server.test.ts) - 16 个测试
 
@@ -857,6 +870,8 @@
 | `BuilderServer.build({ mode: "dev" })`                            | 开发模式构建                   | ✅ 1个测试 |
 | `BuilderServer.build({ mode: "prod" })`                           | 生产模式构建                   | ✅ 1个测试 |
 | `BuilderServer.build("prod")`                                     | 字符串模式参数                 | ✅ 1个测试 |
+| `ServerConfig.external`                                           | 外部依赖不打包                 | ✅ 4个测试 |
+| `ServerConfig.useNativeCompile`                                   | 使用原生编译器（生成可执行文件）| ✅ 6个测试 |
 
 ## 优点
 
@@ -883,20 +898,22 @@
 
 **测试总数**:
 
-- Bun 环境: **460** 个测试
-- Deno 环境: **469** 个测试
+- Deno 环境: **501** 个测试
+- Bun 环境: **484** 个测试
+
+> 注：Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等）
 
 **测试类型**:
 
-- ✅ 单元测试（约 400 个）
+- ✅ 单元测试（约 420 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 39 个）
+- ✅ 边界情况和错误处理测试（约 51 个）
 
 **测试执行环境**:
 
 - Deno 2.x
 - Bun 1.3.5
-- esbuild 0.24.2
+- esbuild 0.27.2
 - PostCSS 8.4.39
 - Autoprefixer 10.4.19
 - cssnano 7.0.3
@@ -909,5 +926,7 @@
 - ✅ 简单打包器（BuilderBundle）测试（Deno 和 Bun 环境）
 - ✅ 全局变量设置测试（window/global/globalThis）
 - ✅ ESM 和 IIFE 格式测试
+- ✅ 服务端 external 依赖配置测试
+- ✅ 原生编译器（useNativeCompile）测试
 
 **可以放心用于生产环境**。

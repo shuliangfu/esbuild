@@ -4,7 +4,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-460%20(Bun)%20%7C%20469%20(Deno)%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-484%20(Bun)%20%7C%20501%20(Deno)%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -50,6 +50,8 @@ bunx jsr add -D @dreamer/esbuild
   - 单文件打包（standalone）
   - 多平台编译（Linux、macOS、Windows）
   - **内存模式**：支持 `write: false` 直接返回编译代码，不写入文件
+  - **外部依赖**：支持 `external` 配置排除指定依赖不打包
+  - **原生编译**：支持 `useNativeCompile` 使用 `deno compile` 或 `bun build --compile` 生成可执行文件
 - **客户端打包**：
   - 基于 esbuild 高性能打包
   - 入口文件打包（entry point → bundle.js）
@@ -430,6 +432,54 @@ interface ServerBuildOptions {
 }
 ```
 
+#### ServerConfig 高级选项
+
+```typescript
+interface ServerConfig {
+  /** 入口文件路径 */
+  entry: string;
+  /** 输出目录 */
+  output: string;
+  /** 目标运行时（默认：deno） */
+  target?: "deno" | "bun" | "node";
+  /** 外部依赖（不打包），支持通配符 */
+  external?: string[];
+  /** 使用原生编译器生成可执行文件（Deno: deno compile, Bun: bun build --compile） */
+  useNativeCompile?: boolean;
+  // ... 其他配置
+}
+```
+
+**示例：排除外部依赖**
+
+```typescript
+const builder = new BuilderServer({
+  entry: "./src/server.ts",
+  output: "./dist/server",
+  target: "deno",
+  external: [
+    "better-sqlite3",     // 排除原生模块
+    "@prisma/*",          // 通配符排除
+    "node:*",             // 排除所有 Node.js 内置模块
+  ],
+});
+```
+
+**示例：生成可执行文件**
+
+```typescript
+const builder = new BuilderServer({
+  entry: "./src/server.ts",
+  output: "./dist/server",
+  target: "deno",
+  useNativeCompile: true,  // 使用 deno compile 或 bun build --compile
+});
+
+await builder.build("prod");
+// Deno 环境：生成 ./dist/server (可执行文件)
+// Bun 环境：生成 ./dist/server (可执行文件)
+```
+
 ### BuilderBundle
 
 简单打包器，用于快速将代码打包为浏览器可用格式。适用于浏览器测试、服务端渲染等场景。
@@ -583,6 +633,7 @@ const builder = createBuilder({
 |--------|-----------|----------|
 | **BuilderClient** | esbuild + Deno 解析器插件 | esbuild + Bun 解析器插件 |
 | **BuilderServer** | esbuild + Deno 解析器插件 | esbuild + Bun 解析器插件 |
+| **BuilderServer** (useNativeCompile) | `deno compile` 原生编译 | `bun build --compile` 原生编译 |
 | **BuilderBundle** | esbuild + Deno 解析器插件 | `bun build` 原生打包 |
 
 ### Deno 解析器插件
@@ -610,6 +661,20 @@ const builder = createBuilder({
 
 `BuilderBundle` 在 Bun 环境下使用 `bun build` 原生命令进行打包，具有更快的编译速度。`BuilderClient` 和 `BuilderServer` 统一使用 esbuild + 解析器插件以保证跨平台一致性和功能完整性。
 
+### 原生编译器（生成可执行文件）
+
+当启用 `useNativeCompile` 选项时，`BuilderServer` 会使用平台原生编译器生成独立可执行文件：
+
+| 运行时 | 编译命令 | 输出 |
+|--------|----------|------|
+| **Deno** | `deno compile --allow-all --output <output> <entry>` | 独立可执行文件 |
+| **Bun** | `bun build --compile --outfile <output> <entry>` | 独立可执行文件 |
+
+**注意事项**：
+- 原生编译会将所有依赖打包进可执行文件
+- Deno 的 `deno compile` 不支持 `external` 选项，会输出警告
+- Bun 的 `bun build --compile` 支持 `--external` 选项排除依赖
+
 ---
 
 ## 📊 测试报告
@@ -617,21 +682,23 @@ const builder = createBuilder({
 本库经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
-- **Bun 环境测试数**: 460
-- **Deno 环境测试数**: 469
+- **Deno 环境测试数**: 501
+- **Bun 环境测试数**: 484
 - **通过**: 全部通过 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
 - **测试执行时间**:
-  - Bun 环境: ~4.01秒
-  - Deno 环境: ~46秒
+  - Deno 环境: ~37秒
+  - Bun 环境: ~2.69秒
 - **测试覆盖**: 所有公共 API、边界情况、错误处理
 - **测试环境**: Deno 2.x, Bun 1.3.5
 
+> 注：Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等）
+
 **测试类型**：
-- ✅ 单元测试（约 400 个）
+- ✅ 单元测试（约 420 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 39 个）
+- ✅ 边界情况和错误处理测试（约 51 个）
 
 **测试亮点**：
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
@@ -646,6 +713,10 @@ const builder = createBuilder({
   - Bun 解析器插件测试（10 个测试）
   - 服务端构建器路径解析测试（Deno 和 Bun 环境）
   - 客户端构建器路径解析测试（Deno 和 Bun 环境）
+- ✅ 服务端构建器高级功能测试（19 个）
+  - 外部依赖配置（external）测试
+  - 原生编译器（useNativeCompile）测试
+  - 多平台编译测试（Linux、macOS、Windows）
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 

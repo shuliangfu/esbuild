@@ -23,8 +23,8 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
-import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
+import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -85,11 +85,137 @@ export class BuilderServer {
   build(
     options: BuildMode | ServerBuildOptions = "prod",
   ): Promise<BuildResult> {
+    // 如果启用原生编译，使用 deno compile / bun build --compile
+    if (this.config.useNativeCompile) {
+      return this.buildWithNativeCompile(options);
+    }
+
     // 根据运行时环境选择编译方式
     if (IS_BUN) {
       return this.buildWithBun(options);
     }
     return this.buildWithEsbuild(options);
+  }
+
+  /**
+   * 使用原生编译器构建（生成独立可执行文件）
+   *
+   * - Deno: 使用 `deno compile`
+   * - Bun: 使用 `bun build --compile`
+   *
+   * @param options - 构建选项
+   * @returns 构建结果
+   */
+  private async buildWithNativeCompile(
+    options: BuildMode | ServerBuildOptions = "prod",
+  ): Promise<BuildResult> {
+    const startTime = Date.now();
+
+    // 解析选项
+    const mode: BuildMode = typeof options === "string"
+      ? options
+      : (options.mode || "prod");
+    const isProd = mode === "prod";
+
+    // 验证输出路径
+    if (!this.config.output || this.config.output.trim() === "") {
+      throw new Error("服务端配置缺少输出路径 (output)");
+    }
+
+    // 解析路径
+    const entryPoint = await resolve(this.config.entry);
+    const outputPath = await resolve(this.config.output);
+    const outputDir = dirname(outputPath);
+
+    // 确保输出目录存在
+    await mkdir(outputDir, { recursive: true });
+
+    // 处理外部依赖配置
+    const externalModules = this.config.external || [];
+
+    if (IS_BUN) {
+      // Bun: 使用 bun build --compile
+      const args: string[] = [
+        "build",
+        "--compile",
+        "--target",
+        "bun",
+      ];
+
+      // 压缩选项
+      if (isProd) {
+        args.push("--minify");
+      }
+
+      // 外部依赖（Bun 支持 --external 参数）
+      for (const ext of externalModules) {
+        args.push("--external", ext);
+      }
+
+      // 输出文件
+      args.push("--outfile", outputPath);
+
+      // 入口文件
+      args.push(entryPoint);
+
+      const command = createCommand("bun", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const output = await command.output();
+
+      if (!output.success) {
+        const stderr = output.stderr
+          ? new TextDecoder().decode(output.stderr)
+          : "未知错误";
+        throw new Error(`Bun 编译失败: ${stderr}`);
+      }
+    } else {
+      // Deno: 使用 deno compile
+      // 注意：deno compile 不支持 --external 参数
+      // 如果配置了 external，需要提示用户
+      if (externalModules.length > 0) {
+        console.warn(
+          `警告: deno compile 不支持 external 配置，以下模块将被打包: ${
+            externalModules.join(", ")
+          }`,
+        );
+      }
+
+      const args: string[] = [
+        "compile",
+        "--allow-all", // 生产环境通常需要所有权限
+        "--output",
+        outputPath,
+      ];
+
+      // 入口文件
+      args.push(entryPoint);
+
+      const command = createCommand("deno", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const output = await command.output();
+
+      if (!output.success) {
+        const stderr = output.stderr
+          ? new TextDecoder().decode(output.stderr)
+          : "未知错误";
+        throw new Error(`Deno 编译失败: ${stderr}`);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+
+    return {
+      outputFiles: [outputPath],
+      duration,
+    };
   }
 
   /**
@@ -158,6 +284,9 @@ export class BuilderServer {
     // 输出文件名
     const outfile = join(outputDir, "server.js");
 
+    // 处理外部依赖配置
+    const externalModules = this.config.external || [];
+
     // esbuild 构建选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -171,6 +300,8 @@ export class BuilderServer {
       metafile: true,
       write,
       plugins: plugins.length > 0 ? plugins : undefined,
+      // 外部依赖不打包
+      external: externalModules.length > 0 ? externalModules : undefined,
     };
 
     // 如果写入文件，设置输出文件路径
@@ -323,6 +454,12 @@ export class BuilderServer {
       // sourcemap 选项（开发模式生成）
       if (!isProd) {
         args.push("--sourcemap=inline");
+      }
+
+      // 外部依赖（Bun 支持 --external 参数）
+      const externalModules = this.config.external || [];
+      for (const ext of externalModules) {
+        args.push("--external", ext);
       }
 
       // 执行 bun build 命令

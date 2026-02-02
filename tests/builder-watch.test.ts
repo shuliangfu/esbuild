@@ -49,7 +49,7 @@ describe("Builder Watch 模式", () => {
       const builder = new Builder(config);
 
       // 启动 watch（异步，不等待完成）
-      const watchPromise = builder.watch();
+      void builder.watch();
 
       // 等待一小段时间确保 watch 启动
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -85,8 +85,10 @@ describe("Builder Watch 模式", () => {
     });
 
     it("应该支持自定义监听路径", async () => {
-      // 确保 lib 目录存在
+      // 确保目录和文件存在（Bun 并行测试可能导致目录被其他测试清理）
+      await mkdir(join(testDataDir, "src"), { recursive: true });
       await mkdir(join(testDataDir, "lib"), { recursive: true });
+      await writeTextFile(entryFile, `console.log('Watch Test');`);
 
       const config: BuilderConfig = {
         client: {
@@ -104,7 +106,7 @@ describe("Builder Watch 模式", () => {
       };
       const builder = new Builder(config);
 
-      const watchPromise = builder.watch();
+      void builder.watch();
       await new Promise((resolve) => setTimeout(resolve, 100));
       builder.stopWatch();
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -113,6 +115,10 @@ describe("Builder Watch 模式", () => {
     }, { sanitizeOps: false, sanitizeResources: false });
 
     it("应该支持防抖配置", async () => {
+      // 确保目录和文件存在（Bun 并行测试可能导致目录被其他测试清理）
+      await mkdir(join(testDataDir, "src"), { recursive: true });
+      await writeTextFile(entryFile, `console.log('Watch Test');`);
+
       const config: BuilderConfig = {
         client: {
           entry: entryFile,
@@ -129,7 +135,7 @@ describe("Builder Watch 模式", () => {
       };
       const builder = new Builder(config);
 
-      const watchPromise = builder.watch();
+      void builder.watch();
       await new Promise((resolve) => setTimeout(resolve, 100));
       builder.stopWatch();
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -138,7 +144,10 @@ describe("Builder Watch 模式", () => {
     }, { sanitizeOps: false, sanitizeResources: false });
 
     it("应该支持文件变化回调", async () => {
-      let callbackCalled = false;
+      // 确保目录和文件存在（Bun 并行测试可能导致目录被其他测试清理）
+      await mkdir(join(testDataDir, "src"), { recursive: true });
+      await writeTextFile(entryFile, `console.log('Watch Test');`);
+
       const config: BuilderConfig = {
         client: {
           entry: entryFile,
@@ -149,15 +158,15 @@ describe("Builder Watch 模式", () => {
           watch: {
             enabled: true,
             paths: [join(testDataDir, "src")],
-            onFileChange: async (path, kind) => {
-              callbackCalled = true;
+            onFileChange: (_path, _kind) => {
+              // 文件变化回调
             },
           },
         },
       };
       const builder = new Builder(config);
 
-      const watchPromise = builder.watch();
+      void builder.watch();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // 修改文件触发回调
@@ -176,6 +185,10 @@ describe("Builder Watch 模式", () => {
 
   describe("stopWatch", () => {
     it("应该停止 Watch 模式", async () => {
+      // 确保目录和文件存在（Bun 并行测试可能导致目录被其他测试清理）
+      await mkdir(join(testDataDir, "src"), { recursive: true });
+      await writeTextFile(entryFile, `console.log('Watch Test');`);
+
       const config: BuilderConfig = {
         client: {
           entry: entryFile,

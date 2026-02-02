@@ -49,12 +49,31 @@ export interface ServerCompileOptions {
 export interface ServerConfig {
   /** 入口文件 */
   entry: string;
-  /** 输出目录 */
+  /** 输出目录（输出 JS 文件的目录，或可执行文件路径） */
   output: string;
   /** 目标运行时 */
   target?: TargetRuntime;
   /** 编译选项 */
   compile?: ServerCompileOptions;
+  /**
+   * 外部依赖（不打包，保留 import 语句）
+   *
+   * 适用于：
+   * - 原生模块（.node 文件）
+   * - 需要在运行时动态加载的模块
+   *
+   * @example ["tailwindcss", "lightningcss", "@tailwindcss/*"]
+   */
+  external?: string[];
+  /**
+   * 使用原生编译器（生成独立可执行文件）
+   *
+   * - Deno: 使用 `deno compile`
+   * - Bun: 使用 `bun build --compile`
+   *
+   * 默认 false（输出 JS 文件）
+   */
+  useNativeCompile?: boolean;
 }
 
 /**
