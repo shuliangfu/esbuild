@@ -66,6 +66,16 @@ export interface ServerConfig {
    */
   external?: string[];
   /**
+   * 自动将 npm 包标记为 external（默认 false）
+   *
+   * 启用后，所有 npm: 协议的包都不会被打包，
+   * 而是保留 import 语句，由运行时解析。
+   *
+   * 适用于服务端编译成 JS 文件的场景，
+   * Deno/Bun 运行时可以直接解析 npm 包。
+   */
+  externalNpm?: boolean;
+  /**
    * 使用原生编译器（生成独立可执行文件）
    *
    * - Deno: 使用 `deno compile`

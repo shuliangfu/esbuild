@@ -271,6 +271,19 @@ export class BuilderServer {
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
 
+    // 如果启用 externalNpm，添加插件将所有 npm 包标记为 external
+    if (this.config.externalNpm) {
+      plugins.push({
+        name: "external-npm",
+        setup(build) {
+          // 匹配 npm: 协议的导入
+          build.onResolve({ filter: /^npm:/ }, (args) => {
+            return { path: args.path, external: true };
+          });
+        },
+      });
+    }
+
     if (IS_BUN) {
       // 在 Bun 环境下自动启用解析器插件
       // 用于解析 package.json 的 imports 配置（如 @dreamer/logger/client）
