@@ -360,6 +360,10 @@ export class BuilderServer {
       absWorkingDir,
       // 只显示错误
       logLevel: "error",
+      // 注入生产环境标志，让 @dreamer/dweb 知道这是编译后的生产代码
+      banner: {
+        js: "globalThis.__DWEB_PROD__ = true;",
+      },
     };
 
     // 如果写入文件，设置输出文件路径
