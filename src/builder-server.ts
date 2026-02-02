@@ -24,7 +24,10 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
-import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
+import {
+  buildModuleCache,
+  denoResolverPlugin,
+} from "./plugins/resolver-deno.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -302,7 +305,19 @@ export class BuilderServer {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
       if (DEBUG) console.log("[esbuild] 使用 denoResolverPlugin");
-      plugins.push(denoResolverPlugin());
+
+      // 构建模块缓存：一次性获取所有依赖的本地缓存路径
+      // 这避免了在解析每个模块时都启动子进程或发送 HTTP 请求
+      if (DEBUG) console.log("[esbuild] 构建模块缓存...");
+      const moduleCache = await buildModuleCache(
+        entryPoint,
+        dirname(entryPoint),
+      );
+      if (DEBUG) {
+        console.log(`[esbuild] 模块缓存完成: ${moduleCache.size} 个模块`);
+      }
+
+      plugins.push(denoResolverPlugin({ moduleCache }));
     }
 
     // 输出文件名

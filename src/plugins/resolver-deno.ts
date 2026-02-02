@@ -32,6 +32,152 @@ const DEBUG_RESOLVER = true;
 const DEBUG_PREFIX = "[resolver-deno]";
 
 /**
+ * 模块缓存映射：specifier -> 本地文件路径
+ * 由 buildModuleCache 函数预先构建，包含所有依赖模块的本地缓存路径
+ */
+export type ModuleCache = Map<string, string>;
+
+/**
+ * 从 deno info --json 输出的模块信息
+ */
+interface DenoInfoModule {
+  /** 模块类型 */
+  kind: string;
+  /** 模块的 specifier（如 https://jsr.io/@dreamer/xxx/1.0.0/src/mod.ts） */
+  specifier: string;
+  /** 本地缓存文件路径 */
+  local?: string;
+  /** 模块依赖 */
+  dependencies?: Array<{
+    specifier: string;
+    code?: { specifier: string };
+    type?: { specifier: string };
+  }>;
+}
+
+/**
+ * deno info --json 的输出结构
+ */
+interface DenoInfoOutput {
+  version: number;
+  roots: string[];
+  modules: DenoInfoModule[];
+}
+
+/**
+ * 预构建模块缓存：运行 `deno info --json` 获取所有依赖模块的本地缓存路径
+ *
+ * 这个函数解决了 esbuild 在解析 JSR 包时每个模块都要启动子进程或发送 HTTP 请求的问题。
+ * 通过一次性获取所有依赖，后续的模块解析可以直接使用本地缓存文件。
+ *
+ * @param entryPoint - 入口文件路径
+ * @param projectDir - 项目目录（用于查找 deno.json）
+ * @returns 模块缓存映射：specifier -> 本地文件路径
+ *
+ * @example
+ * ```typescript
+ * const cache = await buildModuleCache("./src/main.ts", "/path/to/project");
+ * // cache.get("https://jsr.io/@dreamer/xxx/1.0.0/src/mod.ts")
+ * // => "/Users/xxx/Library/Caches/deno/remote/https/jsr.io/xxx..."
+ * ```
+ */
+export async function buildModuleCache(
+  entryPoint: string,
+  projectDir?: string,
+): Promise<ModuleCache> {
+  const cache: ModuleCache = new Map();
+  const workDir = projectDir || cwd();
+
+  if (DEBUG_RESOLVER) {
+    console.log(
+      `${DEBUG_PREFIX} buildModuleCache 开始构建模块缓存: entry=${entryPoint}, workDir=${workDir}`,
+    );
+  }
+
+  try {
+    // 查找项目的 deno.json
+    const projectDenoJson = findProjectDenoJson(workDir);
+    const configArgs = projectDenoJson ? ["--config", projectDenoJson] : [];
+
+    // 运行 deno info --json 获取完整的依赖图
+    const proc = createCommand("deno", {
+      args: ["info", "--json", ...configArgs, entryPoint],
+      cwd: workDir,
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const output = await proc.output();
+
+    if (!output.success) {
+      const stderr = new TextDecoder().decode(output.stderr);
+      if (DEBUG_RESOLVER) {
+        console.log(
+          `${DEBUG_PREFIX} buildModuleCache deno info 失败: ${stderr}`,
+        );
+      }
+      return cache;
+    }
+
+    const stdout = new TextDecoder().decode(output.stdout);
+    if (!stdout.trim()) {
+      return cache;
+    }
+
+    // 解析 JSON 输出
+    const info: DenoInfoOutput = JSON.parse(stdout);
+
+    // 构建 specifier -> local 映射
+    for (const mod of info.modules) {
+      if (mod.local && mod.specifier) {
+        // 存储 https:// URL 到本地路径的映射
+        cache.set(mod.specifier, mod.local);
+
+        // 同时为 jsr: 协议创建映射
+        // https://jsr.io/@scope/name/version/path.ts -> jsr:@scope/name@version/path
+        const jsrMatch = mod.specifier.match(
+          /^https:\/\/jsr\.io\/(@[^/]+\/[^/]+)\/([^/]+)\/(.+)$/,
+        );
+        if (jsrMatch) {
+          const [, scopeAndName, version, path] = jsrMatch;
+          // 精确版本映射
+          const jsrSpecifier = `jsr:${scopeAndName}@${version}/${path}`;
+          cache.set(jsrSpecifier, mod.local);
+
+          // 带 ^ 前缀的版本映射（用于版本范围）
+          const jsrSpecifierCaret = `jsr:${scopeAndName}@^${version}/${path}`;
+          cache.set(jsrSpecifierCaret, mod.local);
+
+          // 主入口映射（如果 path 是 src/mod.ts）
+          if (path === "src/mod.ts" || path === "mod.ts") {
+            cache.set(`jsr:${scopeAndName}@${version}`, mod.local);
+            cache.set(`jsr:${scopeAndName}@^${version}`, mod.local);
+          }
+
+          if (DEBUG_RESOLVER) {
+            console.log(
+              `${DEBUG_PREFIX} buildModuleCache 添加映射: ${jsrSpecifier} -> ${mod.local}`,
+            );
+          }
+        }
+      }
+    }
+
+    if (DEBUG_RESOLVER) {
+      console.log(
+        `${DEBUG_PREFIX} buildModuleCache 完成: ${cache.size} 个模块`,
+      );
+    }
+  } catch (error) {
+    if (DEBUG_RESOLVER) {
+      console.log(`${DEBUG_PREFIX} buildModuleCache 错误: ${error}`);
+    }
+  }
+
+  return cache;
+}
+
+/**
  * JSR 请求头：文档要求 Accept 不得含 text/html，否则会返回 HTML 页面。
  * - JSON：拉取 meta.json / _meta.json
  * - 源码：拉取模块 .ts/.js 时用 JSR_ACCEPT_SOURCE，可拿到原始源码
@@ -47,6 +193,11 @@ export interface ResolverOptions {
   enabled?: boolean;
   /** 浏览器模式：将 jsr: 和 npm: 依赖转换为 CDN URL（如 esm.sh） */
   browserMode?: boolean;
+  /**
+   * 预构建的模块缓存（由 buildModuleCache 生成）
+   * 如果提供，将优先使用缓存中的本地文件路径，避免每个模块都启动子进程或发送 HTTP 请求
+   */
+  moduleCache?: ModuleCache;
 }
 
 /**
@@ -391,7 +542,7 @@ function resolveDenoProtocolPath(
 export function denoResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
-  const { enabled = true, browserMode = false } = options;
+  const { enabled = true, browserMode = false, moduleCache } = options;
 
   return {
     name: "resolver",
@@ -407,6 +558,51 @@ export function denoResolverPlugin(
        * 避免子路径走“协议路径 + onLoad”时返回空内容导致 "has no exports"。
        */
       const protocolResolveDirCache = new Map<string, string>();
+
+      /**
+       * 从预构建的模块缓存中查找本地路径
+       * @param specifier - 模块 specifier（支持 jsr:、https://jsr.io/ 等格式）
+       * @returns 本地文件路径，如果未找到返回 undefined
+       */
+      function getLocalPathFromCache(specifier: string): string | undefined {
+        if (!moduleCache) return undefined;
+
+        // 直接查找
+        let localPath = moduleCache.get(specifier);
+        if (localPath && existsSync(localPath)) {
+          return localPath;
+        }
+
+        // 对于 jsr: 协议，尝试转换为 https:// URL 格式查找
+        if (specifier.startsWith("jsr:")) {
+          // jsr:@scope/name@version/path -> https://jsr.io/@scope/name/version/path
+          const afterJsr = specifier.slice(4);
+          const lastAtIdx = afterJsr.lastIndexOf("@");
+          if (lastAtIdx > 0) {
+            const scopeAndName = afterJsr.slice(0, lastAtIdx);
+            const versionAndPath = afterJsr.slice(lastAtIdx + 1);
+            const slashIdx = versionAndPath.indexOf("/");
+            let version = slashIdx === -1
+              ? versionAndPath
+              : versionAndPath.slice(0, slashIdx);
+            const path = slashIdx === -1 ? "" : versionAndPath.slice(slashIdx);
+            // 去掉版本号前缀 ^ 或 ~
+            version = version.replace(/^[\^~]/, "");
+            const httpsUrl = `https://jsr.io/${scopeAndName}/${version}${path}`;
+            localPath = moduleCache.get(httpsUrl);
+            if (localPath && existsSync(localPath)) {
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
+                );
+              }
+              return localPath;
+            }
+          }
+        }
+
+        return undefined;
+      }
 
       // 设置插件优先级，确保在其他解析器之前运行
       // 这样可以拦截 JSR 包和路径别名的解析
@@ -795,6 +991,22 @@ export function denoResolverPlugin(
           }
 
           try {
+            // 步骤 0: 优先从预构建的模块缓存中查找本地路径
+            // 如果 moduleCache 存在，直接使用缓存中的本地文件路径，避免启动子进程或发送 HTTP 请求
+            const cachedLocalPath = getLocalPathFromCache(protocolPath);
+            if (cachedLocalPath) {
+              const contents = await readTextFile(cachedLocalPath);
+              const resolveDir = dirname(cachedLocalPath);
+              protocolResolveDirCache.set(protocolPath, resolveDir);
+              const loader = getLoaderFromPath(cachedLocalPath);
+              if (DEBUG_RESOLVER) {
+                console.log(
+                  `${DEBUG_PREFIX} onLoad 从预构建缓存获取 ${protocolPath} -> ${cachedLocalPath} (${contents.length} chars)`,
+                );
+              }
+              return { contents, loader, resolveDir };
+            }
+
             // 步骤 1: 先使用动态导入触发 Deno 下载和缓存模块
             // 这会确保模块被下载到 Deno 缓存中（适用于 jsr: 和 npm:）
             try {
