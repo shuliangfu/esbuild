@@ -15,6 +15,7 @@ import {
   denoResolverPlugin,
 } from "./plugins/resolver-deno.ts";
 import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
+import { createVueRuntimeAliasPlugin } from "./plugins/vue-runtime-alias.ts";
 import type {
   BuildMode,
   BuildResult,
@@ -209,9 +210,12 @@ export class BuilderClient {
       esbuild,
       buildOptions,
     );
-    // 在插件列表开头添加 denoResolverPlugin，优先级最高
     // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
+    // Vue3 客户端构建时优先将 "vue" 解析为运行时构建，避免打包完整构建导致浏览器 Dynamic require 报错
+    if (this.config.engine === "vue3") {
+      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache));
+    }
     buildOptions.plugins = plugins;
 
     // 执行构建
@@ -345,6 +349,9 @@ export class BuilderClient {
     );
     // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
+    if (this.config.engine === "vue3") {
+      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache));
+    }
     buildOptions.plugins = plugins;
 
     // 创建构建上下文
