@@ -94,15 +94,6 @@ export class BuilderClient {
       ? true
       : (options.write !== false);
 
-    // 只有在需要写入文件时才验证输出目录配置
-    if (write) {
-      if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error("客户端配置缺少输出目录 (output)");
-      }
-      // 确保输出目录存在
-      await mkdir(this.config.output, { recursive: true });
-    }
-
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
       throw new Error("客户端配置缺少入口文件 (entry)");
@@ -122,6 +113,16 @@ export class BuilderClient {
     const splittingEnabled = typeof bundleOptions.splitting === "boolean"
       ? bundleOptions.splitting
       : bundleOptions.splitting?.enabled !== false;
+
+    // 写入文件或代码分割时都需要 output（代码分割时 outdir 用于路径解析，write: false 时不写盘）
+    if (write || splittingEnabled) {
+      if (!this.config.output || this.config.output.trim() === "") {
+        throw new Error("客户端配置缺少输出目录 (output)");
+      }
+      if (write) {
+        await mkdir(this.config.output, { recursive: true });
+      }
+    }
 
     // 生成 chunk 名称模式（根据分割策略）
     const chunkNames = this.getChunkNames(bundleOptions.splitting);
@@ -177,7 +178,7 @@ export class BuilderClient {
       target: "es2020",
       minify: bundleOptions.minify,
       sourcemap: sourcemapOption,
-      splitting: write ? splittingEnabled : false, // 内存模式不支持 splitting
+      splitting: splittingEnabled, // write: false 时也支持代码分割，产出在 result.outputContents
       external: externalModules,
       treeShaking: true,
       metafile: true,
@@ -191,8 +192,8 @@ export class BuilderClient {
       logLevel: "error",
     };
 
-    // 如果写入文件，需要设置输出目录和 chunk 名称
-    if (write) {
+    // 代码分割时需要 outdir（写盘或仅内存）和 chunk 名称
+    if (splittingEnabled && this.config.output) {
       buildOptions.outdir = this.config.output;
       buildOptions.chunkNames = chunkNames;
     }

@@ -23,7 +23,10 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
-import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
+import {
+  buildModuleCache,
+  denoResolverPlugin,
+} from "./plugins/resolver-deno.ts";
 
 /**
  * 简单打包选项
@@ -164,11 +167,24 @@ export class BuilderBundle {
     const format = options.format || (options.globalName ? "iife" : "esm");
     // 显式传 browserMode 时优先使用；否则在浏览器平台默认 true（external），避免破坏现有行为
     const useBrowserMode = options.browserMode ?? isBrowserPlatform;
+    // Node 平台或 browserMode: false 时需要把 JSR 打进 bundle，必须 isServerBuild: false + moduleCache
+    const needBundleJsr = !useBrowserMode;
 
     if (IS_DENO) {
-      plugins.push(denoResolverPlugin({
-        browserMode: useBrowserMode,
-      }));
+      if (needBundleJsr) {
+        const entryPointAbs = resolve(options.entryPoint);
+        const workDir = dirname(entryPointAbs);
+        const moduleCache = await buildModuleCache(entryPointAbs, workDir);
+        plugins.push(denoResolverPlugin({
+          browserMode: false,
+          isServerBuild: false,
+          moduleCache,
+        }));
+      } else {
+        plugins.push(denoResolverPlugin({
+          browserMode: useBrowserMode,
+        }));
+      }
     } else if (IS_BUN) {
       // Bun 环境下使用 bunResolverPlugin
       const { bunResolverPlugin } = await import("./plugins/resolver-bun.ts");

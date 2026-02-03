@@ -812,9 +812,8 @@ export function denoResolverPlugin(
       build.onResolve(
         { filter: /^(jsr|npm):/ },
         (args): esbuild.OnResolveResult | undefined => {
-          // 服务端构建：直接标记为 external，让 Deno 在运行时解析
-          // 这是参考旧项目的方式，避免扫描缓存目录
-          if (isServerBuild) {
+          // 服务端构建且非浏览器模式：直接标记为 external（path 保持 jsr:，Deno 运行时解析）
+          if (isServerBuild && !browserMode) {
             if (DEBUG_RESOLVER) {
               console.log(
                 `${DEBUG_PREFIX} 服务端构建: 标记为 external: ${args.path}`,
@@ -822,7 +821,7 @@ export function denoResolverPlugin(
             }
             return { path: args.path, external: true };
           }
-          // 客户端构建或需要打包依赖：使用原有逻辑
+          // 浏览器模式：转为 CDN URL 并 external；或客户端打包：走 deno-protocol
           return resolveDenoProtocolPath(args.path, browserMode);
         },
       );
@@ -854,9 +853,10 @@ export function denoResolverPlugin(
             return undefined;
           }
 
-          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external
           if (
             isServerBuild &&
+            !browserMode &&
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
@@ -868,7 +868,7 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
-          // 客户端构建或本地路径：使用原有逻辑
+          // 浏览器模式或客户端构建：使用原有逻辑（CDN URL 或 deno-protocol）
           return resolveDenoProtocolPath(packageImport, browserMode);
         },
       );
@@ -913,9 +913,10 @@ export function denoResolverPlugin(
           const subpath = subpathParts.join("/");
           const fullProtocolPath = `${packageImport}/${subpath}`;
 
-          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external
           if (
             isServerBuild &&
+            !browserMode &&
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
@@ -927,7 +928,7 @@ export function denoResolverPlugin(
             return { path: fullProtocolPath, external: true };
           }
 
-          // 客户端构建或本地路径：使用原有逻辑
+          // 浏览器模式或客户端构建：使用原有逻辑
           return resolveDenoProtocolPath(fullProtocolPath, browserMode);
         },
       );
@@ -960,9 +961,10 @@ export function denoResolverPlugin(
             return undefined;
           }
 
-          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external
           if (
             isServerBuild &&
+            !browserMode &&
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
@@ -974,7 +976,7 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
-          // 客户端构建或本地路径：使用原有逻辑
+          // 浏览器模式或客户端构建：使用原有逻辑
           return resolveDenoProtocolPath(packageImport, browserMode);
         },
       );
@@ -1019,9 +1021,10 @@ export function denoResolverPlugin(
             return undefined;
           }
 
-          // 服务端构建：如果是 jsr:/npm: 协议，直接标记为 external
+          // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external
           if (
             isServerBuild &&
+            !browserMode &&
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
@@ -1033,7 +1036,7 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
-          // 客户端构建或本地路径：使用原有逻辑
+          // 浏览器模式或客户端构建：使用原有逻辑
           return resolveDenoProtocolPath(packageImport, browserMode);
         },
       );

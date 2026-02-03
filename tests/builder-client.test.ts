@@ -334,6 +334,34 @@ describe("BuilderClient", () => {
       expect(result.outputFiles.length).toBeGreaterThan(0);
       expect(result.outputContents).toBeUndefined();
     }, { sanitizeOps: false, sanitizeResources: false });
+
+    it(
+      "应该在 write: false 且 splitting: true 时在内存中返回产出（不写盘）",
+      async () => {
+        const config: ClientConfig = {
+          entry: entryFile,
+          output: outputDir,
+          engine: "react",
+          bundle: {
+            splitting: true,
+            minify: false,
+            sourcemap: false,
+          },
+        };
+        const builder = new BuilderClient(config);
+
+        const result = await builder.build({ mode: "dev", write: false });
+
+        expect(result).toBeTruthy();
+        expect(result.outputContents).toBeTruthy();
+        expect(result.outputContents!.length).toBeGreaterThan(0);
+        const first = result.outputContents![0];
+        expect(first.text).toBeTruthy();
+        expect(first.path).toBeTruthy();
+        expect(first.contents).toBeInstanceOf(Uint8Array);
+      },
+      { sanitizeOps: false, sanitizeResources: false },
+    );
   });
 
   describe("mode 参数行为", () => {
