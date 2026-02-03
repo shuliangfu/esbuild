@@ -234,6 +234,26 @@ interface DenoConfig {
 /** deno-protocol namespace，用于 onLoad 通过 fetch 取内容并打包 */
 const NAMESPACE_DENO_PROTOCOL = "deno-protocol";
 
+/** Vue 运行时构建文件名（客户端打包时使用，避免打包完整构建导致浏览器 Dynamic require 报错） */
+const VUE_RUNTIME_FILE = "dist/vue.runtime.esm-bundler.js";
+
+/** 匹配 npm:vue@ 或 npm:/vue@（Deno 可能输出后者） */
+const NPM_VUE_SPECIFIER_RE = /^npm:\/?vue@/;
+
+/**
+ * 根据 vue 包路径（文件或目录）得到 vue.runtime.esm-bundler.js 的绝对路径
+ * @param vuePackagePath - 来自缓存的路径（可能是 vue/index.js 或 vue 目录）
+ * @returns 运行时文件路径，若不存在返回 undefined
+ */
+function getVueRuntimePath(vuePackagePath: string): string | undefined {
+  if (!existsSync(vuePackagePath)) return undefined;
+  const isFile = vuePackagePath.endsWith(".js") ||
+    vuePackagePath.endsWith(".mjs") || vuePackagePath.endsWith(".cjs");
+  const vueDir = isFile ? dirname(vuePackagePath) : vuePackagePath;
+  const runtimePath = join(vueDir, VUE_RUNTIME_FILE);
+  return existsSync(runtimePath) ? runtimePath : undefined;
+}
+
 /**
  * 读取并解析 deno.json 配置
  *
@@ -1306,6 +1326,25 @@ export function denoResolverPlugin(
             // 如果 moduleCache 存在，直接使用缓存中的本地文件路径，避免启动子进程或发送 HTTP 请求
             const cachedLocalPath = getLocalPathFromCache(protocolPath);
             if (cachedLocalPath) {
+              // 客户端构建时，将 npm:vue@* 重定向到运行时构建，避免打包 vue.cjs.js 导致浏览器 Dynamic require 报错
+              if (
+                !isServerBuild &&
+                NPM_VUE_SPECIFIER_RE.test(protocolPath)
+              ) {
+                const vueRuntimePath = getVueRuntimePath(cachedLocalPath);
+                if (vueRuntimePath) {
+                  const contents = await readTextFile(vueRuntimePath);
+                  const resolveDir = dirname(vueRuntimePath);
+                  protocolResolveDirCache.set(protocolPath, resolveDir);
+                  const loader = getLoaderFromPath(vueRuntimePath);
+                  if (DEBUG_RESOLVER) {
+                    console.log(
+                      `${DEBUG_PREFIX} onLoad Vue 运行时重定向 ${protocolPath} -> ${vueRuntimePath}`,
+                    );
+                  }
+                  return { contents, loader, resolveDir };
+                }
+              }
               const contents = await readTextFile(cachedLocalPath);
               const resolveDir = dirname(cachedLocalPath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
@@ -1398,6 +1437,32 @@ export function denoResolverPlugin(
               protocolResolveDirCache.set(protocolPath, resolveDir);
 
               if (existsSync(filePath)) {
+                // 客户端构建时，将 npm:vue@* 重定向到运行时构建
+                if (
+                  !isServerBuild &&
+                  NPM_VUE_SPECIFIER_RE.test(protocolPath)
+                ) {
+                  const vueRuntimePath = getVueRuntimePath(filePath);
+                  if (vueRuntimePath) {
+                    const contents = await readTextFile(vueRuntimePath);
+                    const runtimeResolveDir = dirname(vueRuntimePath);
+                    protocolResolveDirCache.set(
+                      protocolPath,
+                      runtimeResolveDir,
+                    );
+                    const loader = getLoaderFromPath(vueRuntimePath);
+                    if (DEBUG_RESOLVER) {
+                      console.log(
+                        `${DEBUG_PREFIX} onLoad Vue 运行时重定向(file://) ${protocolPath} -> ${vueRuntimePath}`,
+                      );
+                    }
+                    return {
+                      contents,
+                      loader,
+                      resolveDir: runtimeResolveDir,
+                    };
+                  }
+                }
                 const contents = await readTextFile(filePath);
                 if (DEBUG_RESOLVER) {
                   console.log(
