@@ -110,8 +110,8 @@ export async function buildModuleCache(
     const output = await proc.output();
 
     if (!output.success) {
-      const stderr = new TextDecoder().decode(output.stderr);
       if (DEBUG_RESOLVER) {
+        const stderr = new TextDecoder().decode(output.stderr);
         console.log(
           `${DEBUG_PREFIX} buildModuleCache deno info 失败: ${stderr}`,
         );
@@ -600,11 +600,11 @@ function resolveDenoProtocolPath(
  * @example
  * ```typescript
  * import { buildBundle } from "@dreamer/esbuild";
- * import { createResolverPlugin } from "@dreamer/esbuild/plugins/resolver";
+ * import { denoResolverPlugin } from "@dreamer/esbuild/plugins/resolver";
  *
  * const result = await buildBundle({
  *   entryPoint: "./src/client/mod.ts",
- *   plugins: [createResolverPlugin()],
+ *   plugins: [denoResolverPlugin()],
  * });
  * ```
  */
@@ -1446,6 +1446,16 @@ export function denoResolverPlugin(
                 filePath = decodeURIComponent(filePath);
               } catch {
                 // 忽略解码错误
+              }
+
+              // 客户端构建且为 npm 包时，若解析到的是 CJS 文件（如 react-dom/cjs/...），改用 ESM 入口，避免 "Dynamic require is not supported"
+              if (
+                protocolPath.startsWith("npm:") &&
+                !isServerBuild &&
+                (filePath.includes("/cjs/") || filePath.includes("\\cjs\\"))
+              ) {
+                const esmPath = await getNpmEsmEntryPathIfCjs(filePath);
+                if (esmPath) filePath = esmPath;
               }
 
               // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
