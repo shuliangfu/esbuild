@@ -522,6 +522,51 @@ async function fetchJsrSourceViaMeta(
 }
 
 /**
+ * 当本地路径指向 npm 包的 CJS 文件（如 react-dom/cjs/react-dom.development.js）时，
+ * 返回该包的 ESM 入口路径，供浏览器构建使用，避免打包进 require() 导致运行时 "Dynamic require is not supported"。
+ * 读的是 Deno 缓存里「该 npm 包目录」下的 package.json（如 …/react-dom/package.json），与项目根是否有 package.json 无关。
+ *
+ * @param localPath - 模块缓存的本地文件路径（来自 deno info，指向缓存中的 npm 包内文件）
+ * @returns 若应使用 ESM 入口则返回其绝对路径，否则返回 undefined
+ */
+async function getNpmEsmEntryPathIfCjs(
+  localPath: string,
+): Promise<string | undefined> {
+  const normalized = localPath.replace(/\\/g, "/");
+  const cjsIdx = normalized.indexOf("/cjs/");
+  if (cjsIdx === -1) return undefined;
+
+  // pkgRoot = 该 npm 包在 Deno 缓存中的根目录（如 …/react-dom）
+  const pkgRoot = normalized.slice(0, cjsIdx);
+  const pkgPath = join(pkgRoot, "package.json");
+  if (!existsSync(pkgPath)) return undefined;
+
+  try {
+    const raw = await readTextFile(pkgPath);
+    const pkg = JSON.parse(raw) as Record<string, unknown>;
+    let entry: string | undefined;
+    if (typeof pkg.module === "string") {
+      entry = pkg.module;
+    } else if (
+      pkg.exports && typeof pkg.exports === "object" && pkg.exports !== null
+    ) {
+      const exp = (pkg.exports as Record<string, unknown>)["."];
+      if (exp && typeof exp === "object" && exp !== null) {
+        const expObj = exp as Record<string, unknown>;
+        entry = (expObj.import ?? expObj.default) as string | undefined;
+      }
+    }
+    if (typeof entry !== "string") return undefined;
+
+    const esmPath = join(pkgRoot, entry);
+    if (existsSync(esmPath)) return esmPath;
+  } catch {
+    // 忽略 JSON 或文件错误
+  }
+  return undefined;
+}
+
+/**
  * 解析 jsr: / npm: 协议路径：非浏览器模式一律走 deno-protocol，由 onLoad 用 https fetch 取内容并打包
  *
  * @param protocolPath - 协议路径（如 jsr:@scope/package@^1.0.0-beta.1）
@@ -1304,8 +1349,19 @@ export function denoResolverPlugin(
           try {
             // 步骤 0: 优先从预构建的模块缓存中查找本地路径
             // 如果 moduleCache 存在，直接使用缓存中的本地文件路径，避免启动子进程或发送 HTTP 请求
-            const cachedLocalPath = getLocalPathFromCache(protocolPath);
+            let cachedLocalPath = getLocalPathFromCache(protocolPath);
             if (cachedLocalPath) {
+              // 客户端构建且为 npm 包时，若 Deno 解析到的是 CJS 入口（如 react-dom/cjs/...），
+              // 改为使用该包的 ESM 入口，避免打包进 require("react") 导致浏览器报 "Dynamic require is not supported"
+              if (
+                protocolPath.startsWith("npm:") &&
+                !isServerBuild &&
+                (cachedLocalPath.includes("/cjs/") ||
+                  cachedLocalPath.includes("\\cjs\\"))
+              ) {
+                const esmPath = await getNpmEsmEntryPathIfCjs(cachedLocalPath);
+                if (esmPath) cachedLocalPath = esmPath;
+              }
               const contents = await readTextFile(cachedLocalPath);
               const resolveDir = dirname(cachedLocalPath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
