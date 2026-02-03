@@ -214,7 +214,7 @@ export class BuilderClient {
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     // Vue3 客户端构建时优先将 "vue" 解析为运行时构建，避免打包完整构建导致浏览器 Dynamic require 报错
     if (this.config.engine === "vue3") {
-      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache));
+      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache, entryPoint));
     }
     buildOptions.plugins = plugins;
 
@@ -350,7 +350,7 @@ export class BuilderClient {
     // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     if (this.config.engine === "vue3") {
-      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache));
+      plugins.unshift(createVueRuntimeAliasPlugin(moduleCache, entryPoint));
     }
     buildOptions.plugins = plugins;
 
