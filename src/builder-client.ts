@@ -209,7 +209,12 @@ export class BuilderClient {
       buildOptions,
     );
     // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
-    plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
+    // projectDir 用于 node_modules 内 require('react') 等 bare specifier 解析时查找 deno.json
+    plugins.unshift(denoResolverPlugin({
+      isServerBuild: false,
+      moduleCache,
+      projectDir: dirname(entryPoint),
+    }));
     buildOptions.plugins = plugins;
 
     // 执行构建
@@ -341,8 +346,13 @@ export class BuilderClient {
       esbuild,
       buildOptions,
     );
-    // 客户端构建：isServerBuild: false
-    plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
+    // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
+    // projectDir 用于 node_modules 内 require('react') 等 bare specifier 解析时查找 deno.json
+    plugins.unshift(denoResolverPlugin({
+      isServerBuild: false,
+      moduleCache,
+      projectDir: dirname(entryPoint),
+    }));
     buildOptions.plugins = plugins;
 
     // 创建构建上下文
