@@ -255,5 +255,5 @@ describe("Builder 内部方法", () => {
         // 忽略错误
       }
     }
-  }, { sanitizeOps: false, sanitizeResources: false });
-});
+  });
+}, { sanitizeOps: false, sanitizeResources: false });

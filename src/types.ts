@@ -5,9 +5,9 @@
  */
 
 /**
- * 模板引擎类型（vue2 在 vue3 前，与 @dreamer/render 一致）
+ * 模板引擎类型（与 @dreamer/render 一致）
  */
-export type Engine = "react" | "preact" | "vue2" | "vue3";
+export type Engine = "react" | "preact" | "vue3";
 
 /**
  * 构建模式
@@ -207,7 +207,7 @@ export interface ClientConfig {
   };
   /** 输出目录 */
   output: string;
-  /** 模板引擎类型（react、preact、vue2、vue3；vue2/vue3 不配置 JSX） */
+  /** 模板引擎类型（react、preact、vue3；vue3 不配置 JSX） */
   engine: Engine;
   /** 打包选项 */
   bundle?: ClientBundleOptions;

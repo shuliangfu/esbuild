@@ -5,7 +5,7 @@
 - **测试库版本**: @dreamer/test@^1.0.0-beta.14
 - **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.17
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-02-02
+- **测试时间**: 2026-02-03
 - **测试环境**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
@@ -15,14 +15,11 @@
 
 ### 总体统计
 
-- **Deno 环境测试数**: 501
-- **Bun 环境测试数**: 484
-- **通过**: 全部通过 ✅
+- **测试总数**: 502
+- **通过**: 502 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**:
-  - Deno 环境: ~37秒
-  - Bun 环境: ~2.69秒
+- **测试执行时间**: ~15 秒 (Deno 环境 `deno test -A`)
 
 > **注意**: Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等），这些测试仅在 Deno 环境下运行。
 
@@ -32,8 +29,11 @@
 | ----------------------------------- | ------ | ----------- | ------------------------ |
 | `assets-processor-advanced.test.ts` | 8      | ✅ 全部通过 | 资源处理器高级功能测试   |
 | `assets-processor.test.ts`          | 13     | ✅ 全部通过 | 资源处理器基础功能测试   |
+| `browser-compile-socket-io.test.ts` | 5      | ✅ 全部通过 | 浏览器编译 Socket.IO 等  |
+| `browser-resolver.test.ts`          | 4      | ✅ 全部通过 | 浏览器解析器相对路径等   |
 | `build-analyzer-internal.test.ts`   | 9      | ✅ 全部通过 | 构建分析器内部方法测试   |
 | `build-analyzer.test.ts`            | 17     | ✅ 全部通过 | 构建分析器功能测试       |
+| `build-client-resolver.test.ts`     | 6      | ✅ 全部通过 | 客户端构建路径解析测试   |
 | `builder-build-validation.test.ts`  | 6      | ✅ 全部通过 | 构建产物验证测试         |
 | `builder-bundle.test.ts`            | 28     | ✅ 全部通过 | 简单打包器功能测试       |
 | `builder-config-validation.test.ts` | 9      | ✅ 全部通过 | 构建配置验证测试         |
@@ -49,7 +49,7 @@
 | `cli.test.ts`                       | 10     | ✅ 全部通过 | CLI 工具测试             |
 | `builder-client-advanced.test.ts`   | 14     | ✅ 全部通过 | 客户端构建器高级功能测试 |
 | `builder-client-context.test.ts`    | 8      | ✅ 全部通过 | 客户端构建上下文测试     |
-| `builder-client.test.ts`            | 27     | ✅ 全部通过 | 客户端构建器功能测试     |
+| `builder-client.test.ts`            | 28     | ✅ 全部通过 | 客户端构建器功能测试     |
 | `client-server-separation.test.ts`  | 14     | ✅ 全部通过 | 客户端服务端代码分离测试 |
 | `css-import-handler.test.ts`        | 16     | ✅ 全部通过 | CSS 导入处理插件测试     |
 | `css-injector.test.ts`              | 28     | ✅ 全部通过 | CSS 注入工具测试         |
@@ -66,10 +66,10 @@
 | `builder-server-advanced.test.ts`   | 19     | ✅ 全部通过 | 服务端构建器高级功能测试 |
 | `builder-server.test.ts`            | 16     | ✅ 全部通过 | 服务端构建器功能测试     |
 | `server-module-detector.test.ts`    | 24     | ✅ 全部通过 | 服务端模块检测插件测试   |
-| `resolver.test.ts`                  | 10     | ✅ 全部通过 | 解析器插件测试           |
-| `builder-server-resolver.test.ts`   | 4      | ✅ 全部通过 | 服务端构建器路径解析测试 |
-| `builder-client-resolver.test.ts`   | 4      | ✅ 全部通过 | 客户端构建器路径解析测试 |
-| `build-client-resolver.test.ts`     | 4      | ✅ 全部通过 | 客户端构建路径解析测试   |
+| `resolver-advanced.test.ts`         | 11     | ✅ 全部通过 | 解析器插件高级测试       |
+| `resolver.test.ts`                  | 18     | ✅ 全部通过 | 解析器插件测试           |
+| `builder-server-resolver.test.ts`   | 5      | ✅ 全部通过 | 服务端构建器路径解析测试 |
+| `builder-client-resolver.test.ts`   | 6      | ✅ 全部通过 | 客户端构建器路径解析测试 |
 
 ## 功能测试详情
 
@@ -378,7 +378,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 20. 客户端构建器 (builder-client.test.ts) - 27 个测试
+### 20. 客户端构建器 (builder-client.test.ts) - 28 个测试
 
 **测试场景**:
 
@@ -408,7 +408,7 @@
 - ✅ 应该处理不存在的入口文件
 - ✅ 应该处理空的入口文件
 
-**测试结果**: 27 个测试全部通过
+**测试结果**: 28 个测试全部通过
 
 **实现特点**:
 
@@ -718,7 +718,7 @@
 
 **测试结果**: 24 个测试全部通过
 
-### 37. 解析器插件 (resolver.test.ts) - 10 个测试
+### 37. 解析器插件 (resolver.test.ts) - 18 个测试
 
 **测试场景**:
 
@@ -732,16 +732,16 @@
 - ✅ 应该能够解析 ~/ 路径别名（通过 tsconfig.json）
 - ✅ 应该能够在没有 package.json 时处理相对路径和 npm 包
 
-**测试结果**: 10 个测试全部通过（Bun 环境）
+**测试结果**: 18 个测试全部通过
 
 **实现特点**:
 
 - ✅ 支持相对路径解析（`./`, `../`）
-- ✅ 支持 npm 包导入（`npm:` 协议）
-- ✅ 支持路径别名解析（通过 `tsconfig.json` 的 `paths` 配置）
+- ✅ 支持 JSR 包子路径、jsr: 协议、npm: 协议
+- ✅ 支持路径别名解析（deno.json imports、tsconfig paths）
 - ✅ 支持无 `package.json` 场景
 
-### 38. 服务端构建器路径解析 (builder-server-resolver.test.ts) - 4 个测试
+### 38. 服务端构建器路径解析 (builder-server-resolver.test.ts) - 5 个测试
 
 **测试场景**:
 
@@ -750,7 +750,7 @@
 - ✅ 应该能够解析路径别名（通过 tsconfig.json）
 - ✅ 应该能够在没有配置文件时处理相对路径
 
-**测试结果**: 4 个测试全部通过（Bun 环境）
+**测试结果**: 5 个测试全部通过
 
 **实现特点**:
 
@@ -758,7 +758,7 @@
 - ✅ 支持 `tsconfig.json` 路径别名配置
 - ✅ 支持无配置文件场景
 
-### 39. 客户端构建器路径解析 (builder-client-resolver.test.ts) - 4 个测试
+### 39. 客户端构建器路径解析 (builder-client-resolver.test.ts) - 6 个测试
 
 **测试场景**:
 
@@ -767,7 +767,7 @@
 - ✅ 应该能够解析路径别名（通过 tsconfig.json）
 - ✅ 应该能够处理代码分割和相对路径导入
 
-**测试结果**: 4 个测试全部通过（Bun 环境）
+**测试结果**: 6 个测试全部通过
 
 **实现特点**:
 
@@ -775,7 +775,7 @@
 - ✅ 支持代码分割场景下的路径解析
 - ✅ 支持 `tsconfig.json` 路径别名配置
 
-### 40. 客户端构建路径解析 (build-client-resolver.test.ts) - 4 个测试
+### 40. 客户端构建路径解析 (build-client-resolver.test.ts) - 6 个测试
 
 **测试场景**:
 
@@ -784,7 +784,7 @@
 - ✅ 应该能够解析路径别名（通过 tsconfig.json）
 - ✅ 应该能够处理代码分割和相对路径导入
 
-**测试结果**: 4 个测试全部通过（Bun 环境）
+**测试结果**: 6 个测试全部通过
 
 **实现特点**:
 
@@ -805,7 +805,7 @@
 | `Builder`            | `watch()`            | 启动 Watch 模式        | ✅ 9个测试    |
 | `Builder`            | `stopWatch()`        | 停止 Watch 模式        | ✅ 2个测试    |
 | `BuilderBundle`      | `build()`            | 简单打包               | ✅ 24个测试   |
-| `BuilderClient`      | `build()`            | 构建客户端代码         | ✅ 27个测试   |
+| `BuilderClient`      | `build()`            | 构建客户端代码         | ✅ 28个测试   |
 | `BuilderClient`      | `createContext()`    | 创建增量构建上下文     | ✅ 8个测试    |
 | `BuilderClient`      | `rebuild()`          | 增量重新构建           | ✅ 4个测试    |
 | `BuilderClient`      | `dispose()`          | 清理构建上下文         | ✅ 3个测试    |
@@ -898,8 +898,8 @@
 
 **测试总数**:
 
-- Deno 环境: **501** 个测试
-- Bun 环境: **484** 个测试
+- **502** 个测试（`deno test -A`，全部通过）
+- 执行时间: **约 15 秒**
 
 > 注：Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等）
 
@@ -907,7 +907,7 @@
 
 - ✅ 单元测试（约 420 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 51 个）
+- ✅ 边界情况和错误处理测试（约 52 个）
 
 **测试执行环境**:
 
