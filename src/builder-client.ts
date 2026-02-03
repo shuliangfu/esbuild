@@ -157,8 +157,7 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
-    // 根据渲染引擎配置 JSX
-    // Preact/React 使用自动模式；Vue3 使用模板语法，不需要 JSX 配置
+    // 根据渲染引擎配置 JSX（Preact/React 使用自动模式）
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
       jsxConfig.jsx = "automatic";
@@ -210,7 +209,6 @@ export class BuilderClient {
       buildOptions,
     );
     // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
-    // Vue3 的 "vue" 运行时构建由 resolver-deno 的 onLoad 重定向处理，此处不再调用 vue-runtime-alias 插件
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     buildOptions.plugins = plugins;
 
@@ -298,7 +296,7 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
-    // 根据渲染引擎配置 JSX（Vue3 不配置 JSX）
+    // 根据渲染引擎配置 JSX
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
       jsxConfig.jsx = "automatic";
@@ -343,7 +341,7 @@ export class BuilderClient {
       esbuild,
       buildOptions,
     );
-    // 客户端构建：isServerBuild: false；Vue3 的 "vue" 由 resolver-deno onLoad 重定向处理
+    // 客户端构建：isServerBuild: false
     plugins.unshift(denoResolverPlugin({ isServerBuild: false, moduleCache }));
     buildOptions.plugins = plugins;
 

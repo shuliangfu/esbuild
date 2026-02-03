@@ -92,7 +92,7 @@ bunx jsr add -D @dreamer/esbuild
 ## 🎯 使用场景
 
 - **全栈项目构建**：同时构建服务端和客户端代码
-- **前端项目构建**：React、Preact、Vue3 应用打包
+- **前端项目构建**：React、Preact 应用打包
 - **SPA 单页应用**：客户端渲染（CSR）项目构建
 - **多平台应用打包**：支持 Linux、macOS、Windows
 - **服务端渲染**：使用内存模式获取编译代码用于 SSR

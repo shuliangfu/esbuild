@@ -234,49 +234,6 @@ interface DenoConfig {
 /** deno-protocol namespace，用于 onLoad 通过 fetch 取内容并打包 */
 const NAMESPACE_DENO_PROTOCOL = "deno-protocol";
 
-/** Vue 主包与子包 ESM 构建文件名（客户端打包时使用，避免 .cjs.js 导致浏览器 Dynamic require 报错） */
-const VUE_ESM_FILES: Record<string, string> = {
-  "vue": "dist/vue.runtime.esm-bundler.js",
-  "@vue/runtime-core": "dist/runtime-core.esm-bundler.js",
-  "@vue/runtime-dom": "dist/runtime-dom.esm-bundler.js",
-  "@vue/reactivity": "dist/reactivity.esm-bundler.js",
-};
-
-/** 匹配 npm:vue@ 或 npm:/vue@（Deno 可能输出后者） */
-const NPM_VUE_SPECIFIER_RE = /^npm:\/?vue@/;
-
-/** 匹配 npm:@vue/runtime-core@、npm:@vue/runtime-dom@、npm:@vue/reactivity@ */
-const NPM_VUE_SUBPACKAGE_RE =
-  /^npm:\/?@vue\/(runtime-core|runtime-dom|reactivity)@/;
-
-/**
- * 根据协议路径获取对应的 ESM 构建相对路径（如 dist/xxx.esm-bundler.js）
- */
-function getVueEsmFileForProtocol(protocolPath: string): string | undefined {
-  if (NPM_VUE_SPECIFIER_RE.test(protocolPath)) return VUE_ESM_FILES["vue"];
-  const m = protocolPath.match(NPM_VUE_SUBPACKAGE_RE);
-  if (m) return VUE_ESM_FILES[`@vue/${m[1]}`];
-  return undefined;
-}
-
-/**
- * 根据包路径（文件或目录）和 ESM 相对路径，得到 ESM 文件的绝对路径
- * @param packagePath - 来自缓存的路径（可能是 index.js、xxx.cjs.js 或包目录）
- * @param esmRelativePath - 如 dist/vue.runtime.esm-bundler.js
- * @returns ESM 文件绝对路径，若不存在返回 undefined
- */
-function getPackageEsmPath(
-  packagePath: string,
-  esmRelativePath: string,
-): string | undefined {
-  if (!existsSync(packagePath)) return undefined;
-  const isFile = packagePath.endsWith(".js") ||
-    packagePath.endsWith(".mjs") || packagePath.endsWith(".cjs");
-  const pkgDir = isFile ? dirname(packagePath) : packagePath;
-  const fullPath = join(pkgDir, esmRelativePath);
-  return existsSync(fullPath) ? fullPath : undefined;
-}
-
 /**
  * 读取并解析 deno.json 配置
  *
@@ -1349,25 +1306,6 @@ export function denoResolverPlugin(
             // 如果 moduleCache 存在，直接使用缓存中的本地文件路径，避免启动子进程或发送 HTTP 请求
             const cachedLocalPath = getLocalPathFromCache(protocolPath);
             if (cachedLocalPath) {
-              // 客户端构建时，将 vue 及 @vue/* 重定向到 ESM 构建，避免 .cjs.js 导致浏览器 Dynamic require 报错
-              if (!isServerBuild) {
-                const esmFile = getVueEsmFileForProtocol(protocolPath);
-                if (esmFile) {
-                  const esmPath = getPackageEsmPath(cachedLocalPath, esmFile);
-                  if (esmPath) {
-                    const contents = await readTextFile(esmPath);
-                    const resolveDir = dirname(esmPath);
-                    protocolResolveDirCache.set(protocolPath, resolveDir);
-                    const loader = getLoaderFromPath(esmPath);
-                    if (DEBUG_RESOLVER) {
-                      console.log(
-                        `${DEBUG_PREFIX} onLoad Vue ESM 重定向 ${protocolPath} -> ${esmPath}`,
-                      );
-                    }
-                    return { contents, loader, resolveDir };
-                  }
-                }
-              }
               const contents = await readTextFile(cachedLocalPath);
               const resolveDir = dirname(cachedLocalPath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
@@ -1460,32 +1398,6 @@ export function denoResolverPlugin(
               protocolResolveDirCache.set(protocolPath, resolveDir);
 
               if (existsSync(filePath)) {
-                // 客户端构建时，将 vue 及 @vue/* 重定向到 ESM 构建
-                if (!isServerBuild) {
-                  const esmFile = getVueEsmFileForProtocol(protocolPath);
-                  if (esmFile) {
-                    const esmPath = getPackageEsmPath(filePath, esmFile);
-                    if (esmPath) {
-                      const contents = await readTextFile(esmPath);
-                      const runtimeResolveDir = dirname(esmPath);
-                      protocolResolveDirCache.set(
-                        protocolPath,
-                        runtimeResolveDir,
-                      );
-                      const loader = getLoaderFromPath(esmPath);
-                      if (DEBUG_RESOLVER) {
-                        console.log(
-                          `${DEBUG_PREFIX} onLoad Vue ESM 重定向(file://) ${protocolPath} -> ${esmPath}`,
-                        );
-                      }
-                      return {
-                        contents,
-                        loader,
-                        resolveDir: runtimeResolveDir,
-                      };
-                    }
-                  }
-                }
                 const contents = await readTextFile(filePath);
                 if (DEBUG_RESOLVER) {
                   console.log(
