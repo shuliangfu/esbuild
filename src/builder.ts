@@ -50,6 +50,8 @@ export class Builder implements IBuilder {
   private buildAnalyzer: BuildAnalyzer;
   private watcher?: FileWatcher;
   private isWatching: boolean = false;
+  /** Watch 模式下防抖重建的定时器 ID，stopWatch 时需清除以防泄漏 */
+  private watchRebuildTimer: ReturnType<typeof setTimeout> | null = null;
   private logLevel: LogLevel = "info";
   private errorStats: ErrorStats = {
     total: 0,
@@ -1094,7 +1096,6 @@ export class Builder implements IBuilder {
 
     // 监听文件变化
     const debounceTime = watchOptions.debounce || 300;
-    let rebuildTimer: number | null = null;
 
     (async () => {
       for await (const event of this.watcher!) {
@@ -1136,12 +1137,15 @@ export class Builder implements IBuilder {
         }
 
         // 防抖：延迟重新构建
-        if (rebuildTimer !== null) {
-          clearTimeout(rebuildTimer);
+        if (this.watchRebuildTimer !== null) {
+          clearTimeout(this.watchRebuildTimer);
+          this.watchRebuildTimer = null;
         }
 
-        rebuildTimer = setTimeout(async () => {
+        this.watchRebuildTimer = setTimeout(async () => {
+          this.watchRebuildTimer = null;
           try {
+            if (!this.isWatching) return;
             logger.info("检测到文件变化，开始重新构建...");
             await this.build(options);
             logger.info("重新构建完成");
@@ -1164,6 +1168,11 @@ export class Builder implements IBuilder {
       this.watcher.close();
       this.watcher = undefined;
       this.isWatching = false;
+      // 清除待执行的重建定时器，防止内存泄漏
+      if (this.watchRebuildTimer !== null) {
+        clearTimeout(this.watchRebuildTimer);
+        this.watchRebuildTimer = null;
+      }
       logger.info("已停止文件监听");
     }
   }
