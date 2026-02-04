@@ -178,6 +178,7 @@ export class BuilderClient {
       sourcemap: sourcemapOption,
       splitting: splittingEnabled, // write: false 时也支持代码分割，产出在 result.outputContents
       external: externalModules,
+      alias: bundleOptions.alias,
       treeShaking: true,
       metafile: true,
       // 根据 write 选项决定是否写入文件
@@ -323,6 +324,7 @@ export class BuilderClient {
       sourcemap: bundleOptions.sourcemap,
       splitting: splittingEnabled,
       external: externalModules,
+      alias: bundleOptions.alias,
       chunkNames,
       treeShaking: true,
       metafile: true,

@@ -127,6 +127,8 @@ export interface ClientBundleOptions {
   external?: string[];
   /** 输出格式 */
   format?: OutputFormat;
+  /** 模块别名（用于解决多实例问题，如 preact） */
+  alias?: Record<string, string>;
 }
 
 /**
