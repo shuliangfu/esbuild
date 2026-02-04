@@ -31,8 +31,7 @@ import type {
   OutputFileContent,
   ServerConfig,
 } from "./types.ts";
-
-const DEBUG = false; // 调试开关
+import { logger } from "./utils/logger.ts";
 
 /**
  * 服务端构建选项
@@ -65,6 +64,16 @@ export class BuilderServer {
 
   constructor(config: ServerConfig) {
     this.config = config;
+  }
+
+  /**
+   * 调试日志：仅当 config.debug 为 true 时通过 logger.debug 输出，便于排查构建问题
+   */
+  private debugLog(message: string): void {
+    if (this.config.debug) {
+      const log = this.config.logger ?? logger;
+      log.debug(`[esbuild] ${message}`);
+    }
   }
 
   /**
@@ -231,7 +240,7 @@ export class BuilderServer {
   ): Promise<BuildResult> {
     const startTime = Date.now();
 
-    if (DEBUG) console.log("[esbuild] 开始构建...");
+    this.debugLog("开始构建...");
 
     // 解析选项
     const mode: BuildMode = typeof options === "string"
@@ -268,7 +277,7 @@ export class BuilderServer {
           err && typeof err === "object" && "code" in err &&
           (err as { code: string }).code === "EEXIST"
         ) {
-          if (DEBUG) console.log(`[esbuild] 删除旧的同名文件: ${outputDir}`);
+          this.debugLog(`删除旧的同名文件: ${outputDir}`);
           await remove(outputDir);
           await mkdir(outputDir, { recursive: true });
         } else {
@@ -287,22 +296,24 @@ export class BuilderServer {
       minify: this.config.compile?.minify ?? isProd,
     };
 
-    if (DEBUG) console.log("[esbuild] 入口文件:", entryPoint);
-    if (DEBUG) console.log("[esbuild] 输出目录:", outputDir);
-    if (DEBUG) console.log("[esbuild] 工作目录:", dirname(entryPoint));
+    this.debugLog(`入口文件: ${entryPoint}`);
+    this.debugLog(`输出目录: ${outputDir}`);
+    this.debugLog(`工作目录: ${dirname(entryPoint)}`);
 
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
+    const debug = this.config.debug ?? false;
+    const log = this.config.logger ?? logger;
 
     // 如果启用 externalNpm，添加插件将所有 npm 包标记为 external
     if (this.config.externalNpm) {
-      if (DEBUG) console.log("[esbuild] 启用 externalNpm");
+      this.debugLog("启用 externalNpm");
       plugins.push({
         name: "external-npm",
         setup(build) {
           // 匹配 npm: 协议的导入
           build.onResolve({ filter: /^npm:/ }, (args) => {
-            if (DEBUG) console.log("[esbuild] external npm:", args.path);
+            if (debug) log.debug(`[esbuild] external npm: ${args.path}`);
             return { path: args.path, external: true };
           });
         },
@@ -316,9 +327,7 @@ export class BuilderServer {
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-      if (DEBUG) {
-        console.log("[esbuild] 使用 denoResolverPlugin (服务端构建模式)");
-      }
+      this.debugLog("使用 denoResolverPlugin (服务端构建模式)");
 
       // 服务端构建模式：npm:/jsr: 依赖直接标记为 external，让 Deno 在运行时解析
       // 这样不需要扫描缓存目录，构建速度更快，也避免了缓存目录中损坏文件的问题
@@ -326,6 +335,8 @@ export class BuilderServer {
       plugins.push(denoResolverPlugin({
         isServerBuild: true, // 服务端构建模式
         excludePaths: this.config.excludePaths,
+        debug,
+        logger: log,
         // 注意：不需要 moduleCache，因为服务端构建时依赖由 Deno 运行时解析
       }));
     }
@@ -371,13 +382,13 @@ export class BuilderServer {
       buildOptions.outfile = outfile;
     }
 
-    if (DEBUG) console.log("[esbuild] 开始执行 esbuild.build()...");
-    if (DEBUG) console.log("[esbuild] external:", this.config.external);
+    this.debugLog("开始执行 esbuild.build()...");
+    this.debugLog(`external: ${JSON.stringify(this.config.external)}`);
 
     // 执行构建
     const result = await esbuild.build(buildOptions);
 
-    if (DEBUG) console.log("[esbuild] esbuild.build() 完成");
+    this.debugLog("esbuild.build() 完成");
 
     const duration = Date.now() - startTime;
 

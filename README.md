@@ -375,6 +375,10 @@ const builder = new BuilderClient(config);
 new BuilderClient(config: ClientConfig)
 ```
 
+**ClientConfig 调试与日志**：
+- `debug?: boolean`：是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息。
+- `logger?: BuildLogger`：日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console。
+
 #### 方法
 
 | 方法 | 说明 |
@@ -446,6 +450,10 @@ interface ServerConfig {
   external?: string[];
   /** 使用原生编译器生成可执行文件（Deno: deno compile, Bun: bun build --compile） */
   useNativeCompile?: boolean;
+  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息，便于排查 */
+  debug?: boolean;
+  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  logger?: BuildLogger;
   // ... 其他配置
 }
 ```
@@ -532,6 +540,10 @@ interface BundleOptions {
   define?: Record<string, string>;
   /** 是否打包依赖（默认：true） */
   bundle?: boolean;
+  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息 */
+  debug?: boolean;
+  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  logger?: BuildLogger;
 }
 ```
 
@@ -570,6 +582,49 @@ interface OutputFileContent {
   /** 文件内容（二进制格式） */
   contents: Uint8Array;
 }
+```
+
+---
+
+## 🔧 调试与日志
+
+服务端/客户端构建与简单打包均支持 **debug** 和 **logger** 参数，便于排查构建与解析问题：
+
+- **debug**（`boolean`，默认 `false`）：设为 `true` 时输出 resolver、build 等详细调试信息。
+- **logger**（`BuildLogger`，可选）：日志实例；未传时使用库内默认 logger。所有 info/debug 输出均通过 logger，不使用 `console`。
+
+**示例**：
+
+```typescript
+import { createLogger } from "@dreamer/logger";
+import { BuilderServer, BuilderClient, buildBundle } from "@dreamer/esbuild";
+
+const logger = createLogger({ level: "debug", format: "text" });
+
+// 服务端构建：开启调试并传入自定义 logger
+const serverBuilder = new BuilderServer({
+  entry: "./src/server.ts",
+  output: "./dist",
+  debug: true,
+  logger,
+});
+
+// 客户端构建：同上
+const clientBuilder = new BuilderClient({
+  entry: "./src/client/index.tsx",
+  output: "./dist/client",
+  engine: "react",
+  debug: true,
+  logger,
+});
+
+// 简单打包：BundleOptions 同样支持 debug、logger
+const result = await buildBundle({
+  entryPoint: "./src/client/mod.ts",
+  format: "esm",
+  debug: true,
+  logger,
+});
 ```
 
 ---

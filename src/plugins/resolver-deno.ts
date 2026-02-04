@@ -21,17 +21,21 @@ import {
   cwd,
   dirname,
   existsSync,
-  getEnv,
   join,
   normalize as pathNormalize,
   readTextFile,
   readTextFileSync,
-} from "@dreamer/runtime-adapter"
-import * as esbuild from "esbuild"
+} from "@dreamer/runtime-adapter";
+import * as esbuild from "esbuild";
+import type { BuildLogger } from "../types.ts";
 
-/** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta / CJS→ESM 重定向等调试日志。通过环境变量 DEBUG=1 开启 */
-const DEBUG = getEnv("DEBUG") === "1";
 const PREFIX = "[resolver-deno]";
+
+/** 未传入 logger 时使用的空实现，避免使用 console */
+const NOOP_LOGGER: BuildLogger = {
+  debug: () => {},
+  info: () => {},
+};
 
 /**
  * 模块缓存映射：specifier -> 本地文件路径
@@ -74,6 +78,8 @@ interface DenoInfoOutput {
  *
  * @param entryPoint - 入口文件路径
  * @param projectDir - 项目目录（用于查找 deno.json）
+ * @param debug - 是否输出调试日志
+ * @param logger - 日志实例，未传时使用空实现，所有输出均通过 logger 不使用 console
  * @returns 模块缓存映射：specifier -> 本地文件路径
  *
  * @example
@@ -86,15 +92,19 @@ interface DenoInfoOutput {
 export async function buildModuleCache(
   entryPoint: string,
   projectDir?: string,
+  debug = false,
+  logger?: BuildLogger,
 ): Promise<ModuleCache> {
   const cache: ModuleCache = new Map();
   const workDir = projectDir || cwd();
+  const log = logger ?? NOOP_LOGGER;
 
-  if (DEBUG) {
-    console.log(
-      `${PREFIX} buildModuleCache 开始构建模块缓存: entry=${entryPoint}, workDir=${workDir}`,
-    );
-  }
+  const debugLog = (msg: string) => {
+    if (debug) log.debug(`${PREFIX} ${msg}`);
+  };
+  debugLog(
+    `buildModuleCache 开始构建模块缓存: entry=${entryPoint}, workDir=${workDir}`,
+  );
 
   try {
     // 查找项目的 deno.json
@@ -113,11 +123,7 @@ export async function buildModuleCache(
 
     if (!output.success) {
       const stderr = new TextDecoder().decode(output.stderr);
-      if (DEBUG) {
-        console.log(
-          `${PREFIX} buildModuleCache deno info 失败: ${stderr}`,
-        );
-      }
+      debugLog(`buildModuleCache deno info 失败: ${stderr}`);
       return cache;
     }
 
@@ -156,24 +162,16 @@ export async function buildModuleCache(
             cache.set(`jsr:${scopeAndName}@^${version}`, mod.local);
           }
 
-          if (DEBUG) {
-            console.log(
-              `${PREFIX} buildModuleCache 添加映射: ${jsrSpecifier} -> ${mod.local}`,
-            );
-          }
+          debugLog(
+            `buildModuleCache 添加映射: ${jsrSpecifier} -> ${mod.local}`,
+          );
         }
       }
     }
 
-    if (DEBUG) {
-      console.log(
-        `${PREFIX} buildModuleCache 完成: ${cache.size} 个模块`,
-      );
-    }
+    debugLog(`buildModuleCache 完成: ${cache.size} 个模块`);
   } catch (error) {
-    if (DEBUG) {
-      console.log(`${PREFIX} buildModuleCache 错误: ${error}`);
-    }
+    debugLog(`buildModuleCache 错误: ${error}`);
   }
 
   return cache;
@@ -231,6 +229,10 @@ export interface ResolverOptions {
    * 建议传入入口文件所在目录（如 dirname(entryPoint)）。
    */
   projectDir?: string;
+  /** 是否启用调试日志（默认：false），开启后输出 onLoad / fetchJsrSourceViaMeta / CJS→ESM 重定向等，便于排查 */
+  debug?: boolean;
+  /** 日志实例（未传时使用空实现），info/debug 均通过 logger 输出，不使用 console */
+  logger?: BuildLogger;
 }
 
 /**
@@ -392,19 +394,24 @@ async function fetchSourceFromUrl(url: string): Promise<string | null> {
  * 不猜路径：manifest 里是包内真实路径（如 /src/encryption/encryption-manager.ts），exports 是子路径→文件映射。
  *
  * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@^1.0.0-beta.2/encryption/encryption-manager.ts）
+ * @param debug - 是否输出调试日志（默认 false）
+ * @param logger - 日志实例，未传时使用空实现，所有输出均通过 logger 不使用 console
  * @returns 源码内容，失败返回 null
  */
 async function fetchJsrSourceViaMeta(
   protocolPath: string,
+  debug = false,
+  logger?: BuildLogger,
 ): Promise<string | null> {
-  if (DEBUG) {
-    console.log(
+  const log = logger ?? NOOP_LOGGER;
+  if (debug) {
+    log.debug(
       `${PREFIX} fetchJsrSourceViaMeta 入参 protocolPath=${protocolPath}`,
     );
   }
   if (!protocolPath.startsWith("jsr:")) {
-    if (DEBUG) {
-      console.log(
+    if (debug) {
+      log.debug(
         `${PREFIX} fetchJsrSourceViaMeta 非 jsr: 协议，返回 null`,
       );
     }
@@ -426,8 +433,8 @@ async function fetchJsrSourceViaMeta(
     subpath = parts.length > 2 ? parts.slice(2).join("/") : "";
     const pkgMetaUrl = `https://jsr.io/${scopeAndName}/meta.json`;
     const pkgMetaRaw = await fetchJsonFromUrl(pkgMetaUrl);
-    if (DEBUG) {
-      console.log(
+    if (debug) {
+      log.debug(
         `${PREFIX} fetchJsrSourceViaMeta 无版本号分支 pkgMetaUrl=${pkgMetaUrl} pkgMetaRaw=${
           pkgMetaRaw == null ? "null" : "ok"
         }`,
@@ -459,8 +466,8 @@ async function fetchJsrSourceViaMeta(
   const base = `https://jsr.io/${scopeAndName}/${concreteVersion}`;
   const metaUrl = `${base}_meta.json`;
   const metaRaw = await fetchJsonFromUrl(metaUrl);
-  if (DEBUG) {
-    console.log(
+  if (debug) {
+    log.debug(
       `${PREFIX} fetchJsrSourceViaMeta scopeAndName=${scopeAndName} version=${version} subpath=${subpath} metaUrl=${metaUrl} metaRaw=${
         metaRaw == null ? "null" : "ok"
       }`,
@@ -480,8 +487,8 @@ async function fetchJsrSourceViaMeta(
   if (pathFromExport && typeof pathFromExport === "string") {
     pathFromExport = pathFromExport.replace(/^\.\//, "");
   }
-  if (DEBUG) {
-    console.log(
+  if (debug) {
+    log.debug(
       `${PREFIX} fetchJsrSourceViaMeta exportKey=${exportKey} pathFromExport=${pathFromExport} manifestHasPath=${
         pathFromExport ? typeof manifest[`/${pathFromExport}`] : "n/a"
       }`,
@@ -490,8 +497,8 @@ async function fetchJsrSourceViaMeta(
   if (pathFromExport && typeof manifest[`/${pathFromExport}`] === "object") {
     const fileUrl = `${base}/${pathFromExport}`;
     const code = await fetchSourceFromUrl(fileUrl);
-    if (DEBUG) {
-      console.log(
+    if (debug) {
+      log.debug(
         `${PREFIX} fetchJsrSourceViaMeta 第一路径 fileUrl=${fileUrl} code=${
           code != null ? `${code.length} chars` : "null"
         }`,
@@ -517,8 +524,8 @@ async function fetchJsrSourceViaMeta(
   if (pathKey) {
     const pathSlice = pathKey.slice(1);
     const code = await fetchSourceFromUrl(`${base}/${pathSlice}`);
-    if (DEBUG) {
-      console.log(
+    if (debug) {
+      log.debug(
         `${PREFIX} fetchJsrSourceViaMeta 第二路径 pathKey=${pathKey} url=${base}/${pathSlice} code=${
           code != null ? `${code.length} chars` : "null"
         }`,
@@ -526,8 +533,8 @@ async function fetchJsrSourceViaMeta(
     }
     if (code != null) return code;
   }
-  if (DEBUG) {
-    console.log(`${PREFIX} fetchJsrSourceViaMeta 未取到源码，返回 null`);
+  if (debug) {
+    log.debug(`${PREFIX} fetchJsrSourceViaMeta 未取到源码，返回 null`);
   }
   return null;
 }
@@ -648,7 +655,14 @@ export function denoResolverPlugin(
     excludePaths = [],
     // 项目目录：importer 在 node_modules 内时用此目录查找 deno.json
     projectDir,
+    debug = false,
+    logger: optionsLogger,
   } = options;
+
+  const log = optionsLogger ?? NOOP_LOGGER;
+  const debugLog = (msg: string) => {
+    if (debug) log.debug(`${PREFIX} ${msg}`);
+  };
 
   return {
     name: "resolver",
@@ -718,11 +732,9 @@ export function denoResolverPlugin(
             if (!pathToCheck) continue;
             for (const excludePattern of excludePaths) {
               if (pathToCheck.includes(excludePattern)) {
-                if (DEBUG) {
-                  console.log(
-                    `${PREFIX} 排除路径匹配: ${pathToCheck} (模式: ${excludePattern})`,
-                  );
-                }
+                debugLog(
+                  `排除路径匹配: ${pathToCheck} (模式: ${excludePattern})`,
+                );
                 return { path: args.path, external: true };
               }
             }
@@ -816,11 +828,9 @@ export function denoResolverPlugin(
                 `https://jsr.io/${scopeAndName}/${version}${pathVariant}`;
               localPath = moduleCache.get(httpsUrl);
               if (localPath && existsSync(localPath)) {
-                if (DEBUG) {
-                  console.log(
-                    `${PREFIX} getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
-                  );
-                }
+                debugLog(
+                  `getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
+                );
                 return localPath;
               }
             }
@@ -839,11 +849,9 @@ export function denoResolverPlugin(
                 if (
                   normalizedKey.endsWith(normalizedSubpath) && existsSync(value)
                 ) {
-                  if (DEBUG) {
-                    console.log(
-                      `${PREFIX} getLocalPathFromCache 模糊匹配 ${specifier} -> ${key} -> ${value}`,
-                    );
-                  }
+                  debugLog(
+                    `getLocalPathFromCache 模糊匹配 ${specifier} -> ${key} -> ${value}`,
+                  );
                   return value;
                 }
               }
@@ -939,11 +947,7 @@ export function denoResolverPlugin(
         (args): esbuild.OnResolveResult | undefined => {
           // 服务端构建且非浏览器模式：直接标记为 external（path 保持 jsr:，Deno 运行时解析）
           if (isServerBuild && !browserMode) {
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} 服务端构建: 标记为 external: ${args.path}`,
-              );
-            }
+            debugLog(`服务端构建: 标记为 external: ${args.path}`);
             return { path: args.path, external: true };
           }
           // 浏览器模式：转为 CDN URL 并 external；或客户端打包：走 deno-protocol
@@ -986,11 +990,7 @@ export function denoResolverPlugin(
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
-              );
-            }
+            debugLog(`服务端构建: 标记为 external: ${packageImport}`);
             return { path: packageImport, external: true };
           }
 
@@ -1047,11 +1047,7 @@ export function denoResolverPlugin(
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} 服务端构建: 标记为 external: ${fullProtocolPath}`,
-              );
-            }
+            debugLog(`服务端构建: 标记为 external: ${fullProtocolPath}`);
             return { path: fullProtocolPath, external: true };
           }
 
@@ -1104,11 +1100,7 @@ export function denoResolverPlugin(
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
-              );
-            }
+            debugLog(`服务端构建: 标记为 external: ${packageImport}`);
             return { path: packageImport, external: true };
           }
 
@@ -1178,11 +1170,7 @@ export function denoResolverPlugin(
             (packageImport.startsWith("jsr:") ||
               packageImport.startsWith("npm:"))
           ) {
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} 服务端构建: 标记为 external: ${packageImport}`,
-              );
-            }
+            debugLog(`服务端构建: 标记为 external: ${packageImport}`);
             return { path: packageImport, external: true };
           }
 
@@ -1225,11 +1213,9 @@ export function denoResolverPlugin(
                 ) {
                   const esmPath = await getEsmIfCjsCached(resolvedPath);
                   if (esmPath) {
-                    if (DEBUG) {
-                      console.log(
-                        `${PREFIX} [CJS→ESM] 相对路径解析重定向: ${resolvedPath} -> ${esmPath}`,
-                      );
-                    }
+                    debugLog(
+                      `[CJS→ESM] 相对路径解析重定向: ${resolvedPath} -> ${esmPath}`,
+                    );
                     resolvedPath = esmPath;
                   }
                 }
@@ -1273,11 +1259,9 @@ export function denoResolverPlugin(
                   ) {
                     const esmPath = await getEsmIfCjsCached(resolvedPath);
                     if (esmPath) {
-                      if (DEBUG) {
-                        console.log(
-                          `${PREFIX} [CJS→ESM] 相对路径解析重定向: ${resolvedPath} -> ${esmPath}`,
-                        );
-                      }
+                      debugLog(
+                        `[CJS→ESM] 相对路径解析重定向: ${resolvedPath} -> ${esmPath}`,
+                      );
                       resolvedPath = esmPath;
                     }
                   }
@@ -1414,11 +1398,9 @@ export function denoResolverPlugin(
                         resolvedProtocolPath,
                       );
                       if (esmPath) {
-                        if (DEBUG) {
-                          console.log(
-                            `${PREFIX} [CJS→ESM] 相对路径解析重定向: ${resolvedProtocolPath} -> ${esmPath}`,
-                          );
-                        }
+                        debugLog(
+                          `[CJS→ESM] 相对路径解析重定向: ${resolvedProtocolPath} -> ${esmPath}`,
+                        );
                         pathToReturn = esmPath;
                       }
                     }
@@ -1465,11 +1447,9 @@ export function denoResolverPlugin(
           if (!isCjsPath(resolvedPath)) return undefined;
           const esmPath = await getEsmIfCjsCached(resolvedPath);
           if (!esmPath) return undefined;
-          if (DEBUG) {
-            console.log(
-              `${PREFIX} [CJS→ESM] file 相对路径重定向: ${resolvedPath} -> ${esmPath}`,
-            );
-          }
+          debugLog(
+            `[CJS→ESM] file 相对路径重定向: ${resolvedPath} -> ${esmPath}`,
+          );
           return { path: esmPath, namespace: "file" };
         },
       );
@@ -1501,11 +1481,9 @@ export function denoResolverPlugin(
 
         // 对于其他未被处理的模块（如 node_modules 中的包），标记为 external
         // 这可以防止 esbuild 尝试解析它们，避免扫描全局缓存目录
-        if (DEBUG) {
-          console.log(
-            `${PREFIX} 兜底 onResolve: 将未知模块标记为 external: ${args.path} (kind=${args.kind}, importer=${args.importer})`,
-          );
-        }
+        debugLog(
+          `兜底 onResolve: 将未知模块标记为 external: ${args.path} (kind=${args.kind}, importer=${args.importer})`,
+        );
         return { path: args.path, external: true };
       });
 
@@ -1515,11 +1493,7 @@ export function denoResolverPlugin(
         { filter: /.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = args.path;
-          if (DEBUG) {
-            console.log(
-              `${PREFIX} onLoad 入参 protocolPath=${protocolPath}`,
-            );
-          }
+          debugLog(`onLoad 入参 protocolPath=${protocolPath}`);
 
           try {
             // 步骤 0: 优先从预构建的模块缓存中查找本地路径
@@ -1534,11 +1508,9 @@ export function denoResolverPlugin(
               ) {
                 const esmPath = await getEsmIfCjsCached(cachedLocalPath);
                 if (esmPath) {
-                  if (DEBUG) {
-                    console.log(
-                      `${PREFIX} [CJS→ESM] ${protocolPath} 重定向: ${cachedLocalPath} -> ${esmPath}`,
-                    );
-                  }
+                  debugLog(
+                    `[CJS→ESM] ${protocolPath} 重定向: ${cachedLocalPath} -> ${esmPath}`,
+                  );
                   cachedLocalPath = esmPath;
                 }
               }
@@ -1546,11 +1518,9 @@ export function denoResolverPlugin(
               const resolveDir = dirname(cachedLocalPath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
               const loader = getLoaderFromPath(cachedLocalPath);
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 从预构建缓存获取 ${protocolPath} -> ${cachedLocalPath} (${contents.length} chars)`,
-                );
-              }
+              debugLog(
+                `onLoad 从预构建缓存获取 ${protocolPath} -> ${cachedLocalPath} (${contents.length} chars)`,
+              );
               return { contents, loader, resolveDir };
             }
 
@@ -1567,13 +1537,11 @@ export function denoResolverPlugin(
             let fileUrl: string | undefined;
             try {
               fileUrl = await import.meta.resolve(protocolPath);
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad import.meta.resolve 结果 fileUrl=${
-                    fileUrl ?? "undefined"
-                  }`,
-                );
-              }
+              debugLog(
+                `onLoad import.meta.resolve 结果 fileUrl=${
+                  fileUrl ?? "undefined"
+                }`,
+              );
             } catch {
               // 忽略
             }
@@ -1581,11 +1549,7 @@ export function denoResolverPlugin(
             // 步骤 3.5: 插件里 import.meta.resolve 用的是 esbuild 的上下文，拿不到项目的 deno.json；
             // 若未得到 file://，在项目目录下起子进程做 resolve，用项目的 deno.json 得到真实 file://
             if (!fileUrl || !fileUrl.startsWith("file://")) {
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 未得到 file://，尝试子进程 resolve`,
-                );
-              }
+              debugLog("onLoad 未得到 file://，尝试子进程 resolve");
               try {
                 const projectDir =
                   (build.initialOptions.absWorkingDir as string | undefined) ||
@@ -1607,11 +1571,7 @@ export function denoResolverPlugin(
                   const line = new TextDecoder().decode(out.stdout).trim();
                   if (line.startsWith("file://")) {
                     fileUrl = line;
-                    if (DEBUG) {
-                      console.log(
-                        `${PREFIX} onLoad 子进程 resolve 得到 fileUrl=${fileUrl}`,
-                      );
-                    }
+                    debugLog(`onLoad 子进程 resolve 得到 fileUrl=${fileUrl}`);
                   }
                 }
               } catch {
@@ -1636,11 +1596,9 @@ export function denoResolverPlugin(
               ) {
                 const esmPath = await getEsmIfCjsCached(filePath);
                 if (esmPath) {
-                  if (DEBUG) {
-                    console.log(
-                      `${PREFIX} [CJS→ESM] ${protocolPath} 重定向: ${filePath} -> ${esmPath}`,
-                    );
-                  }
+                  debugLog(
+                    `[CJS→ESM] ${protocolPath} 重定向: ${filePath} -> ${esmPath}`,
+                  );
                   filePath = esmPath;
                 }
               }
@@ -1652,11 +1610,9 @@ export function denoResolverPlugin(
 
               if (existsSync(filePath)) {
                 const contents = await readTextFile(filePath);
-                if (DEBUG) {
-                  console.log(
-                    `${PREFIX} onLoad 分支 file:// 文件存在 path=${filePath} contentsLen=${contents.length}`,
-                  );
-                }
+                debugLog(
+                  `onLoad 分支 file:// 文件存在 path=${filePath} contentsLen=${contents.length}`,
+                );
                 // 根据文件扩展名确定 loader
                 const loader = getLoaderFromPath(filePath);
                 return {
@@ -1665,14 +1621,16 @@ export function denoResolverPlugin(
                   resolveDir,
                 };
               }
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 分支 file:// 文件不存在 path=${filePath}，对 jsr: 尝试 fetchJsrSourceViaMeta`,
-                );
-              }
+              debugLog(
+                `onLoad 分支 file:// 文件不存在 path=${filePath}，对 jsr: 尝试 fetchJsrSourceViaMeta`,
+              );
               // 文件不存在（如缓存路径在另一台机器或已清理）：对 jsr: 回退到 fetchJsrSourceViaMeta，避免返回空内容导致 "No matching export"
               if (protocolPath.startsWith("jsr:")) {
-                const contents = await fetchJsrSourceViaMeta(protocolPath);
+                const contents = await fetchJsrSourceViaMeta(
+                  protocolPath,
+                  debug,
+                  log,
+                );
                 if (contents != null) {
                   const loader = getLoaderFromPath(protocolPath);
                   return { contents, loader, resolveDir };
@@ -1690,22 +1648,20 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))
             ) {
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 分支 https fileUrl=${fileUrl}`,
-                );
-              }
+              debugLog(`onLoad 分支 https fileUrl=${fileUrl}`);
               // 步骤 5: 如果 resolve 返回 HTTP URL
               // 对 jsr: 优先用 fetchJsrSourceViaMeta（内部带 Accept: JSR_ACCEPT_SOURCE），避免运行时自动加 Sec-Fetch-Dest: document 导致 JSR 仍回 HTML
               if (protocolPath.startsWith("jsr:")) {
-                const contents = await fetchJsrSourceViaMeta(protocolPath);
-                if (DEBUG) {
-                  console.log(
-                    `${PREFIX} onLoad 步骤5(https+jsr) fetchJsrSourceViaMeta 结果 contents=${
-                      contents != null ? `${contents.length} chars` : "null"
-                    }`,
-                  );
-                }
+                const contents = await fetchJsrSourceViaMeta(
+                  protocolPath,
+                  debug,
+                  log,
+                );
+                debugLog(
+                  `onLoad 步骤5(https+jsr) fetchJsrSourceViaMeta 结果 contents=${
+                    contents != null ? `${contents.length} chars` : "null"
+                  }`,
+                );
                 if (contents != null) {
                   const loader = getLoaderFromPath(protocolPath);
                   // 不设 resolveDir：否则 esbuild 会把模块内 "./socket" 等解析为 cwd()/socket，加载到项目文件导致 "No matching export"
@@ -1736,44 +1692,38 @@ export function denoResolverPlugin(
               fileUrl &&
               (fileUrl.startsWith("jsr:") || fileUrl.startsWith("npm:"))
             ) {
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 分支 fileUrl=jsr/npm fileUrl=${fileUrl}`,
-                );
-              }
+              debugLog(`onLoad 分支 fileUrl=jsr/npm fileUrl=${fileUrl}`);
               // 步骤 6: 子进程也未得到 file:// 时，用 JSR _meta.json 的 manifest/exports 解析真实路径再 fetch 源码（非 CDN）
               if (protocolPath.startsWith("jsr:")) {
-                const contents = await fetchJsrSourceViaMeta(protocolPath);
-                if (DEBUG) {
-                  console.log(
-                    `${PREFIX} onLoad 步骤6 fetchJsrSourceViaMeta 结果 contents=${
-                      contents != null ? `${contents.length} chars` : "null"
-                    }`,
-                  );
-                }
+                const contents = await fetchJsrSourceViaMeta(
+                  protocolPath,
+                  debug,
+                  log,
+                );
+                debugLog(
+                  `onLoad 步骤6 fetchJsrSourceViaMeta 结果 contents=${
+                    contents != null ? `${contents.length} chars` : "null"
+                  }`,
+                );
                 if (contents != null) {
                   const loader = getLoaderFromPath(protocolPath);
                   // 不设 resolveDir，相对导入走 deno-protocol onResolve
                   return { contents, loader };
                 }
               }
-              if (DEBUG) {
-                console.log(
-                  `${PREFIX} onLoad 步骤6 返回空内容 (fileUrl=jsr/npm 且 fetchJsr 为 null)`,
-                );
-              }
+              debugLog(
+                "onLoad 步骤6 返回空内容 (fileUrl=jsr/npm 且 fetchJsr 为 null)",
+              );
               const loader = getLoaderFromPath(protocolPath);
               return { contents: "", loader };
             }
 
             // 如果所有方法都失败，至少设置 resolveDir
-            if (DEBUG) {
-              console.log(
-                `${PREFIX} onLoad 落入最终分支 返回空内容 fileUrl=${
-                  fileUrl ?? "undefined"
-                }`,
-              );
-            }
+            debugLog(
+              `onLoad 落入最终分支 返回空内容 fileUrl=${
+                fileUrl ?? "undefined"
+              }`,
+            );
             // 这样 esbuild 才能正确解析文件内部的相对路径导入
             const resolveDir = cwd();
             protocolResolveDirCache.set(protocolPath, resolveDir);

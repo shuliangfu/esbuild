@@ -23,6 +23,7 @@ import type {
   OutputFileContent,
   SplittingStrategy,
 } from "./types.ts";
+import { logger } from "./utils/logger.ts";
 
 /**
  * 客户端构建选项
@@ -199,9 +200,12 @@ export class BuilderClient {
 
     // 构建模块缓存：一次性获取所有依赖的本地缓存路径
     // 这避免了在解析每个模块时都启动子进程或发送 HTTP 请求
+    const log = this.config.logger ?? logger;
     const moduleCache = await buildModuleCache(
       entryPoint,
       dirname(entryPoint),
+      this.config.debug,
+      log,
     );
 
     // 添加插件（包括 denoResolverPlugin，传递模块缓存）
@@ -215,6 +219,8 @@ export class BuilderClient {
       isServerBuild: false,
       moduleCache,
       projectDir: dirname(entryPoint),
+      debug: this.config.debug,
+      logger: log,
     }));
     buildOptions.plugins = plugins;
 
@@ -338,9 +344,12 @@ export class BuilderClient {
     };
 
     // 构建模块缓存：一次性获取所有依赖的本地缓存路径
+    const log = this.config.logger ?? logger;
     const moduleCache = await buildModuleCache(
       entryPoint,
       dirname(entryPoint),
+      this.config.debug,
+      log,
     );
 
     // 添加插件（包括 denoResolverPlugin，传递模块缓存）
@@ -354,6 +363,8 @@ export class BuilderClient {
       isServerBuild: false,
       moduleCache,
       projectDir: dirname(entryPoint),
+      debug: this.config.debug,
+      logger: log,
     }));
     buildOptions.plugins = plugins;
 

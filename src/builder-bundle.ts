@@ -27,6 +27,8 @@ import {
   buildModuleCache,
   denoResolverPlugin,
 } from "./plugins/resolver-deno.ts";
+import { logger } from "./utils/logger.ts";
+import type { BuildLogger } from "./types.ts";
 
 /**
  * 简单打包选项
@@ -83,6 +85,14 @@ export interface BundleOptions {
    * 如 "Fragment"（Preact）、"React.Fragment"（React）
    */
   jsxFragment?: string;
+  /**
+   * 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息，便于排查
+   */
+  debug?: boolean;
+  /**
+   * 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console
+   */
+  logger?: BuildLogger;
 }
 
 /**
@@ -170,19 +180,30 @@ export class BuilderBundle {
     // Node 平台或 browserMode: false 时需要把 JSR 打进 bundle，必须 isServerBuild: false + moduleCache
     const needBundleJsr = !useBrowserMode;
 
+    const debug = options.debug ?? false;
+    const log = options.logger ?? logger;
     if (IS_DENO) {
       if (needBundleJsr) {
         const entryPointAbs = resolve(options.entryPoint);
         const workDir = dirname(entryPointAbs);
-        const moduleCache = await buildModuleCache(entryPointAbs, workDir);
+        const moduleCache = await buildModuleCache(
+          entryPointAbs,
+          workDir,
+          debug,
+          log,
+        );
         plugins.push(denoResolverPlugin({
           browserMode: false,
           isServerBuild: false,
           moduleCache,
+          debug,
+          logger: log,
         }));
       } else {
         plugins.push(denoResolverPlugin({
           browserMode: useBrowserMode,
+          debug,
+          logger: log,
         }));
       }
     } else if (IS_BUN) {

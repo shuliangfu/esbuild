@@ -5,6 +5,17 @@
  */
 
 /**
+ * 构建/解析器使用的日志接口
+ * 与 @dreamer/logger 的 Logger 兼容，便于传入自定义 logger，info/debug 等均通过 logger 输出
+ */
+export interface BuildLogger {
+  debug(message: string, data?: unknown): void;
+  info(message: string, data?: unknown): void;
+  warn?(message: string, data?: unknown): void;
+  error?(message: string, data?: unknown): void;
+}
+
+/**
  * 模板引擎类型（与 @dreamer/render 一致）
  */
 export type Engine = "react" | "preact";
@@ -95,6 +106,10 @@ export interface ServerConfig {
    * @example [".bun/install", ".npm/", "yarn/global"]
    */
   excludePaths?: string[];
+  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息，便于排查 */
+  debug?: boolean;
+  /** 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console */
+  logger?: BuildLogger;
 }
 
 /**
@@ -219,6 +234,10 @@ export interface ClientConfig {
   plugins?: import("./plugin.ts").BuildPlugin[];
   /** Source Map 配置 */
   sourcemap?: SourceMapConfig | boolean;
+  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息 */
+  debug?: boolean;
+  /** 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console */
+  logger?: BuildLogger;
 }
 
 /**
