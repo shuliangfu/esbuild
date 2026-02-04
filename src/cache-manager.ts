@@ -7,13 +7,16 @@
  */
 
 import {
+  exists,
   join,
   makeTempDir,
   mkdir,
   readdir,
+  readFile,
   readTextFile,
   remove,
   stat,
+  writeFile,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import type { BuildOptions, BuildResult } from "./types.ts";
@@ -173,7 +176,6 @@ export class CacheManager {
 
     try {
       let content: string;
-      const { exists, readFile } = await import("@dreamer/runtime-adapter");
 
       // 优先尝试读取压缩文件
       if (await exists(compressedFile)) {
@@ -308,7 +310,6 @@ export class CacheManager {
           }
 
           // 保存压缩后的数据
-          const { writeFile } = await import("@dreamer/runtime-adapter");
           await writeFile(cacheFile + ".gz", compressed);
         } catch {
           // 压缩失败，使用原始方式保存
@@ -335,11 +336,8 @@ export class CacheManager {
     try {
       await remove(cacheFile);
       // 尝试删除压缩文件（如果存在）
-      const { exists, remove: removeFile } = await import(
-        "@dreamer/runtime-adapter"
-      );
       if (await exists(compressedFile)) {
-        await removeFile(compressedFile);
+        await remove(compressedFile);
       }
     } catch {
       // 忽略删除失败
@@ -484,11 +482,8 @@ export class CacheManager {
               await remove(filePath);
               // 尝试删除压缩文件
               const compressedFile = filePath + ".gz";
-              const { exists, remove: removeFile } = await import(
-                "@dreamer/runtime-adapter"
-              );
               if (await exists(compressedFile)) {
-                await removeFile(compressedFile);
+                await remove(compressedFile);
               }
               cleanedCount++;
             }
@@ -549,11 +544,8 @@ export class CacheManager {
           await remove(item.path);
           // 尝试删除压缩文件
           const compressedFile = item.path + ".gz";
-          const { exists, remove: removeFile } = await import(
-            "@dreamer/runtime-adapter"
-          );
           if (await exists(compressedFile)) {
-            await removeFile(compressedFile);
+            await remove(compressedFile);
           }
           cleanedCount++;
         } catch {

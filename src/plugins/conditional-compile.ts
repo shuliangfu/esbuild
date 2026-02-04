@@ -11,6 +11,7 @@
  * 3. 服务端模块会被 server-module-detector 插件自动标记为 external
  */
 
+import { readTextFile } from "@dreamer/runtime-adapter";
 import type { BuildPlugin, OnLoadArgs, OnLoadResult } from "../plugin.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -76,7 +77,6 @@ export function createConditionalCompilePlugin(
         },
         async (args: OnLoadArgs): Promise<OnLoadResult | null | undefined> => {
           // 读取文件内容
-          const { readTextFile } = await import("@dreamer/runtime-adapter");
           let contents: string;
           try {
             contents = await readTextFile(args.path);

@@ -6,6 +6,7 @@
  * 分析构建产物，提供文件大小、依赖关系等信息
  */
 
+import { dirname, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import type * as esbuild from "esbuild";
 import type { OptimizationSuggestion } from "./types.ts";
 
@@ -366,10 +367,6 @@ export class BuildAnalyzer {
     outputPath: string,
     performance?: { stages: Record<string, number>; total: number },
   ): Promise<string> {
-    const { writeTextFile, dirname, mkdir } = await import(
-      "@dreamer/runtime-adapter"
-    );
-
     // 确保输出目录存在
     await mkdir(dirname(outputPath), { recursive: true });
 

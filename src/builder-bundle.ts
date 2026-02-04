@@ -23,6 +23,7 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
+import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import {
   buildModuleCache,
   denoResolverPlugin,
@@ -208,7 +209,6 @@ export class BuilderBundle {
       }
     } else if (IS_BUN) {
       // Bun 环境下使用 bunResolverPlugin
-      const { bunResolverPlugin } = await import("./plugins/resolver-bun.ts");
       plugins.push(bunResolverPlugin({
         enabled: true,
         browserMode: useBrowserMode,

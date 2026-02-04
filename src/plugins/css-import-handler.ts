@@ -7,6 +7,7 @@
  * - 在构建时或运行时生成 <link> 标签并注入到 HTML
  */
 
+import { readTextFile } from "@dreamer/runtime-adapter";
 import type { BuildPlugin, OnLoadArgs, OnLoadResult } from "../plugin.ts";
 
 /**
@@ -92,7 +93,6 @@ export function createCSSImportHandlerPlugin(
             };
           } else {
             // 内联模式：读取 CSS 内容，返回为字符串
-            const { readTextFile } = await import("@dreamer/runtime-adapter");
             try {
               const content = await readTextFile(args.path);
               // 将 CSS 内容作为字符串导出，供运行时使用

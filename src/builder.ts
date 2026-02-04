@@ -8,6 +8,7 @@
 
 import {
   cwd,
+  dirname,
   exists,
   type FileWatcher,
   mkdir,
@@ -556,7 +557,6 @@ export class Builder implements IBuilder {
   private async validateBuilderConfig(config: BuilderConfig): Promise<void> {
     const warnings: string[] = [];
     const errors: string[] = [];
-    const { exists, stat } = await import("@dreamer/runtime-adapter");
 
     // 验证服务端配置
     if (config.server) {
@@ -931,7 +931,6 @@ export class Builder implements IBuilder {
     errors: string[],
   ): Promise<void> {
     try {
-      const { readTextFile } = await import("@dreamer/runtime-adapter");
       const content = await readTextFile(filePath);
 
       // 检查基本 HTML 结构
@@ -966,7 +965,6 @@ export class Builder implements IBuilder {
     warnings: string[],
   ): Promise<void> {
     try {
-      const { readTextFile, exists } = await import("@dreamer/runtime-adapter");
       const content = await readTextFile(filePath);
 
       // 检查 CSS 文件中的 url() 引用
@@ -1070,12 +1068,10 @@ export class Builder implements IBuilder {
       // 如果没有指定路径，使用入口文件所在目录
       if (this.config.client?.entry) {
         const entryFile = await resolve(this.config.client.entry);
-        const { dirname } = await import("@dreamer/runtime-adapter");
         watchPaths.push(dirname(entryFile));
       }
       if (this.config.server?.entry) {
         const entryFile = await resolve(this.config.server.entry);
-        const { dirname } = await import("@dreamer/runtime-adapter");
         watchPaths.push(dirname(entryFile));
       }
     }
