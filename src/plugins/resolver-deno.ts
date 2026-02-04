@@ -26,8 +26,8 @@ import {
   normalize as pathNormalize,
   readTextFile,
   readTextFileSync,
-} from "@dreamer/runtime-adapter";
-import * as esbuild from "esbuild";
+} from "@dreamer/runtime-adapter"
+import * as esbuild from "esbuild"
 
 /** 调试开关：为 true 时在控制台输出 onLoad / fetchJsrSourceViaMeta / CJS→ESM 重定向等调试日志。通过环境变量 DEBUG=1 开启 */
 const DEBUG = getEnv("DEBUG") === "1";
@@ -1064,6 +1064,7 @@ export function denoResolverPlugin(
       // 例如：preact、lodash、react、scheduler
       // 这些包需要在 deno.json 的 imports 中配置为 npm:package@version
       // importer 在 node_modules 内时（如 react-dom 内 require('react')）用 projectDir 或 cwd() 查找项目 deno.json
+      // 客户端构建时：preact/react 必须始终从 projectDir 解析，避免 JSR 缓存内的包（如 @dreamer/render）使用其自身 deno.json 导致多实例水合错误 _H
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*$/ },
         (args): esbuild.OnResolveResult | undefined => {
@@ -1071,7 +1072,11 @@ export function denoResolverPlugin(
 
           const inNodeModules = args.importer?.includes("node_modules") ??
             false;
-          const startDir = inNodeModules
+          const isRuntimePackage = packageName === "preact" ||
+            packageName === "react";
+          const useProjectDir = inNodeModules ||
+            (isServerBuild === false && isRuntimePackage && projectDir);
+          const startDir = useProjectDir
             ? (projectDir || cwd())
             : (args.resolveDir ||
               (args.importer ? dirname(args.importer) : cwd()));
@@ -1115,6 +1120,7 @@ export function denoResolverPlugin(
       // 3.2 匹配带子路径的普通包名（非 @scope/ 前缀）
       // 例如：preact/jsx-runtime、lodash/map、react/jsx-runtime
       // importer 在 node_modules 内时用 projectDir 或 cwd() 查找项目 deno.json（同 3.1）
+      // 客户端构建时：preact/*、react/* 必须始终从 projectDir 解析，避免多实例水合错误 _H
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*\/.+$/ },
         (args): esbuild.OnResolveResult | undefined => {
@@ -1126,7 +1132,11 @@ export function denoResolverPlugin(
 
           const inNodeModules = args.importer?.includes("node_modules") ??
             false;
-          const startDir = inNodeModules
+          const isRuntimePackage = packageName === "preact" ||
+            packageName === "react";
+          const useProjectDir = inNodeModules ||
+            (isServerBuild === false && isRuntimePackage && projectDir);
+          const startDir = useProjectDir
             ? (projectDir || cwd())
             : (args.resolveDir ||
               (args.importer ? dirname(args.importer) : cwd()));
