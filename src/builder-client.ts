@@ -159,6 +159,17 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
+    // 当 external 包含 preact/react 时，强制 resolver 将其标为 external（双构建：chunk 通过 import map 引用主包）
+    const hasRuntimeExternal = (externalModules as string[]).some(
+      (ext) =>
+        ext === "preact" ||
+        ext.startsWith("preact/") ||
+        ext === "react" ||
+        ext.startsWith("react/") ||
+        ext === "react-dom" ||
+        ext.startsWith("react-dom/"),
+    );
+
     // 根据渲染引擎配置 JSX（Preact/React 使用自动模式）
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
@@ -222,6 +233,7 @@ export class BuilderClient {
       projectDir: dirname(entryPoint),
       debug: this.config.debug,
       logger: log,
+      forceRuntimeExternal: hasRuntimeExternal,
     }));
     buildOptions.plugins = plugins;
 
@@ -310,6 +322,16 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
+    const hasRuntimeExternalCtx = (externalModules as string[]).some(
+      (ext) =>
+        ext === "preact" ||
+        ext.startsWith("preact/") ||
+        ext === "react" ||
+        ext.startsWith("react/") ||
+        ext === "react-dom" ||
+        ext.startsWith("react-dom/"),
+    );
+
     // 根据渲染引擎配置 JSX
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
@@ -367,6 +389,7 @@ export class BuilderClient {
       projectDir: dirname(entryPoint),
       debug: this.config.debug,
       logger: log,
+      forceRuntimeExternal: hasRuntimeExternalCtx,
     }));
     buildOptions.plugins = plugins;
 

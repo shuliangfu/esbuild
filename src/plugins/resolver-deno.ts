@@ -233,6 +233,11 @@ export interface ResolverOptions {
   debug?: boolean;
   /** 日志实例（未传时使用空实现），info/debug 均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
+  /**
+   * 强制将 preact/react 及其子路径标记为 external（默认：false）
+   * 用于双构建场景：主包打包 preact，chunk 通过 import map 引用主包
+   */
+  forceRuntimeExternal?: boolean;
 }
 
 /**
@@ -657,6 +662,7 @@ export function denoResolverPlugin(
     projectDir,
     debug = false,
     logger: optionsLogger,
+    forceRuntimeExternal = false,
   } = options;
 
   const log = optionsLogger ?? NOOP_LOGGER;
@@ -1104,6 +1110,12 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
+          // 双构建场景：chunk 构建时 preact/react 标为 external，由 import map 解析到主包
+          if (forceRuntimeExternal && isRuntimePackage) {
+            debugLog(`forceRuntimeExternal: 标记为 external: ${args.path}`);
+            return { path: args.path, external: true };
+          }
+
           // 客户端构建时 preact/react 必须打包进 bundle，不能 external
           // 根因：SSR 用 Deno 缓存的 npm:preact，若客户端从 esm.sh 加载则构建不一致，水合 __H 未定义
           const effectiveBrowserMode = isServerBuild === false && isRuntimePackage
@@ -1176,6 +1188,12 @@ export function denoResolverPlugin(
           ) {
             debugLog(`服务端构建: 标记为 external: ${packageImport}`);
             return { path: packageImport, external: true };
+          }
+
+          // 双构建场景：chunk 构建时 preact/*、react/* 标为 external
+          if (forceRuntimeExternal && isRuntimePackage) {
+            debugLog(`forceRuntimeExternal: 标记为 external: ${args.path}`);
+            return { path: args.path, external: true };
           }
 
           // 客户端构建时 preact/*、react/* 必须打包进 bundle，不能 external
