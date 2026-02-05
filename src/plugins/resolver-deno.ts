@@ -1104,8 +1104,12 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
-          // 浏览器模式或客户端构建：使用原有逻辑
-          return resolveDenoProtocolPath(packageImport, browserMode);
+          // 客户端构建时 preact/react 必须打包进 bundle，不能 external
+          // 根因：SSR 用 Deno 缓存的 npm:preact，若客户端从 esm.sh 加载则构建不一致，水合 __H 未定义
+          const effectiveBrowserMode = isServerBuild === false && isRuntimePackage
+            ? false
+            : browserMode;
+          return resolveDenoProtocolPath(packageImport, effectiveBrowserMode);
         },
       );
 
@@ -1174,8 +1178,15 @@ export function denoResolverPlugin(
             return { path: packageImport, external: true };
           }
 
-          // 浏览器模式或客户端构建：使用原有逻辑
-          return resolveDenoProtocolPath(packageImport, browserMode);
+          // 客户端构建时 preact/*、react/* 必须打包进 bundle，不能 external
+          const effectiveBrowserModeSubpath = isServerBuild === false &&
+            isRuntimePackage
+            ? false
+            : browserMode;
+          return resolveDenoProtocolPath(
+            packageImport,
+            effectiveBrowserModeSubpath,
+          );
         },
       );
 
