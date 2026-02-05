@@ -10,7 +10,6 @@ import { dirname, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
-import { createPreactExternalPlugin } from "./plugins/preact-external.ts";
 import {
   buildModuleCache,
   denoResolverPlugin,
@@ -224,10 +223,6 @@ export class BuilderClient {
       debug: this.config.debug,
       logger: log,
     }));
-    // Preact 引擎时，在 resolver 之前将 preact 标为 external，避免多实例 _H 报错
-    if (this.config.engine === "preact") {
-      plugins.unshift(createPreactExternalPlugin());
-    }
     buildOptions.plugins = plugins;
 
     // 执行构建
@@ -373,10 +368,6 @@ export class BuilderClient {
       debug: this.config.debug,
       logger: log,
     }));
-    // Preact 引擎时，在 resolver 之前将 preact 标为 external，避免多实例 _H 报错
-    if (this.config.engine === "preact") {
-      plugins.unshift(createPreactExternalPlugin());
-    }
     buildOptions.plugins = plugins;
 
     // 创建构建上下文
