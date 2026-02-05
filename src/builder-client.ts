@@ -125,8 +125,9 @@ export class BuilderClient {
       }
     }
 
-    // 生成 chunk 名称模式（根据分割策略）
-    const chunkNames = this.getChunkNames(bundleOptions.splitting);
+    // 生成 chunk 名称模式：优先使用 bundleOptions.chunkNames，否则根据分割策略生成
+    const chunkNames = bundleOptions.chunkNames ??
+      this.getChunkNames(bundleOptions.splitting);
 
     // 处理 Source Map 配置
     let sourcemapOption: boolean | "inline" | "external" | "both" = false;
@@ -301,8 +302,9 @@ export class BuilderClient {
       ? bundleOptions.splitting
       : bundleOptions.splitting?.enabled !== false;
 
-    // 生成 chunk 名称模式（根据分割策略）
-    const chunkNames = this.getChunkNames(bundleOptions.splitting);
+    // 生成 chunk 名称模式：优先使用 bundleOptions.chunkNames，否则根据分割策略生成
+    const chunkNames = bundleOptions.chunkNames ??
+      this.getChunkNames(bundleOptions.splitting);
 
     // 方案一：自动检测并排除服务端模块（通过插件实现）
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external

@@ -144,6 +144,8 @@ export interface ClientBundleOptions {
   format?: OutputFormat;
   /** 模块别名（用于解决多实例问题，如 preact） */
   alias?: Record<string, string>;
+  /** 自定义 chunk 命名模式（如 "[name]" 用于开发模式 HMR 无感更新，避免 hash 导致多实例） */
+  chunkNames?: string;
 }
 
 /**
