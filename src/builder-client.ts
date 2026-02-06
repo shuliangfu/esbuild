@@ -126,7 +126,12 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error(this.tr("log.esbuild.clientMissingEntry", "客户端配置缺少入口文件 (entry)"));
+      throw new Error(
+        this.tr(
+          "log.esbuild.clientMissingEntry",
+          "客户端配置缺少入口文件 (entry)",
+        ),
+      );
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -147,7 +152,12 @@ export class BuilderClient {
     // 写入文件或代码分割时都需要 output（代码分割时 outdir 用于路径解析，write: false 时不写盘）
     if (write || splittingEnabled) {
       if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error(this.tr("log.esbuild.clientMissingOutput", "客户端配置缺少输出目录 (output)"));
+        throw new Error(
+          this.tr(
+            "log.esbuild.clientMissingOutput",
+            "客户端配置缺少输出目录 (output)",
+          ),
+        );
       }
       if (write) {
         await mkdir(this.config.output, { recursive: true });
@@ -318,7 +328,12 @@ export class BuilderClient {
   ): Promise<esbuild.BuildContext> {
     // 验证输出目录配置
     if (!this.config.output || this.config.output.trim() === "") {
-      throw new Error(this.tr("log.esbuild.clientMissingOutput", "客户端配置缺少输出目录 (output)"));
+      throw new Error(
+        this.tr(
+          "log.esbuild.clientMissingOutput",
+          "客户端配置缺少输出目录 (output)",
+        ),
+      );
     }
 
     // 确保输出目录存在
@@ -326,7 +341,12 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error(this.tr("log.esbuild.clientMissingEntry", "客户端配置缺少入口文件 (entry)"));
+      throw new Error(
+        this.tr(
+          "log.esbuild.clientMissingEntry",
+          "客户端配置缺少入口文件 (entry)",
+        ),
+      );
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -443,7 +463,12 @@ export class BuilderClient {
    */
   async rebuild(): Promise<BuildResult> {
     if (!this.buildContext) {
-      throw new Error(this.tr("log.esbuild.contextNotCreated", "构建上下文未创建，请先调用 createContext()"));
+      throw new Error(
+        this.tr(
+          "log.esbuild.contextNotCreated",
+          "构建上下文未创建，请先调用 createContext()",
+        ),
+      );
     }
 
     const startTime = Date.now();
@@ -462,7 +487,10 @@ export class BuilderClient {
     const duration = Date.now() - startTime;
 
     // 当 createContext 时 write: false，result.outputFiles 包含内存中的输出
-    if (this.contextWrite === false && result.outputFiles && result.outputFiles.length > 0) {
+    if (
+      this.contextWrite === false && result.outputFiles &&
+      result.outputFiles.length > 0
+    ) {
       const outputContents: OutputFileContent[] = result.outputFiles.map(
         (file) => ({
           path: file.path,

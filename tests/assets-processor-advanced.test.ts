@@ -264,7 +264,7 @@ describe("AssetsProcessor 高级功能", () => {
       const files = await readdir(assetsDir);
       // 成功时：small.xxx.png；失败时：small.png（处理器捕获错误不中断）
       const pngFile = files.find((f) =>
-        f.name.startsWith("small") && f.name.endsWith(".png"),
+        f.name.startsWith("small") && f.name.endsWith(".png")
       );
       expect(pngFile).toBeTruthy();
       expect(pngFile!.name).toMatch(/^small(\.[a-f0-9]{8})?\.png$/);
@@ -388,7 +388,9 @@ describe("AssetsProcessor 高级功能", () => {
       const processor = new AssetsProcessor(config, excludeOutputDir);
       await processor.processAssets();
 
-      const keepExists = await stat(join(excludeOutputDir, "assets", "keep.txt"))
+      const keepExists = await stat(
+        join(excludeOutputDir, "assets", "keep.txt"),
+      )
         .then(() => true)
         .catch(() => false);
       expect(keepExists).toBe(true);

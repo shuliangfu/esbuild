@@ -6,19 +6,13 @@
 
 import { describe, expect, it } from "@dreamer/test";
 import {
-  Builder,
   AssetsProcessor,
-  createBuilder,
+  Builder,
   type BuilderConfig,
+  createBuilder,
 } from "../src/entry-builder.ts";
-import {
-  BuilderClient,
-  type ClientBuildOptions,
-} from "../src/entry-client.ts";
-import {
-  BuilderServer,
-  type ServerBuildOptions,
-} from "../src/entry-server.ts";
+import { BuilderClient, type ClientBuildOptions } from "../src/entry-client.ts";
+import { BuilderServer, type ServerBuildOptions } from "../src/entry-server.ts";
 import {
   buildBundle,
   BuilderBundle,
@@ -28,9 +22,9 @@ import {
 import {
   generateCSSTag,
   generateCSSTags,
-  injectCSSIntoHTML,
-  injectCSSFromDependencies,
   getCSSRelativePath,
+  injectCSSFromDependencies,
+  injectCSSIntoHTML,
 } from "../src/utils/css-injector.ts";
 
 describe("entry-builder 子路径导出", () => {
