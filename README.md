@@ -1,16 +1,39 @@
 # @dreamer/esbuild
 
-> 一个兼容 Deno 和 Bun 的构建工具库，提供服务端和客户端编译、打包、优化功能
+> 兼容 Deno 和 Bun 的高性能构建工具库，提供全栈编译、打包、资源处理、优化等功能，支持子路径按需导入
+
+本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 框架的核心构建引擎，也可独立用于任意 Deno/Bun 项目的构建。
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-502%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-518%20passed-brightgreen)](./TEST_REPORT.md)
+
+---
+
+## 📑 目录
+
+- [功能](#-功能)
+- [安装](#-安装)
+- [特性](#-特性)
+- [使用场景](#-使用场景)
+- [快速开始](#-快速开始)
+- [使用示例](#-使用示例)
+- [API 文档](#-api-文档)
+- [高级配置](#-高级配置)
+- [编译方式](#️-编译方式)
+- [测试报告](#-测试报告)
+- [注意事项](#-注意事项)
 
 ---
 
 ## 🎯 功能
 
 构建工具库，提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能。基于 esbuild 实现高性能打包，支持 TypeScript、JSX、代码分割、Tree-shaking 等现代构建特性。
+
+**架构优化**：
+- **子路径导出**：`/builder`、`/client`、`/server`、`/bundle`、`/css-injector` 按需导入，减少打包体积
+- **延迟初始化**：BuildAnalyzer、CacheManager 在首次 `build()` 时创建，避免 dev/build 时额外加载
+- **Tree-shaking 友好**：子路径导出使按需加载成为可能
 
 ---
 
@@ -26,6 +49,35 @@ deno add jsr:@dreamer/esbuild
 
 ```bash
 bunx jsr add -D @dreamer/esbuild
+```
+
+### 按需导入（子路径）
+
+为减少打包体积、提升 Tree-shaking 效果，可按需从子路径导入：
+
+| 子路径 | 导出内容 | 适用场景 |
+|--------|----------|----------|
+| `jsr:@dreamer/esbuild/builder` | Builder、AssetsProcessor、createBuilder、BuilderConfig | 全栈构建、资源处理 |
+| `jsr:@dreamer/esbuild/client` | BuilderClient、ClientBuildOptions | 仅客户端打包 |
+| `jsr:@dreamer/esbuild/server` | BuilderServer、ServerBuildOptions | 仅服务端编译 |
+| `jsr:@dreamer/esbuild/bundle` | buildBundle、BuilderBundle、BundleOptions、BundleResult | 快速打包、测试、SSR |
+| `jsr:@dreamer/esbuild/css-injector` | generateCSSTag、generateCSSTags、injectCSSIntoHTML、injectCSSFromDependencies、getCSSRelativePath | extract 模式下将 CSS 路径注入 HTML |
+
+```typescript
+// 仅需 Builder、AssetsProcessor 时
+import { Builder, AssetsProcessor, createBuilder } from "jsr:@dreamer/esbuild/builder";
+
+// 仅需客户端构建时
+import { BuilderClient } from "jsr:@dreamer/esbuild/client";
+
+// 仅需服务端构建时
+import { BuilderServer } from "jsr:@dreamer/esbuild/server";
+
+// 仅需 buildBundle 时（测试、SSR 等）
+import { buildBundle } from "jsr:@dreamer/esbuild/bundle";
+
+// 仅需 CSS 注入工具时（extract 模式 + 手动注入 HTML）
+import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 ```
 
 ---
@@ -86,6 +138,13 @@ bunx jsr add -D @dreamer/esbuild
   - 支持路径别名（`@/`, `~/` 等）
   - Deno 环境：支持 `deno.json` 的 `imports` 配置
   - Bun 环境：支持 `package.json` 的 `imports` 和 `tsconfig.json` 的 `paths` 配置
+- **静态资源处理（AssetsProcessor）**：
+  - 复制 `public/` 到输出目录，支持 `exclude` 排除
+  - 图片压缩、格式转换（webp/avif/original）、content hash
+  - 图片质量参数 `quality`（0-100）
+  - 自动更新 HTML/CSS/JS 中的资源引用路径
+  - 生成 `asset-manifest.json` 供 SSR 运行时替换路径
+  - `pathUpdateDirs` 支持 SSR 场景下更新服务端 bundle 中的路径
 
 ---
 
@@ -94,9 +153,14 @@ bunx jsr add -D @dreamer/esbuild
 - **全栈项目构建**：同时构建服务端和客户端代码
 - **前端项目构建**：React、Preact 应用打包
 - **SPA 单页应用**：客户端渲染（CSR）项目构建
+- **SSR/Hybrid/SSG**：与 @dreamer/dweb 集成，asset-manifest 支持生产模式资源路径替换
 - **多平台应用打包**：支持 Linux、macOS、Windows
 - **服务端渲染**：使用内存模式获取编译代码用于 SSR
 - **CI/CD 构建流程**：自动化构建和部署
+
+### 与 @dreamer/dweb 集成
+
+本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 的核心构建引擎。dweb 的 `deno task build` 内部调用 `Builder.build()`，完成服务端 + 客户端 + 资源处理。生产模式下，dweb 使用 `asset-manifest.json` 在 SSR/Hybrid/SSG 输出 HTML 前替换资源路径。
 
 ---
 
@@ -379,6 +443,11 @@ new BuilderClient(config: ClientConfig)
 - `debug?: boolean`：是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息。
 - `logger?: BuildLogger`：日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console。
 
+**ClientConfig.cssImport**（CSS 导入处理）：
+- `enabled?: boolean`：是否启用（默认：true）
+- `extract?: boolean`：是否提取为独立文件（默认：false，内联进 JS）。true 时需配合 css-injector 手动注入 HTML
+- `cssOnly?: boolean`：内联模式仅处理 .css（scss/sass/less 需预处理器，默认：true）
+
 #### 方法
 
 | 方法 | 说明 |
@@ -445,7 +514,7 @@ interface ServerConfig {
   /** 输出目录 */
   output: string;
   /** 目标运行时（默认：deno） */
-  target?: "deno" | "bun" | "node";
+  target?: "deno" | "bun";
   /** 外部依赖（不打包），支持通配符 */
   external?: string[];
   /** 使用原生编译器生成可执行文件（Deno: deno compile, Bun: bun build --compile） */
@@ -557,6 +626,48 @@ interface BundleResult {
   map?: string;
 }
 ```
+
+### AssetsProcessor
+
+静态资源处理器，负责复制、图片处理、路径更新、生成 asset-manifest。
+
+```typescript
+import { AssetsProcessor } from "jsr:@dreamer/esbuild/builder";
+
+const config = {
+  publicDir: "./public",
+  assetsDir: "assets",
+  images: { compress: true, format: "webp", hash: true, quality: 80 },
+};
+const processor = new AssetsProcessor(
+  config,
+  "./dist/client",
+  ["./dist/server"],  // 可选，SSR 场景下需更新的额外目录
+);
+await processor.processAssets();
+```
+
+#### AssetsConfig
+
+```typescript
+interface AssetsConfig {
+  /** 静态资源目录 */
+  publicDir?: string;
+  /** 资源输出目录（默认：assets） */
+  assetsDir?: string;
+  /** 复制时排除的文件，如 ["tailwind.css", "uno.css"] */
+  exclude?: string[];
+  /** 图片处理（需 @dreamer/image） */
+  images?: {
+    compress?: boolean;
+    format?: "webp" | "avif" | "original";
+    hash?: boolean;
+    quality?: number;  // 0-100，默认 80（有损）或 100（PNG/GIF 无损）
+  };
+}
+```
+
+**输出**：`outputDir/asset-manifest.json`，格式 `{ "/assets/原路径": "/assets/带hash新路径" }`，供 SSR 框架替换 HTML 中的资源路径。
 
 ### BuildResult
 
@@ -678,6 +789,67 @@ const builder = createBuilder({
 });
 ```
 
+### 静态资源与 asset-manifest
+
+配置 `assets` 后，Builder 会在构建时调用 `AssetsProcessor` 处理静态资源，并生成 `asset-manifest.json`。
+
+```typescript
+const builder = createBuilder({
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+  server: {
+    entry: "./src/server.ts",
+    output: "./dist/server",
+  },
+  assets: {
+    publicDir: "./public",
+    assetsDir: "assets",
+    exclude: ["tailwind.css", "uno.css"],  // 排除会被其他插件编译的源文件
+    images: {
+      compress: true,
+      format: "webp",   // "webp" | "avif" | "original"
+      hash: true,       // 文件名加 content hash，用于缓存失效
+      quality: 80,      // 0-100，JPEG/WebP/AVIF 默认 80，PNG/GIF 默认 100
+    },
+  },
+});
+
+await builder.build();
+```
+
+**流程**：
+1. 复制 `public/` 到 `outputDir/assets/`（排除 `exclude` 配置的文件）
+2. 图片压缩、格式转换、content hash
+3. 更新 HTML/CSS/JS 中的资源引用路径
+4. 生成 `outputDir/asset-manifest.json`，格式：`{ "/assets/logo.png": "/assets/logo.abc12345.webp" }`
+
+**SSR 场景**：当同时配置 `server` 时，`pathUpdateDirs` 会自动包含 server output 目录，确保服务端 bundle 中的资源路径也被更新。SSR 框架（如 dweb）可在输出 HTML 前用 manifest 替换路径。
+
+### css-injector 使用场景
+
+`css-injector` 适用于 **extract 模式**：将 CSS 提取为独立文件，再手动将 `<link>` 路径注入 HTML。
+
+```typescript
+import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
+
+// 构建后得到 CSS 文件路径列表（如 createCSSImportHandlerPlugin extract 模式）
+const cssFiles = ["dist/main.css", "dist/chunk-1.css"];
+
+const html = `<!DOCTYPE html><html><head></head><body></body></html>`;
+const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
+  outputDir: "./dist",
+  publicPath: "/assets/",
+  dedupe: true,
+});
+```
+
+**导出函数**：`generateCSSTag`、`generateCSSTags`、`injectCSSIntoHTML`、`injectCSSFromDependencies`、`getCSSRelativePath`。
+
+**注意**：dweb 框架使用内联模式（`extract: false`），CSS 直接 `<style>` 注入，无需 css-injector。
+
 ---
 
 ## ⚙️ 编译方式
@@ -737,20 +909,22 @@ const builder = createBuilder({
 本库经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
-- **测试总数**: 502
+- **测试总数**: 518
 - **通过**: 全部通过 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: 约 15 秒（`deno test -A`）
-- **测试覆盖**: 所有公共 API、边界情况、错误处理
+- **测试执行时间**: 约 30 秒（`deno test -A`）
+- **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理
 - **测试环境**: Deno 2.x, Bun 1.3.5
 
 **测试类型**：
-- ✅ 单元测试（约 420 个）
+- ✅ 单元测试（约 440 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 52 个）
+- ✅ 边界情况和错误处理测试（约 48 个）
 
 **测试亮点**：
+- ✅ 子路径导出测试（entry-builder、entry-client、entry-server、entry-bundle、css-injector）
+- ✅ AssetsProcessor 高级功能（asset-manifest、quality、pathUpdateDirs）
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
 - ✅ 内存模式（write: false）功能完整测试
@@ -774,7 +948,7 @@ const builder = createBuilder({
 
 ## 📝 注意事项
 
-- **依赖要求**：需要安装 `npm:esbuild` 和 `@dreamer/runtime-adapter`
+- **依赖要求**：需要安装 `npm:esbuild`、`@dreamer/runtime-adapter`；图片处理需 `@dreamer/image`
 - **运行环境**：构建工具仅在服务端运行，不能在浏览器中使用
 - **内存模式**：使用 `write: false` 时，内存模式不支持代码分割（splitting）
 - **平台编译**：服务端多平台编译需要对应平台的编译工具链
@@ -783,6 +957,17 @@ const builder = createBuilder({
   - Deno 环境：需要 `deno.json` 配置 `imports` 字段来使用路径别名
   - Bun 环境：可以使用 `package.json` 的 `imports` 或 `tsconfig.json` 的 `paths` 来配置路径别名
   - Bun 环境不会读取 `deno.json` 配置
+
+---
+
+## 📦 依赖
+
+| 依赖 | 用途 |
+|------|------|
+| `npm:esbuild` | 核心打包引擎 |
+| `@dreamer/runtime-adapter` | 跨运行时 API（Deno/Bun） |
+| `@dreamer/image` | 图片压缩、格式转换（仅当配置 `assets.images` 时） |
+| `postcss`、`autoprefixer`、`cssnano` | CSS 优化（仅当配置 CSS 处理时） |
 
 ---
 

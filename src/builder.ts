@@ -46,8 +46,10 @@ export class Builder implements IBuilder {
   private config: BuilderConfig;
   private clientBuilder?: BuilderClient;
   private serverBuilder?: BuilderServer;
-  private cacheManager?: CacheManager;
-  private buildAnalyzer: BuildAnalyzer;
+  /** 延迟初始化：首次 build 时再创建实例（静态导入，无动态加载） */
+  private _cacheManager?: CacheManager | null;
+  /** 延迟初始化：首次 build 时再创建实例（静态导入，无动态加载） */
+  private _buildAnalyzer?: BuildAnalyzer;
   private watcher?: FileWatcher;
   private isWatching: boolean = false;
   /** Watch 模式下防抖重建的定时器 ID，stopWatch 时需清除以防泄漏 */
@@ -73,18 +75,7 @@ export class Builder implements IBuilder {
       });
     }
 
-    // 初始化构建分析器
-    this.buildAnalyzer = new BuildAnalyzer();
-
-    // 初始化缓存管理器（如果启用了缓存）
-    const cacheEnabled = config.build?.cache !== false &&
-      config.build?.cache !== undefined;
-    if (cacheEnabled) {
-      const cacheDir = typeof config.build?.cache === "string"
-        ? config.build.cache
-        : undefined;
-      this.cacheManager = new CacheManager(cacheDir, true);
-    }
+    // BuildAnalyzer、CacheManager 延迟加载，首次 build() 时再初始化
 
     // 初始化客户端构建器
     if (config.client) {
@@ -95,6 +86,36 @@ export class Builder implements IBuilder {
     if (config.server) {
       this.serverBuilder = new BuilderServer(config.server);
     }
+  }
+
+  /**
+   * 延迟获取缓存管理器（首次 build 时再创建，静态导入无动态加载）
+   */
+  private getCacheManager(): CacheManager | undefined {
+    if (this._cacheManager !== undefined) {
+      return this._cacheManager ?? undefined;
+    }
+    const cacheEnabled = this.config.build?.cache !== false &&
+      this.config.build?.cache !== undefined;
+    if (!cacheEnabled) {
+      this._cacheManager = null;
+      return undefined;
+    }
+    const cacheDir = typeof this.config.build?.cache === "string"
+      ? this.config.build.cache
+      : undefined;
+    this._cacheManager = new CacheManager(cacheDir, true);
+    return this._cacheManager;
+  }
+
+  /**
+   * 延迟获取构建分析器（首次 build 时再创建，静态导入无动态加载）
+   */
+  private getBuildAnalyzer(): BuildAnalyzer {
+    if (!this._buildAnalyzer) {
+      this._buildAnalyzer = new BuildAnalyzer();
+    }
+    return this._buildAnalyzer;
   }
 
   /**
@@ -129,7 +150,8 @@ export class Builder implements IBuilder {
 
     // 检查缓存（如果启用了缓存）
     let cacheCheckTime = 0;
-    if (this.cacheManager && buildOptions.cache !== false) {
+    const cacheManager = this.getCacheManager();
+    if (cacheManager && buildOptions.cache !== false) {
       this.reportProgress(
         buildOptions,
         "缓存检查",
@@ -140,11 +162,11 @@ export class Builder implements IBuilder {
       );
       const cacheStart = Date.now();
       const entryFile = await resolve(this.config.server!.entry);
-      const cacheKey = await this.cacheManager.getCacheKey(
+      const cacheKey = await cacheManager.getCacheKey(
         [entryFile],
         buildOptions,
       );
-      const cachedResult = await this.cacheManager.getCachedResult(cacheKey);
+      const cachedResult = await cacheManager.getCachedResult(cacheKey);
       cacheCheckTime = Date.now() - cacheStart;
       performance.stages.cacheCheck = cacheCheckTime;
       if (cachedResult) {
@@ -175,13 +197,13 @@ export class Builder implements IBuilder {
     this.reportProgress(buildOptions, "完成", 100, undefined, undefined, true);
 
     // 保存缓存（如果启用了缓存）
-    if (this.cacheManager && buildOptions.cache !== false) {
+    if (cacheManager && buildOptions.cache !== false) {
       const entryFile = await resolve(this.config.server!.entry);
-      const cacheKey = await this.cacheManager.getCacheKey(
+      const cacheKey = await cacheManager.getCacheKey(
         [entryFile],
         buildOptions,
       );
-      await this.cacheManager.saveCache(cacheKey, result);
+      await cacheManager.saveCache(cacheKey, result);
     }
 
     performance.total = Date.now() - buildStartTime;
@@ -201,11 +223,7 @@ export class Builder implements IBuilder {
 
     // 构建完成时立即输出产物列表（实时输出，路径从根 outputDir 开始如 server.js）
     if (this.config.server?.output) {
-      this.logOutputFiles(
-        finalResult.outputFiles,
-        this.config.server.output,
-        buildOptions,
-      );
+      this.logOutputFiles(finalResult.outputFiles, buildOptions);
     }
 
     return finalResult;
@@ -243,18 +261,19 @@ export class Builder implements IBuilder {
     }
 
     // 检查缓存（如果启用了缓存）
+    const cacheManager = this.getCacheManager();
     if (
-      this.cacheManager && buildOptions.cache !== false &&
+      cacheManager && buildOptions.cache !== false &&
       this.config.client!.entry
     ) {
       const cacheStart = Date.now();
       const entryFile = await resolve(this.config.client!.entry);
       // 先尝试使用入口文件生成缓存键（快速检查）
-      const cacheKey = await this.cacheManager.getCacheKey(
+      const cacheKey = await cacheManager.getCacheKey(
         [entryFile],
         buildOptions,
       );
-      const cachedResult = await this.cacheManager.getCachedResult(cacheKey);
+      const cachedResult = await cacheManager.getCachedResult(cacheKey);
       performance.stages.cacheCheck = Date.now() - cacheStart;
       if (cachedResult) {
         performance.total = Date.now() - buildStartTime;
@@ -287,31 +306,32 @@ export class Builder implements IBuilder {
     // 保存缓存（如果启用了缓存）
     // 优化：使用 metafile 生成包含依赖文件的缓存键
     if (
-      this.cacheManager && buildOptions.cache !== false &&
+      cacheManager && buildOptions.cache !== false &&
       this.config.client!.entry
     ) {
       const entryFile = await resolve(this.config.client!.entry);
-      const cacheKey = await this.cacheManager.getCacheKey(
+      const cacheKey = await cacheManager.getCacheKey(
         [entryFile],
         buildOptions,
         result.metafile,
       );
-      await this.cacheManager.saveCache(cacheKey, result);
+      await cacheManager.saveCache(cacheKey, result);
     }
 
     // 分析构建结果（如果生成了 metafile）
     if (result.metafile && typeof result.metafile === "object") {
       try {
-        const analysis = this.buildAnalyzer.analyze(
+        const buildAnalyzer = this.getBuildAnalyzer();
+        const analysis = buildAnalyzer.analyze(
           result.metafile as any,
         );
         // 可以将分析结果附加到 result 中，或者输出到控制台
         // 这里暂时只分析，不修改 result
         if (mode === "dev") {
-          logger.info(this.buildAnalyzer.generateReport(analysis));
+          logger.info(buildAnalyzer.generateReport(analysis));
 
           // 生成优化建议
-          const suggestions = this.buildAnalyzer
+          const suggestions = buildAnalyzer
             .generateOptimizationSuggestions(
               analysis,
               performance,
@@ -326,7 +346,7 @@ export class Builder implements IBuilder {
               ? buildOptions.reportHTML
               : `${this.config.client!.output}/build-report.html`;
             try {
-              await this.buildAnalyzer.generateHTMLReport(
+              await buildAnalyzer.generateHTMLReport(
                 analysis,
                 reportPath,
                 performance,
@@ -384,9 +404,18 @@ export class Builder implements IBuilder {
     if (this.config.assets && this.config.client) {
       this.reportProgress(buildOptions, "处理资源", 85);
       const assetsStart = Date.now();
+      // SSR 时需同时更新 server output 中的路径（服务端渲染的 HTML 含图片引用）
+      const pathUpdateDirs = this.config.server?.output
+        ? [
+          this.config.server.output.endsWith(".js")
+            ? dirname(resolve(this.config.server.output))
+            : resolve(this.config.server.output),
+        ]
+        : [];
       const assetsProcessor = new AssetsProcessor(
         this.config.assets,
         this.config.client.output,
+        pathUpdateDirs,
       );
       await assetsProcessor.processAssets();
       performance.stages.assets = Date.now() - assetsStart;
@@ -414,14 +443,7 @@ export class Builder implements IBuilder {
 
     // 构建完成时立即输出产物列表（实时输出，路径从根 outputDir 开始如 server.js、client/xxx.js）
     if (this.config.client?.output) {
-      const rootDir = this.config.server?.output ??
-        dirname(this.config.client.output);
-      this.logOutputFiles(
-        finalResult.outputFiles,
-        rootDir,
-        buildOptions,
-        this.config.client.output,
-      );
+      this.logOutputFiles(finalResult.outputFiles, buildOptions);
     }
 
     return finalResult;
@@ -914,16 +936,9 @@ export class Builder implements IBuilder {
    * 路径从根 outputDir 开始，使用相对路径（如 server.js、client/chunk-xxx.js）
    *
    * @param outputFiles 构建产出的文件路径列表（可为绝对路径）
-   * @param rootOutputDir 根输出目录（如 dist 或 dist/backend），所有路径相对此目录
    * @param options 构建选项（用于 silent 判断）
    */
-  private logOutputFiles(
-    outputFiles: string[],
-    _rootOutputDir: string,
-    options?: BuildOptions,
-    /** 客户端 outputDir，用于处理 esbuild 返回的相对于 outdir 的路径 */
-    _clientOutputDir?: string,
-  ): void {
+  private logOutputFiles(outputFiles: string[], options?: BuildOptions): void {
     if (
       options?.silent ||
       options?.skipOutputLog ||
@@ -1312,13 +1327,14 @@ export class Builder implements IBuilder {
     // 分析所有构建结果
     if (allMetafiles.length > 0 && mode === "dev") {
       try {
+        const buildAnalyzer = this.getBuildAnalyzer();
         // 合并所有 metafile（简化版：只分析第一个）
-        const combinedAnalysis = this.buildAnalyzer.analyze(
+        const combinedAnalysis = buildAnalyzer.analyze(
           allMetafiles[0] as any,
         );
-        logger.info(this.buildAnalyzer.generateReport(combinedAnalysis));
+        logger.info(buildAnalyzer.generateReport(combinedAnalysis));
 
-        const suggestions = this.buildAnalyzer.generateOptimizationSuggestions(
+        const suggestions = buildAnalyzer.generateOptimizationSuggestions(
           combinedAnalysis,
           performance,
         );
@@ -1332,7 +1348,7 @@ export class Builder implements IBuilder {
             ? buildOptions.reportHTML
             : `${this.config.client!.output}/build-report.html`;
           try {
-            await this.buildAnalyzer.generateHTMLReport(
+            await buildAnalyzer.generateHTMLReport(
               combinedAnalysis,
               reportPath,
               performance,
@@ -1378,11 +1394,7 @@ export class Builder implements IBuilder {
     performance.total = Date.now() - buildStartTime;
 
     // 输出构建产物列表（路径从根 outputDir 开始）
-    const outputDirs = buildResults.map((r) => r.outputDir);
-    const rootDir = outputDirs.length > 0
-      ? outputDirs.reduce((a, b) => (a.length <= b.length ? a : b))
-      : this.config.client!.output;
-    this.logOutputFiles(allOutputFiles, rootDir, buildOptions);
+    this.logOutputFiles(allOutputFiles, buildOptions);
 
     return {
       outputFiles: allOutputFiles,
