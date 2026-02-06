@@ -71,21 +71,39 @@ export class Builder implements IBuilder {
     // 验证构建配置（如果启用）- 异步验证，不阻塞构造函数
     if (config.validateConfig || config.build?.validateConfig) {
       this.validateBuilderConfig(config).catch((error) => {
-        this.log("error", "构建配置验证失败:", error);
+        this.log("error", this.tr("log.esbuild.builder.configValidationFailed", "构建配置验证失败") + ":", error);
       });
     }
 
     // BuildAnalyzer、CacheManager 延迟加载，首次 build() 时再初始化
 
-    // 初始化客户端构建器
+    // 初始化客户端构建器（透传 t）
     if (config.client) {
-      this.clientBuilder = new BuilderClient(config.client);
+      this.clientBuilder = new BuilderClient({
+        ...config.client,
+        t: config.client.t ?? config.t,
+      });
     }
 
-    // 初始化服务端构建器
+    // 初始化服务端构建器（透传 t）
     if (config.server) {
-      this.serverBuilder = new BuilderServer(config.server);
+      this.serverBuilder = new BuilderServer({
+        ...config.server,
+        t: config.server.t ?? config.t,
+      });
     }
+  }
+
+  /**
+   * 获取翻译文本，无 t 或翻译缺失时返回 fallback（硬编码中文）
+   */
+  private tr(
+    key: string,
+    fallback: string,
+    params?: Record<string, string | number | boolean>,
+  ): string {
+    const r = this.config.t?.(key, params);
+    return (r != null && r !== key) ? r : fallback;
   }
 
   /**
@@ -113,7 +131,7 @@ export class Builder implements IBuilder {
    */
   private getBuildAnalyzer(): BuildAnalyzer {
     if (!this._buildAnalyzer) {
-      this._buildAnalyzer = new BuildAnalyzer();
+      this._buildAnalyzer = new BuildAnalyzer(this.config.t);
     }
     return this._buildAnalyzer;
   }
@@ -125,7 +143,7 @@ export class Builder implements IBuilder {
    */
   async buildServer(options?: BuildOptions): Promise<BuildResult> {
     if (!this.serverBuilder) {
-      throw new Error("未配置服务端构建");
+      throw new Error(this.tr("log.esbuild.builder.serverNotConfigured", "未配置服务端构建"));
     }
 
     const performance: { stages: Record<string, number>; total: number } = {
@@ -142,7 +160,7 @@ export class Builder implements IBuilder {
 
     // 清理输出目录（如果需要）
     if (buildOptions.clean) {
-      this.reportProgress(buildOptions, "清理", 10, undefined, undefined, true);
+      this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageClean", "清理"), 10, undefined, undefined, true);
       const cleanStart = Date.now();
       await this.cleanServer();
       performance.stages.clean = Date.now() - cleanStart;
@@ -154,7 +172,7 @@ export class Builder implements IBuilder {
     if (cacheManager && buildOptions.cache !== false) {
       this.reportProgress(
         buildOptions,
-        "缓存检查",
+        this.tr("log.esbuild.builder.stageCacheCheck", "缓存检查"),
         20,
         undefined,
         undefined,
@@ -172,7 +190,7 @@ export class Builder implements IBuilder {
       if (cachedResult) {
         this.reportProgress(
           buildOptions,
-          "完成",
+          this.tr("log.esbuild.builder.stageComplete", "完成"),
           100,
           undefined,
           undefined,
@@ -190,11 +208,11 @@ export class Builder implements IBuilder {
     }
 
     // 构建服务端
-    this.reportProgress(buildOptions, "构建", 50, undefined, undefined, true);
+    this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageBuild", "构建"), 50, undefined, undefined, true);
     const buildStart = Date.now();
     const result = await this.serverBuilder.build();
     performance.stages.build = Date.now() - buildStart;
-    this.reportProgress(buildOptions, "完成", 100, undefined, undefined, true);
+    this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageComplete", "完成"), 100, undefined, undefined, true);
 
     // 保存缓存（如果启用了缓存）
     if (cacheManager && buildOptions.cache !== false) {
@@ -236,7 +254,7 @@ export class Builder implements IBuilder {
    */
   async buildClient(options?: BuildOptions): Promise<BuildResult> {
     if (!this.clientBuilder) {
-      throw new Error("未配置客户端构建");
+      throw new Error(this.tr("log.esbuild.builder.clientNotConfigured", "未配置客户端构建"));
     }
 
     const performance: { stages: Record<string, number>; total: number } = {
@@ -298,7 +316,7 @@ export class Builder implements IBuilder {
       );
     }
 
-    this.reportProgress(buildOptions, "构建", 50);
+    this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageBuild", "构建"), 50);
     const buildStart = Date.now();
     const result = await this.clientBuilder.build(mode);
     performance.stages.build = Date.now() - buildStart;
@@ -351,21 +369,21 @@ export class Builder implements IBuilder {
                 reportPath,
                 performance,
               );
-              this.log("info", `📊 构建报告已生成: ${reportPath}`);
+              this.log("info", `📊 ${this.tr("log.esbuild.builder.reportGenerated", "构建报告已生成")}: ${reportPath}`);
             } catch (error) {
-              this.log("warn", `生成 HTML 报告失败: ${error}`);
+              this.log("warn", `${this.tr("log.esbuild.builder.reportFailed", "生成 HTML 报告失败")}: ${error}`);
             }
           }
         }
       } catch (error) {
         // 分析失败不影响构建
-        logger.warn("构建分析失败", { error });
+        logger.warn(this.tr("log.esbuild.builder.analysisFailed", "构建分析失败"), { error });
       }
     }
 
     // 生成 HTML 文件
     if (this.config.client?.html) {
-      this.reportProgress(buildOptions, "生成 HTML", 70);
+      this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageHtml", "生成 HTML"), 70);
       const htmlStart = Date.now();
       const htmlGenerator = new HTMLGenerator(
         this.config.client.html,
@@ -382,7 +400,7 @@ export class Builder implements IBuilder {
       if (this.config.assets?.css && cssFiles.length > 0) {
         this.reportProgress(
           buildOptions,
-          "优化 CSS",
+          this.tr("log.esbuild.builder.stageCss", "优化 CSS"),
           75,
           undefined,
           cssFiles.length,
@@ -402,7 +420,7 @@ export class Builder implements IBuilder {
 
     // 处理静态资源（如果配置了）
     if (this.config.assets && this.config.client) {
-      this.reportProgress(buildOptions, "处理资源", 85);
+      this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageAssets", "处理资源"), 85);
       const assetsStart = Date.now();
       // SSR 时需同时更新 server output 中的路径（服务端渲染的 HTML 含图片引用）
       const pathUpdateDirs = this.config.server?.output
@@ -548,33 +566,36 @@ export class Builder implements IBuilder {
   ): string {
     // 快速构建（<500ms）时仅输出单行
     if (performance.total > 0 && performance.total < 500) {
-      return `构建完成 (${this.formatDuration(performance.total)})`;
+      return `${this.tr("log.esbuild.builder.buildComplete", "构建完成")} (${this.formatDuration(performance.total)})`;
     }
 
     const lines: string[] = [];
-    lines.push("=== 构建性能报告 ===\n");
+    lines.push(`=== ${this.tr("log.esbuild.builder.perfReportTitle", "构建性能报告")} ===\n`);
 
     // 总耗时
-    lines.push(`总耗时: ${this.formatDuration(performance.total)}\n`);
+    lines.push(`${this.tr("log.esbuild.builder.perfTotal", "总耗时")}: ${this.formatDuration(performance.total)}\n`);
 
     // 慢构建警告
     const threshold = options?.slowBuildThreshold ?? 5000; // 默认 5 秒
     if (performance.total > threshold) {
+      const duration = this.formatDuration(performance.total);
+      const thresholdStr = this.formatDuration(threshold);
       lines.push(
-        `⚠️  警告: 构建耗时 ${
-          this.formatDuration(performance.total)
-        }，超过阈值 ${this.formatDuration(threshold)}`,
+        `⚠️  ${this.tr("log.esbuild.builder.perfSlowWarning", `警告: 构建耗时 ${duration}，超过阈值 ${thresholdStr}`, {
+          duration,
+          threshold: thresholdStr,
+        })}`,
       );
-      lines.push("   建议检查以下方面：");
-      lines.push("   - 是否启用了缓存？");
-      lines.push("   - 是否有大量未优化的资源？");
-      lines.push("   - 是否可以考虑并行构建？");
+      lines.push(`   ${this.tr("log.esbuild.builder.perfSuggestHint", "建议检查以下方面：")}`);
+      lines.push(`   - ${this.tr("log.esbuild.builder.perfSuggestCache", "是否启用了缓存？")}`);
+      lines.push(`   - ${this.tr("log.esbuild.builder.perfSuggestAssets", "是否有大量未优化的资源？")}`);
+      lines.push(`   - ${this.tr("log.esbuild.builder.perfSuggestParallel", "是否可以考虑并行构建？")}`);
       lines.push("");
     }
 
     // 各阶段耗时
     if (Object.keys(performance.stages).length > 0) {
-      lines.push("各阶段耗时:");
+      lines.push(this.tr("log.esbuild.builder.perfStages", "各阶段耗时:") + "");
       const sortedStages = Object.entries(performance.stages)
         .sort(([, a], [, b]) => b - a);
 
@@ -590,7 +611,7 @@ export class Builder implements IBuilder {
         const isBottleneck = shouldShowBottleneck &&
           duration > bottleneckThreshold &&
           duration === maxDuration;
-        const bottleneckMarker = isBottleneck ? " ⚠️ (瓶颈)" : "";
+        const bottleneckMarker = isBottleneck ? ` ⚠️ (${this.tr("log.esbuild.builder.perfBottleneck", "瓶颈")})` : "";
         lines.push(
           `  ${this.formatStageName(stage)}: ${
             this.formatDuration(duration)
@@ -607,12 +628,12 @@ export class Builder implements IBuilder {
    */
   private formatStageName(stage: string): string {
     const stageMap: Record<string, string> = {
-      clean: "清理",
-      cacheCheck: "缓存检查",
-      build: "构建",
-      assets: "资源处理",
-      html: "HTML 生成",
-      css: "CSS 优化",
+      clean: this.tr("log.esbuild.builder.stageNameClean", "清理"),
+      cacheCheck: this.tr("log.esbuild.builder.stageNameCacheCheck", "缓存检查"),
+      build: this.tr("log.esbuild.builder.stageNameBuild", "构建"),
+      assets: this.tr("log.esbuild.builder.stageNameAssets", "资源处理"),
+      html: this.tr("log.esbuild.builder.stageNameHtml", "HTML 生成"),
+      css: this.tr("log.esbuild.builder.stageNameCss", "CSS 优化"),
     };
     return stageMap[stage] || stage;
   }
@@ -639,62 +660,60 @@ export class Builder implements IBuilder {
     // 验证服务端配置
     if (config.server) {
       if (!config.server.entry) {
-        errors.push("服务端配置缺少入口文件 (entry)");
+        errors.push(this.tr("log.esbuild.builder.validateServerMissingEntry", "服务端配置缺少入口文件 (entry)"));
       } else {
-        // 验证入口文件是否存在
         try {
           if (!(await exists(config.server.entry))) {
-            errors.push(`服务端入口文件不存在: ${config.server.entry}`);
+            errors.push(`${this.tr("log.esbuild.builder.validateServerEntryNotExists", "服务端入口文件不存在")}: ${config.server.entry}`);
           } else {
             const entryStat = await stat(config.server.entry);
             if (!entryStat.isFile) {
-              errors.push(`服务端入口路径不是文件: ${config.server.entry}`);
+              errors.push(`${this.tr("log.esbuild.builder.validateServerEntryNotFile", "服务端入口路径不是文件")}: ${config.server.entry}`);
             }
           }
         } catch (error) {
           warnings.push(
-            `无法验证服务端入口文件: ${config.server.entry} (${error})`,
+            `${this.tr("log.esbuild.builder.validateServerEntryError", "无法验证服务端入口文件")}: ${config.server.entry} (${error})`,
           );
         }
       }
       if (!config.server.output) {
-        errors.push("服务端配置缺少输出目录 (output)");
+        errors.push(this.tr("log.esbuild.builder.validateServerMissingOutput", "服务端配置缺少输出目录 (output)"));
       }
     }
 
     // 验证客户端配置
     if (config.client) {
       if (!config.client.entry) {
-        errors.push("客户端配置缺少入口文件 (entry)");
+        errors.push(this.tr("log.esbuild.clientMissingEntry", "客户端配置缺少入口文件 (entry)"));
       } else {
-        // 验证入口文件是否存在
         try {
           if (!(await exists(config.client.entry))) {
-            errors.push(`客户端入口文件不存在: ${config.client.entry}`);
+            errors.push(`${this.tr("log.esbuild.builder.validateClientEntryNotExists", "客户端入口文件不存在")}: ${config.client.entry}`);
           } else {
             const entryStat = await stat(config.client.entry);
             if (!entryStat.isFile) {
-              errors.push(`客户端入口路径不是文件: ${config.client.entry}`);
+              errors.push(`${this.tr("log.esbuild.builder.validateClientEntryNotFile", "客户端入口路径不是文件")}: ${config.client.entry}`);
             }
           }
         } catch (error) {
           warnings.push(
-            `无法验证客户端入口文件: ${config.client.entry} (${error})`,
+            `${this.tr("log.esbuild.builder.validateClientEntryError", "无法验证客户端入口文件")}: ${config.client.entry} (${error})`,
           );
         }
       }
       if (!config.client.output) {
-        errors.push("客户端配置缺少输出目录 (output)");
+        errors.push(this.tr("log.esbuild.clientMissingOutput", "客户端配置缺少输出目录 (output)"));
       }
       if (!config.client.engine) {
-        warnings.push("客户端配置未指定模板引擎 (engine)，建议明确指定");
+        warnings.push(this.tr("log.esbuild.builder.validateClientNoEngine", "客户端配置未指定模板引擎 (engine)，建议明确指定"));
       }
     }
 
     // 验证构建选项
     if (config.build) {
       if (config.build.cache === false) {
-        warnings.push("构建缓存已禁用，可能影响构建性能");
+        warnings.push(this.tr("log.esbuild.builder.validateCacheDisabled", "构建缓存已禁用，可能影响构建性能"));
       }
     }
 
@@ -705,7 +724,7 @@ export class Builder implements IBuilder {
 
     // 输出警告
     if (warnings.length > 0) {
-      this.log("warn", "构建配置警告:");
+      this.log("warn", this.tr("log.esbuild.builder.validateConfigWarnings", "构建配置警告") + ":");
       for (const warning of warnings) {
         this.log("warn", `  ⚠️  ${warning}`);
       }
@@ -713,11 +732,11 @@ export class Builder implements IBuilder {
 
     // 输出错误
     if (errors.length > 0) {
-      this.log("error", "构建配置错误:");
+      this.log("error", this.tr("log.esbuild.builder.validateConfigErrors", "构建配置错误") + ":");
       for (const error of errors) {
         this.log("error", `  ❌ ${error}`);
       }
-      throw new Error("构建配置验证失败");
+      throw new Error(this.tr("log.esbuild.builder.configValidationFailed", "构建配置验证失败"));
     }
   }
 
@@ -744,7 +763,7 @@ export class Builder implements IBuilder {
 
           // 检查必需的依赖（esbuild 是必需的）
           if (!deps.esbuild && !deps["npm:esbuild"]) {
-            warnings.push("未找到 esbuild 依赖，构建可能失败");
+            warnings.push(this.tr("log.esbuild.builder.validateEsbuildMissing", "未找到 esbuild 依赖，构建可能失败"));
           }
         } catch {
           // 忽略解析错误
@@ -765,7 +784,7 @@ export class Builder implements IBuilder {
           );
 
           if (!hasEsbuild) {
-            warnings.push("未在 deno.json 中找到 esbuild 导入，构建可能失败");
+            warnings.push(this.tr("log.esbuild.builder.validateEsbuildDenoMissing", "未在 deno.json 中找到 esbuild 导入，构建可能失败"));
           }
         } catch {
           // 忽略解析错误
@@ -836,7 +855,7 @@ export class Builder implements IBuilder {
 
     // 记录最近错误（最多保留 50 条）
     this.errorStats.recentErrors.push({
-      message: message || error?.message || "未知错误",
+      message: message || error?.message || this.tr("log.esbuild.builder.unknownError", "未知错误"),
       type: errorType,
       timestamp: Date.now(),
       stack: error?.stack,
@@ -862,12 +881,12 @@ export class Builder implements IBuilder {
     const stats = this.errorStats;
     const lines: string[] = [];
 
-    lines.push("=== 构建错误统计报告 ===\n");
-    lines.push(`总错误数: ${stats.total}`);
-    lines.push(`警告数: ${stats.warnings}\n`);
+    lines.push(`=== ${this.tr("log.esbuild.builder.errorReportTitle", "构建错误统计报告")} ===\n`);
+    lines.push(`${this.tr("log.esbuild.builder.errorTotal", "总错误数")}: ${stats.total}`);
+    lines.push(`${this.tr("log.esbuild.builder.errorWarnings", "警告数")}: ${stats.warnings}\n`);
 
     if (Object.keys(stats.errorsByType).length > 0) {
-      lines.push("错误类型统计:");
+      lines.push(this.tr("log.esbuild.builder.errorTypeStats", "错误类型统计") + ":");
       const sortedTypes = Object.entries(stats.errorsByType)
         .sort(([, a], [, b]) => b - a);
       for (const [type, count] of sortedTypes) {
@@ -877,7 +896,7 @@ export class Builder implements IBuilder {
     }
 
     if (stats.recentErrors.length > 0) {
-      lines.push("最近错误（最多显示 10 条）:");
+      lines.push(this.tr("log.esbuild.builder.errorRecent", "最近错误（最多显示 10 条）") + ":");
       const recent = stats.recentErrors.slice(-10).reverse();
       for (const error of recent) {
         const time = new Date(error.timestamp).toLocaleString();
@@ -977,7 +996,7 @@ export class Builder implements IBuilder {
     for (const file of result.outputFiles) {
       try {
         if (!(await exists(file))) {
-          errors.push(`输出文件不存在: ${file}`);
+          errors.push(`${this.tr("log.esbuild.builder.outputFileNotExists", "输出文件不存在")}: ${file}`);
           continue;
         }
 
@@ -987,7 +1006,7 @@ export class Builder implements IBuilder {
           const sizeInMB = fileStat.size / (1024 * 1024);
           if (sizeInMB > 5) {
             warnings.push(
-              `文件较大 (${sizeInMB.toFixed(2)}MB): ${file}，建议进行代码分割`,
+              this.tr("log.esbuild.builder.fileTooLarge", `文件较大 (${sizeInMB.toFixed(2)}MB): ${file}，建议进行代码分割`, { size: sizeInMB.toFixed(2), file }),
             );
           }
 
@@ -1002,24 +1021,24 @@ export class Builder implements IBuilder {
           }
         }
       } catch (error) {
-        errors.push(`无法验证文件 ${file}: ${error}`);
+        errors.push(this.tr("log.esbuild.builder.validateFileError", `无法验证文件 ${file}: ${error}`, { file, error: String(error) }));
       }
     }
 
     // 输出警告和错误
     if (warnings.length > 0) {
-      logger.warn("构建产物验证警告", { warnings });
+      logger.warn(this.tr("log.esbuild.builder.validateOutputWarnings", "构建产物验证警告"), { warnings });
       for (const warning of warnings) {
         logger.warn(`  ⚠️  ${warning}`);
       }
     }
 
     if (errors.length > 0) {
-      logger.error("构建产物验证错误", { errors });
+      logger.error(this.tr("log.esbuild.builder.validateOutputErrors", "构建产物验证错误"), { errors });
       for (const error of errors) {
         logger.error(`  ❌ ${error}`);
       }
-      throw new Error("构建产物验证失败");
+      throw new Error(this.tr("log.esbuild.builder.validateOutputFailed", "构建产物验证失败"));
     }
   }
 
@@ -1154,13 +1173,13 @@ export class Builder implements IBuilder {
    */
   async watch(options?: BuildOptions): Promise<void> {
     if (this.isWatching) {
-      logger.warn("Watch 模式已在运行中");
+      logger.warn(this.tr("log.esbuild.builder.watchAlreadyRunning", "Watch 模式已在运行中"));
       return;
     }
 
     const watchOptions = options?.watch || this.config.build?.watch;
     if (!watchOptions || watchOptions.enabled === false) {
-      throw new Error("Watch 模式未启用");
+      throw new Error(this.tr("log.esbuild.builder.watchNotEnabled", "Watch 模式未启用"));
     }
 
     // 确定监听路径
@@ -1178,7 +1197,7 @@ export class Builder implements IBuilder {
     }
 
     if (watchPaths.length === 0) {
-      throw new Error("未找到可监听的路径");
+      throw new Error(this.tr("log.esbuild.builder.watchNoPaths", "未找到可监听的路径"));
     }
 
     // 创建文件监听器
@@ -1188,7 +1207,7 @@ export class Builder implements IBuilder {
     });
 
     this.isWatching = true;
-    logger.info(`开始监听文件变化: ${watchPaths.join(", ")}`);
+    logger.info(`${this.tr("log.esbuild.builder.watchStart", "开始监听文件变化")}: ${watchPaths.join(", ")}`);
 
     // 首次构建
     await this.build(options);
@@ -1230,7 +1249,7 @@ export class Builder implements IBuilder {
             try {
               await watchOptions.onFileChange(path, event.kind);
             } catch (error) {
-              logger.error("文件变化回调失败", { error });
+              logger.error(this.tr("log.esbuild.builder.watchCallbackFailed", "文件变化回调失败"), { error });
             }
           }
         }
@@ -1245,16 +1264,16 @@ export class Builder implements IBuilder {
           this.watchRebuildTimer = null;
           try {
             if (!this.isWatching) return;
-            logger.info("检测到文件变化，开始重新构建...");
+            logger.info(this.tr("log.esbuild.builder.watchRebuildStart", "检测到文件变化，开始重新构建..."));
             await this.build(options);
-            logger.info("重新构建完成");
+            logger.info(this.tr("log.esbuild.builder.watchRebuildComplete", "重新构建完成"));
           } catch (error) {
-            logger.error("重新构建失败", { error });
+            logger.error(this.tr("log.esbuild.builder.watchRebuildFailed", "重新构建失败"), { error });
           }
         }, debounceTime) as unknown as number;
       }
     })().catch((error) => {
-      logger.error("文件监听错误", { error });
+      logger.error(this.tr("log.esbuild.builder.watchError", "文件监听错误"), { error });
       this.isWatching = false;
     });
   }
@@ -1272,7 +1291,7 @@ export class Builder implements IBuilder {
         clearTimeout(this.watchRebuildTimer);
         this.watchRebuildTimer = null;
       }
-      logger.info("已停止文件监听");
+      logger.info(this.tr("log.esbuild.builder.watchStopped", "已停止文件监听"));
     }
   }
 
@@ -1290,7 +1309,7 @@ export class Builder implements IBuilder {
     const entries = this.config.client!.entries!;
     const entryNames = Object.keys(entries);
 
-    this.reportProgress(buildOptions, `构建 ${entryNames.length} 个入口`, 20);
+    this.reportProgress(buildOptions, this.tr("log.esbuild.builder.buildEntries", "构建 {count} 个入口", { count: String(entryNames.length) }), 20);
 
     // 并行构建所有入口
     const buildPromises = entryNames.map(async (name) => {
@@ -1353,19 +1372,19 @@ export class Builder implements IBuilder {
               reportPath,
               performance,
             );
-            this.log("info", `📊 构建报告已生成: ${reportPath}`);
+            this.log("info", `📊 ${this.tr("log.esbuild.builder.reportGenerated", "构建报告已生成")}: ${reportPath}`);
           } catch (error) {
-            this.log("warn", `生成 HTML 报告失败: ${error}`);
+            this.log("warn", `${this.tr("log.esbuild.builder.reportFailed", "生成 HTML 报告失败")}: ${error}`);
           }
         }
       } catch (error) {
-        logger.warn("构建分析失败", { error });
+        logger.warn(this.tr("log.esbuild.builder.analysisFailed", "构建分析失败"), { error });
       }
     }
 
     // 生成 HTML 文件（如果配置了多入口 HTML）
     if (this.config.client?.html?.entries) {
-      this.reportProgress(buildOptions, "生成 HTML", 70);
+      this.reportProgress(buildOptions, this.tr("log.esbuild.builder.stageHtml", "生成 HTML"), 70);
       const htmlStart = Date.now();
       const htmlGenerator = new HTMLGenerator(
         this.config.client.html,
@@ -1416,7 +1435,7 @@ export class Builder implements IBuilder {
   private logOptimizationSuggestions(
     suggestions: OptimizationSuggestion[],
   ): void {
-    logger.info("\n=== 构建优化建议 ===\n");
+    logger.info(`\n=== ${this.tr("log.esbuild.builder.optimizationSuggestions", "构建优化建议")} ===\n`);
 
     for (const suggestion of suggestions) {
       const icon = suggestion.type === "error"
@@ -1427,14 +1446,14 @@ export class Builder implements IBuilder {
       logger.info(`${icon} ${suggestion.title}`);
       logger.info(`   ${suggestion.description}`);
       if (suggestion.fix) {
-        logger.info(`   修复建议: ${suggestion.fix}`);
+        logger.info(`   ${this.tr("log.esbuild.builder.suggestionFix", "修复建议")}: ${suggestion.fix}`);
       }
       if (suggestion.files && suggestion.files.length > 0) {
         const fileList = suggestion.files.slice(0, 5).join(", ");
         const more = suggestion.files.length > 5
           ? ` 等 ${suggestion.files.length} 个文件`
           : "";
-        logger.info(`   相关文件: ${fileList}${more}`);
+        logger.info(`   ${this.tr("log.esbuild.builder.suggestionFiles", "相关文件")}: ${fileList}${more}`);
       }
       logger.info("");
     }
