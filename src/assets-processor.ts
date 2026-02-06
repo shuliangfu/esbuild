@@ -31,6 +31,13 @@ export class AssetsProcessor {
   private config: AssetsConfig;
   private outputDir: string;
 
+  /**
+   * 原路径 -> 新路径（带 hash）的映射，用于更新 HTML/CSS/JS 中的引用
+   * key: 相对于 outputDir 的路径，如 assets/logo.png
+   * value: 带 hash 的新路径，如 assets/logo.a1b2c3d4.webp
+   */
+  private assetPathMap = new Map<string, string>();
+
   constructor(config: AssetsConfig, outputDir: string) {
     this.config = config;
     this.outputDir = outputDir;
@@ -149,7 +156,11 @@ export class AssetsProcessor {
    */
   private async processImagesInDirectory(
     dir: string,
-    config: { compress?: boolean; format?: "webp" | "avif" | "original" },
+    config: {
+      compress?: boolean;
+      format?: "webp" | "avif" | "original";
+      hash?: boolean;
+    },
   ): Promise<void> {
     const entries = await readdir(dir);
     const tasks: Promise<void>[] = [];
@@ -167,7 +178,12 @@ export class AssetsProcessor {
         const imageExts = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "avif"];
 
         if (ext && imageExts.includes(ext)) {
-          tasks.push(this.processImageFile(filePath, config));
+          // 跳过已带 hash 的文件名（如 logo.abc12345.webp），避免重复 hash
+          const nameWithoutExt = entry.name.slice(0, -(ext.length + 1));
+          const lastPart = nameWithoutExt.split(".").pop() ?? "";
+          if (!/^[a-f0-9]{8}$/.test(lastPart)) {
+            tasks.push(this.processImageFile(filePath, config));
+          }
         }
       }
     }
@@ -178,10 +194,16 @@ export class AssetsProcessor {
 
   /**
    * 处理单个图片文件
+   *
+   * 支持格式转换、压缩、content hash 化（用于缓存失效）
    */
   private async processImageFile(
     filePath: string,
-    config: { compress?: boolean; format?: "webp" | "avif" | "original" },
+    config: {
+      compress?: boolean;
+      format?: "webp" | "avif" | "original";
+      hash?: boolean;
+    },
   ): Promise<void> {
     try {
       // 读取原始图片数据
@@ -239,7 +261,24 @@ export class AssetsProcessor {
         });
       }
 
-      // 如果数据有变化，写回文件
+      // content hash 化（默认开启，用于缓存失效）
+      const useHash = config.hash !== false;
+      if (useHash) {
+        const contentHash = await this.computeContentHash(processedData);
+        const dir = filePath.substring(0, filePath.lastIndexOf("/") + 1);
+        const basename = outputPath.split("/").pop() ?? "";
+        const ext = basename.includes(".") ? basename.split(".").pop() ?? "" : "";
+        const nameWithoutExt = basename.slice(0, -(ext.length + 1));
+        const hashedBasename = `${nameWithoutExt}.${contentHash}.${ext}`;
+        outputPath = join(dir, hashedBasename);
+
+        // 记录路径映射，用于更新 HTML/CSS/JS 中的引用
+        const oldRelPath = relative(this.outputDir, filePath);
+        const newRelPath = relative(this.outputDir, outputPath);
+        this.assetPathMap.set(oldRelPath, newRelPath);
+      }
+
+      // 如果数据有变化或路径变化，写回文件
       if (processedData !== imageData || outputPath !== filePath) {
         await writeFile(outputPath, processedData);
 
@@ -259,6 +298,20 @@ export class AssetsProcessor {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  /**
+   * 计算内容的 SHA-256 hash，取前 8 位十六进制作为短 hash
+   */
+  private async computeContentHash(data: Uint8Array): Promise<string> {
+    const buffer = new Uint8Array(data).buffer;
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    const hashArray = new Uint8Array(hashBuffer);
+    const hashHex = Array.from(hashArray)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 8);
+    return hashHex;
   }
 
   /**
@@ -306,29 +359,48 @@ export class AssetsProcessor {
 
   /**
    * 更新文件中的资源路径
+   *
+   * 将 HTML/CSS/JS 中对图片的引用替换为带 hash 的新路径，实现缓存失效
    */
   private async updatePathsInFile(filePath: string): Promise<void> {
     const content = await readTextFile(filePath);
-    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-    const relativePath = relative(this.outputDir, dir);
+    const fileDir = filePath.substring(0, filePath.lastIndexOf("/") + 1);
+    const relativePath = relative(this.outputDir, fileDir);
 
     // 更新相对路径引用
-    // 这里可以根据需要实现更复杂的路径更新逻辑
     let updatedContent = content;
+
+    /**
+     * 将路径替换为带 hash 的新路径（若存在映射）
+     * @param path 原始引用路径（如 assets/logo.png）
+     * @returns 替换后的路径，若无需替换则返回原路径
+     */
+    const replaceWithHashedPath = (path: string): string => {
+      if (
+        path.startsWith("http://") ||
+        path.startsWith("https://") ||
+        path.startsWith("data:") ||
+        path.startsWith("/")
+      ) {
+        return path;
+      }
+      // 解析为相对于 outputDir 的路径
+      const resolvedPath = resolve(fileDir, path);
+      const oldRelPath = relative(this.outputDir, resolvedPath);
+      const newRelPath = this.assetPathMap.get(oldRelPath);
+      if (newRelPath) {
+        // 计算从当前文件到新资源路径的相对路径
+        return relative(fileDir, resolve(this.outputDir, newRelPath));
+      }
+      return this.resolveAssetPath(path, relativePath);
+    };
 
     // 更新 CSS 中的 url() 引用
     if (filePath.endsWith(".css")) {
       updatedContent = updatedContent.replace(
         /url\(['"]?([^'")]+)['"]?\)/g,
-        (match, path) => {
-          if (
-            path.startsWith("http://") || path.startsWith("https://") ||
-            path.startsWith("data:") || path.startsWith("/")
-          ) {
-            return match; // 不处理绝对路径和数据 URI
-          }
-          // 更新相对路径
-          const newPath = this.resolveAssetPath(path, relativePath);
+        (_match, path) => {
+          const newPath = replaceWithHashedPath(path.trim());
           return `url('${newPath}')`;
         },
       );
@@ -338,18 +410,18 @@ export class AssetsProcessor {
     if (filePath.endsWith(".html")) {
       updatedContent = updatedContent.replace(
         /(src|href)=['"]([^'"]+)['"]/g,
-        (match, attr, path) => {
-          if (
-            path.startsWith("http://") || path.startsWith("https://") ||
-            path.startsWith("data:") || path.startsWith("/")
-          ) {
-            return match; // 不处理绝对路径和数据 URI
-          }
-          // 更新相对路径
-          const newPath = this.resolveAssetPath(path, relativePath);
+        (_match, attr, path) => {
+          const newPath = replaceWithHashedPath(path);
           return `${attr}="${newPath}"`;
         },
       );
+    }
+
+    // 更新 JS 中的资源路径（将 assets/xxx.png 等替换为带 hash 的路径）
+    if (filePath.endsWith(".js")) {
+      for (const [oldRelPath, newRelPath] of this.assetPathMap) {
+        updatedContent = updatedContent.replaceAll(oldRelPath, newRelPath);
+      }
     }
 
     // 如果内容有变化，写回文件
