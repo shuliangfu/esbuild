@@ -93,7 +93,9 @@ export function createCSSImportHandlerPlugin(
       // 处理 CSS 文件加载
       build.onLoad(
         { filter: /\.(css|scss|sass|less|styl)$/ },
-        async (args: OnLoadArgs & { resolveDir?: string }): Promise<OnLoadResult | null | undefined> => {
+        async (
+          args: OnLoadArgs & { resolveDir?: string },
+        ): Promise<OnLoadResult | null | undefined> => {
           cssFiles.add(args.path);
 
           if (extract) {
@@ -118,7 +120,8 @@ export function createCSSImportHandlerPlugin(
             const escaped = JSON.stringify(content);
             const hash = simpleHash(content);
             // 注入前检查 data-dweb-css-id，避免重复注入
-            const injectCode = `const __css=${escaped};if(typeof document!=="undefined"){const id="dweb-css-${hash}";if(!document.getElementById(id)){const s=document.createElement("style");s.id=id;s.setAttribute("data-dweb-css-id",id);s.textContent=__css;(document.head||document.documentElement).appendChild(s);}}export default __css;`;
+            const injectCode =
+              `const __css=${escaped};if(typeof document!=="undefined"){const id="dweb-css-${hash}";if(!document.getElementById(id)){const s=document.createElement("style");s.id=id;s.setAttribute("data-dweb-css-id",id);s.textContent=__css;(document.head||document.documentElement).appendChild(s);}}export default __css;`;
             return {
               contents: injectCode,
               loader: "js",

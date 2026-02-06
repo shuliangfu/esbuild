@@ -142,7 +142,12 @@ export class BuilderServer {
 
     // 验证输出路径
     if (!this.config.output || this.config.output.trim() === "") {
-      throw new Error(this.tr("log.esbuild.server.missingOutput", "服务端配置缺少输出路径 (output)"));
+      throw new Error(
+        this.tr(
+          "log.esbuild.server.missingOutput",
+          "服务端配置缺少输出路径 (output)",
+        ),
+      );
     }
 
     // 解析路径
@@ -193,7 +198,13 @@ export class BuilderServer {
         const stderr = output.stderr
           ? new TextDecoder().decode(output.stderr)
           : this.tr("log.esbuild.builder.unknownError", "未知错误");
-        throw new Error(this.tr("log.esbuild.server.bunCompileFailed", `Bun 编译失败: ${stderr}`, { stderr }));
+        throw new Error(
+          this.tr(
+            "log.esbuild.server.bunCompileFailed",
+            `Bun 编译失败: ${stderr}`,
+            { stderr },
+          ),
+        );
       }
     } else {
       // Deno: 使用 deno compile
@@ -201,9 +212,13 @@ export class BuilderServer {
       // 如果配置了 external，需要提示用户
       if (externalModules.length > 0) {
         console.warn(
-          this.tr("log.esbuild.server.denoCompileExternalWarning", "警告: deno compile 不支持 external 配置，以下模块将被打包: {modules}", {
-            modules: externalModules.join(", "),
-          }),
+          this.tr(
+            "log.esbuild.server.denoCompileExternalWarning",
+            "警告: deno compile 不支持 external 配置，以下模块将被打包: {modules}",
+            {
+              modules: externalModules.join(", "),
+            },
+          ),
         );
       }
 
@@ -229,7 +244,13 @@ export class BuilderServer {
         const stderr = output.stderr
           ? new TextDecoder().decode(output.stderr)
           : this.tr("log.esbuild.builder.unknownError", "未知错误");
-        throw new Error(this.tr("log.esbuild.server.denoCompileFailed", `Deno 编译失败: ${stderr}`, { stderr }));
+        throw new Error(
+          this.tr(
+            "log.esbuild.server.denoCompileFailed",
+            `Deno 编译失败: ${stderr}`,
+            { stderr },
+          ),
+        );
       }
     }
 
@@ -267,7 +288,12 @@ export class BuilderServer {
     let outputDir: string;
     if (write) {
       if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error(this.tr("log.esbuild.builder.validateServerMissingOutput", "服务端配置缺少输出目录 (output)"));
+        throw new Error(
+          this.tr(
+            "log.esbuild.builder.validateServerMissingOutput",
+            "服务端配置缺少输出目录 (output)",
+          ),
+        );
       }
       outputDir = await resolve(this.config.output);
     } else {
@@ -464,7 +490,12 @@ export class BuilderServer {
     let outputDir: string;
     if (write) {
       if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error(this.tr("log.esbuild.builder.validateServerMissingOutput", "服务端配置缺少输出目录 (output)"));
+        throw new Error(
+          this.tr(
+            "log.esbuild.builder.validateServerMissingOutput",
+            "服务端配置缺少输出目录 (output)",
+          ),
+        );
       }
       outputDir = await resolve(this.config.output);
       // 确保输出目录存在
@@ -568,10 +599,14 @@ export class BuilderServer {
           ? new TextDecoder().decode(output.stderr)
           : this.tr("log.esbuild.builder.unknownError", "未知错误");
         throw new Error(
-          this.tr("log.esbuild.server.bunBuildFailed", `Bun 服务端编译失败: ${stderrStr}。入口文件: ${this.config.entry}`, {
-            stderr: stderrStr,
-            entry: this.config.entry,
-          }),
+          this.tr(
+            "log.esbuild.server.bunBuildFailed",
+            `Bun 服务端编译失败: ${stderrStr}。入口文件: ${this.config.entry}`,
+            {
+              stderr: stderrStr,
+              entry: this.config.entry,
+            },
+          ),
         );
       }
 

@@ -1,8 +1,14 @@
 # @dreamer/esbuild
 
-> 兼容 Deno 和 Bun 的高性能构建工具库，提供全栈编译、打包、资源处理、优化等功能，支持子路径按需导入
+> High-performance build tool library compatible with Deno and Bun, providing
+> full-stack compilation, bundling, resource processing, optimization, and more,
+> with subpath on-demand imports
 
-本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 框架的核心构建引擎，也可独立用于任意 Deno/Bun 项目的构建。
+This library is the core build engine of the
+[@dreamer/dweb](https://jsr.io/@dreamer/dweb) framework, and can also be used
+independently for any Deno/Bun project builds.
+
+English | [中文 (Chinese)](./README-zh.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
@@ -10,34 +16,40 @@
 
 ---
 
-## 📑 目录
+## 📑 Table of Contents
 
-- [功能](#-功能)
-- [安装](#-安装)
-- [特性](#-特性)
-- [使用场景](#-使用场景)
-- [快速开始](#-快速开始)
-- [使用示例](#-使用示例)
-- [API 文档](#-api-文档)
-- [高级配置](#-高级配置)
-- [编译方式](#️-编译方式)
-- [测试报告](#-测试报告)
-- [注意事项](#-注意事项)
-
----
-
-## 🎯 功能
-
-构建工具库，提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能。基于 esbuild 实现高性能打包，支持 TypeScript、JSX、代码分割、Tree-shaking 等现代构建特性。
-
-**架构优化**：
-- **子路径导出**：`/builder`、`/client`、`/server`、`/bundle`、`/css-injector` 按需导入，减少打包体积
-- **延迟初始化**：BuildAnalyzer、CacheManager 在首次 `build()` 时创建，避免 dev/build 时额外加载
-- **Tree-shaking 友好**：子路径导出使按需加载成为可能
+- [Features](#-features)
+- [Installation](#-installation)
+- [Characteristics](#-characteristics)
+- [Use Cases](#-use-cases)
+- [Quick Start](#-quick-start)
+- [Usage Examples](#-usage-examples)
+- [API Documentation](#-api-documentation)
+- [Advanced Configuration](#-advanced-configuration)
+- [Compilation Methods](#️-compilation-methods)
+- [Test Report](#-test-report)
+- [Notes](#-notes)
 
 ---
 
-## 📦 安装
+## 🎯 Features
+
+Build tool library providing a unified build interface, supporting compilation,
+bundling, and optimization of server and client code. High-performance bundling
+based on esbuild, supporting modern build features such as TypeScript, JSX, code
+splitting, Tree-shaking, etc.
+
+**Architecture optimizations**:
+
+- **Subpath exports**: `/builder`, `/client`, `/server`, `/bundle`,
+  `/css-injector` on-demand imports to reduce bundle size
+- **Lazy initialization**: BuildAnalyzer, CacheManager created on first
+  `build()`, avoiding extra loading during dev/build
+- **Tree-shaking friendly**: Subpath exports enable on-demand loading
+
+---
+
+## 📦 Installation
 
 ### Deno
 
@@ -51,129 +63,143 @@ deno add jsr:@dreamer/esbuild
 bunx jsr add -D @dreamer/esbuild
 ```
 
-### 按需导入（子路径）
+### On-Demand Import (Subpaths)
 
-为减少打包体积、提升 Tree-shaking 效果，可按需从子路径导入：
+To reduce bundle size and improve Tree-shaking, import from subpaths as needed:
 
-| 子路径 | 导出内容 | 适用场景 |
-|--------|----------|----------|
-| `jsr:@dreamer/esbuild/builder` | Builder、AssetsProcessor、createBuilder、BuilderConfig | 全栈构建、资源处理 |
-| `jsr:@dreamer/esbuild/client` | BuilderClient、ClientBuildOptions | 仅客户端打包 |
-| `jsr:@dreamer/esbuild/server` | BuilderServer、ServerBuildOptions | 仅服务端编译 |
-| `jsr:@dreamer/esbuild/bundle` | buildBundle、BuilderBundle、BundleOptions、BundleResult | 快速打包、测试、SSR |
-| `jsr:@dreamer/esbuild/css-injector` | generateCSSTag、generateCSSTags、injectCSSIntoHTML、injectCSSFromDependencies、getCSSRelativePath | extract 模式下将 CSS 路径注入 HTML |
+| Subpath                             | Exports                                                                                           | Use Case                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `jsr:@dreamer/esbuild/builder`      | Builder, AssetsProcessor, createBuilder, BuilderConfig                                            | Full-stack build, resource processing      |
+| `jsr:@dreamer/esbuild/client`       | BuilderClient, ClientBuildOptions                                                                 | Client-only bundling                       |
+| `jsr:@dreamer/esbuild/server`       | BuilderServer, ServerBuildOptions                                                                 | Server-only compilation                    |
+| `jsr:@dreamer/esbuild/bundle`       | buildBundle, BuilderBundle, BundleOptions, BundleResult                                           | Quick bundling, testing, SSR               |
+| `jsr:@dreamer/esbuild/css-injector` | generateCSSTag, generateCSSTags, injectCSSIntoHTML, injectCSSFromDependencies, getCSSRelativePath | Inject CSS paths into HTML in extract mode |
 
 ```typescript
-// 仅需 Builder、AssetsProcessor 时
-import { Builder, AssetsProcessor, createBuilder } from "jsr:@dreamer/esbuild/builder";
+// When only Builder, AssetsProcessor needed
+import {
+  AssetsProcessor,
+  Builder,
+  createBuilder,
+} from "jsr:@dreamer/esbuild/builder";
 
-// 仅需客户端构建时
+// When only client build needed
 import { BuilderClient } from "jsr:@dreamer/esbuild/client";
 
-// 仅需服务端构建时
+// When only server build needed
 import { BuilderServer } from "jsr:@dreamer/esbuild/server";
 
-// 仅需 buildBundle 时（测试、SSR 等）
+// When only buildBundle needed (testing, SSR, etc.)
 import { buildBundle } from "jsr:@dreamer/esbuild/bundle";
 
-// 仅需 CSS 注入工具时（extract 模式 + 手动注入 HTML）
+// When only CSS injector needed (extract mode + manual HTML injection)
 import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 ```
 
 ---
 
-## 🌍 环境兼容性
+## 🌍 Environment Compatibility
 
-| 环境 | 版本要求 | 状态 |
-|------|---------|------|
-| **Deno** | 2.5.0+ | ✅ 完全支持 |
-| **Bun** | 1.3.0+ | ✅ 完全支持 |
-| **服务端** | - | ✅ 支持（兼容 Deno 和 Bun 运行时） |
-| **客户端** | - | ❌ 不支持（构建工具，仅在服务端运行） |
-
----
-
-## ✨ 特性
-
-- **服务端编译**：
-  - 服务端代码编译和打包（基于 `@dreamer/runtime-adapter`）
-  - TypeScript 编译（Deno/Bun 内置）
-  - 代码压缩和优化
-  - 单文件打包（standalone）
-  - 多平台编译（Linux、macOS、Windows）
-  - **内存模式**：支持 `write: false` 直接返回编译代码，不写入文件
-  - **外部依赖**：支持 `external` 配置排除指定依赖不打包
-  - **原生编译**：支持 `useNativeCompile` 使用 `deno compile` 或 `bun build --compile` 生成可执行文件
-- **客户端打包**：
-  - 基于 esbuild 高性能打包
-  - 入口文件打包（entry point → bundle.js）
-  - 代码分割（路由级别、组件级别）
-  - Tree-shaking（移除未使用的代码）
-  - 多种输出格式（ESM、CJS、IIFE）
-  - **内存模式**：支持 `write: false` 直接返回编译代码，不写入文件
-- **HTML 生成**：
-  - 自动生成 HTML 入口文件
-  - 自动注入打包后的 JS/CSS 文件
-  - 支持自定义 HTML 模板
-  - 支持预加载策略配置
-  - 支持多入口 HTML（MPA 多页应用）
-- **CSS 处理**：
-  - CSS 提取和优化
-  - 自动添加浏览器前缀（autoprefixer）
-  - CSS 压缩（cssnano）
-  - 自动注入 CSS 到 HTML
-- **构建优化**：
-  - 构建缓存管理
-  - 增量编译
-  - Watch 模式
-  - 构建产物分析
-  - 性能监控和报告
-- **插件系统**：
-  - 灵活的插件架构
-  - 服务端模块自动检测和排除
-  - 条件编译支持
-  - 自定义构建逻辑
-- **路径解析**：
-  - 自动解析相对路径、npm 包、JSR 包
-  - 支持路径别名（`@/`, `~/` 等）
-  - Deno 环境：支持 `deno.json` 的 `imports` 配置
-  - Bun 环境：支持 `package.json` 的 `imports` 和 `tsconfig.json` 的 `paths` 配置
-- **静态资源处理（AssetsProcessor）**：
-  - 复制 `public/` 到输出目录，支持 `exclude` 排除
-  - 图片压缩、格式转换（webp/avif/original）、content hash
-  - 图片质量参数 `quality`（0-100）
-  - 自动更新 HTML/CSS/JS 中的资源引用路径
-  - 生成 `asset-manifest.json` 供 SSR 运行时替换路径
-  - `pathUpdateDirs` 支持 SSR 场景下更新服务端 bundle 中的路径
+| Environment | Version Requirement | Status                                               |
+| ----------- | ------------------- | ---------------------------------------------------- |
+| **Deno**    | 2.5.0+              | ✅ Fully supported                                   |
+| **Bun**     | 1.3.0+              | ✅ Fully supported                                   |
+| **Server**  | -                   | ✅ Supported (compatible with Deno and Bun runtimes) |
+| **Client**  | -                   | ❌ Not supported (build tool, runs on server only)   |
 
 ---
 
-## 🎯 使用场景
+## ✨ Characteristics
 
-- **全栈项目构建**：同时构建服务端和客户端代码
-- **前端项目构建**：React、Preact 应用打包
-- **SPA 单页应用**：客户端渲染（CSR）项目构建
-- **SSR/Hybrid/SSG**：与 @dreamer/dweb 集成，asset-manifest 支持生产模式资源路径替换
-- **多平台应用打包**：支持 Linux、macOS、Windows
-- **服务端渲染**：使用内存模式获取编译代码用于 SSR
-- **CI/CD 构建流程**：自动化构建和部署
-
-### 与 @dreamer/dweb 集成
-
-本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 的核心构建引擎。dweb 的 `deno task build` 内部调用 `Builder.build()`，完成服务端 + 客户端 + 资源处理。生产模式下，dweb 使用 `asset-manifest.json` 在 SSR/Hybrid/SSG 输出 HTML 前替换资源路径。
+- **Server compilation**:
+  - Server code compilation and bundling (based on `@dreamer/runtime-adapter`)
+  - TypeScript compilation (Deno/Bun built-in)
+  - Code minification and optimization
+  - Single-file bundling (standalone)
+  - Multi-platform compilation (Linux, macOS, Windows)
+  - **Memory mode**: Supports `write: false` to return compiled code directly
+    without writing to file
+  - **External dependencies**: Supports `external` config to exclude specified
+    dependencies from bundling
+  - **Native compilation**: Supports `useNativeCompile` to use `deno compile` or
+    `bun build --compile` to generate executable
+- **Client bundling**:
+  - High-performance bundling based on esbuild
+  - Entry file bundling (entry point → bundle.js)
+  - Code splitting (route-level, component-level)
+  - Tree-shaking (remove unused code)
+  - Multiple output formats (ESM, CJS, IIFE)
+  - **Memory mode**: Supports `write: false` to return compiled code directly
+    without writing to file
+- **HTML generation**:
+  - Auto-generate HTML entry files
+  - Auto-inject bundled JS/CSS files
+  - Support custom HTML templates
+  - Support preload strategy configuration
+  - Support multi-entry HTML (MPA multi-page apps)
+- **CSS processing**:
+  - CSS extraction and optimization
+  - Auto-add browser prefixes (autoprefixer)
+  - CSS minification (cssnano)
+  - Auto-inject CSS into HTML
+- **Build optimization**:
+  - Build cache management
+  - Incremental compilation
+  - Watch mode
+  - Build output analysis
+  - Performance monitoring and reporting
+- **Plugin system**:
+  - Flexible plugin architecture
+  - Server module auto-detection and exclusion
+  - Conditional compilation support
+  - Custom build logic
+- **Path resolution**:
+  - Auto-resolve relative paths, npm packages, JSR packages
+  - Support path aliases (`@/`, `~/`, etc.)
+  - Deno environment: Supports `deno.json` `imports` config
+  - Bun environment: Supports `package.json` `imports` and `tsconfig.json`
+    `paths` config
+- **Static resource processing (AssetsProcessor)**:
+  - Copy `public/` to output directory, supports `exclude`
+  - Image compression, format conversion (webp/avif/original), content hash
+  - Image quality parameter `quality` (0-100)
+  - Auto-update resource reference paths in HTML/CSS/JS
+  - Generate `asset-manifest.json` for SSR runtime path replacement
+  - `pathUpdateDirs` supports updating paths in server bundle for SSR scenarios
 
 ---
 
-## 🚀 快速开始
+## 🎯 Use Cases
 
-### 基础使用
+- **Full-stack project build**: Build server and client code simultaneously
+- **Frontend project build**: React, Preact app bundling
+- **SPA single-page app**: Client-side rendering (CSR) project build
+- **SSR/Hybrid/SSG**: Integration with @dreamer/dweb, asset-manifest supports
+  production mode resource path replacement
+- **Multi-platform app packaging**: Supports Linux, macOS, Windows
+- **Server-side rendering**: Use memory mode to get compiled code for SSR
+- **CI/CD build pipeline**: Automated build and deployment
+
+### Integration with @dreamer/dweb
+
+This library is the core build engine of
+[@dreamer/dweb](https://jsr.io/@dreamer/dweb). dweb's `deno task build`
+internally calls `Builder.build()` to complete server + client + resource
+processing. In production mode, dweb uses `asset-manifest.json` to replace
+resource paths before outputting HTML in SSR/Hybrid/SSG.
+
+---
+
+## 🚀 Quick Start
+
+### Basic Usage
 
 ```typescript
 import { createBuilder } from "@dreamer/esbuild";
 
-// 创建构建器
+// Create builder
 const builder = createBuilder({
-  // 客户端构建配置
+  // Client build configuration
   client: {
     entry: "./src/client/index.tsx",
     output: "./dist/client",
@@ -189,17 +215,17 @@ const builder = createBuilder({
   },
 });
 
-// 构建客户端
+// Build client
 await builder.buildClient();
 ```
 
-### 全栈项目构建
+### Full-Stack Project Build
 
 ```typescript
 import { createBuilder } from "@dreamer/esbuild";
 
 const builder = createBuilder({
-  // 服务端构建配置
+  // Server build configuration
   server: {
     entry: "./src/server.ts",
     output: "./dist/server",
@@ -209,7 +235,7 @@ const builder = createBuilder({
       platform: ["linux", "darwin"],
     },
   },
-  // 客户端构建配置
+  // Client build configuration
   client: {
     entry: "./src/client/index.tsx",
     output: "./dist/client",
@@ -221,17 +247,18 @@ const builder = createBuilder({
   },
 });
 
-// 同时构建服务端和客户端
+// Build server and client simultaneously
 await builder.build();
 ```
 
 ---
 
-## 🎨 使用示例
+## 🎨 Usage Examples
 
-### 示例 1：客户端构建（内存模式）
+### Example 1: Client Build (Memory Mode)
 
-使用 `write: false` 参数，可以直接获取编译后的代码而不写入文件，适用于服务端渲染等场景。
+Using `write: false` parameter, you can get compiled code directly without
+writing to file, suitable for server-side rendering and similar scenarios.
 
 ```typescript
 import { BuilderClient } from "@dreamer/esbuild";
@@ -242,15 +269,15 @@ const builder = new BuilderClient({
   engine: "react",
 });
 
-// 内存模式：不写入文件，直接返回编译代码
+// Memory mode: Do not write to file, return compiled code directly
 const result = await builder.build({ mode: "prod", write: false });
 
-// 获取编译后的代码
+// Get compiled code
 const code = result.outputContents?.[0]?.text;
 console.log(code);
 ```
 
-### 示例 2：服务端构建（内存模式）
+### Example 2: Server Build (Memory Mode)
 
 ```typescript
 import { BuilderServer } from "@dreamer/esbuild";
@@ -261,15 +288,15 @@ const builder = new BuilderServer({
   target: "deno",
 });
 
-// 内存模式：返回编译后的代码
+// Memory mode: Return compiled code
 const result = await builder.build({ mode: "prod", write: false });
 
-// 获取编译后的代码
+// Get compiled code
 const code = result.outputContents?.[0]?.text;
 console.log(code);
 ```
 
-### 示例 3：增量构建（Watch 模式）
+### Example 3: Incremental Build (Watch Mode)
 
 ```typescript
 import { createBuilder } from "@dreamer/esbuild";
@@ -285,23 +312,23 @@ const builder = createBuilder({
       enabled: true,
       debounce: 300,
       onFileChange: (path, kind) => {
-        console.log(`文件变化: ${path} (${kind})`);
+        console.log(`File changed: ${path} (${kind})`);
       },
     },
   },
 });
 
-// 启动 Watch 模式
+// Start Watch mode
 await builder.watch();
 
-// 停止 Watch 模式
+// Stop Watch mode
 builder.stopWatch();
 ```
 
-### 示例 4：构建产物分析
+### Example 4: Build Output Analysis
 
 ```typescript
-import { createBuilder, BuildAnalyzer } from "@dreamer/esbuild";
+import { BuildAnalyzer, createBuilder } from "@dreamer/esbuild";
 
 const builder = createBuilder({
   client: {
@@ -313,29 +340,32 @@ const builder = createBuilder({
 
 const result = await builder.buildClient();
 
-// 分析构建产物
+// Analyze build output
 const analyzer = new BuildAnalyzer();
 const analysis = await analyzer.analyze(result.metafile);
 
-// 生成分析报告
+// Generate analysis report
 const report = analyzer.generateReport(analysis);
 console.log(report);
 
-// 生成 HTML 报告
+// Generate HTML report
 await analyzer.generateHTMLReport(analysis, "./dist/build-report.html");
 ```
 
-### 示例 5：使用插件
+### Example 5: Using Plugins
 
 ```typescript
-import { BuilderClient, createServerModuleDetectorPlugin } from "@dreamer/esbuild";
+import {
+  BuilderClient,
+  createServerModuleDetectorPlugin,
+} from "@dreamer/esbuild";
 
 const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
   output: "./dist/client",
   engine: "react",
   plugins: [
-    // 自动排除服务端模块
+    // Auto-exclude server modules
     createServerModuleDetectorPlugin({
       patterns: ["@dreamer/database", "express"],
     }),
@@ -345,9 +375,9 @@ const builder = new BuilderClient({
 await builder.build("prod");
 ```
 
-### 示例 6：路径别名配置
+### Example 6: Path Alias Configuration
 
-#### Deno 环境（deno.json）
+#### Deno Environment (deno.json)
 
 ```json
 {
@@ -366,9 +396,10 @@ import { config } from "~/config.ts";
 import { log } from "@dreamer/logger/client";
 ```
 
-#### Bun 环境（package.json 或 tsconfig.json）
+#### Bun Environment (package.json or tsconfig.json)
 
-**方式 1：使用 package.json**
+**Method 1: Using package.json**
+
 ```json
 {
   "imports": {
@@ -378,7 +409,8 @@ import { log } from "@dreamer/logger/client";
 }
 ```
 
-**方式 2：使用 tsconfig.json**
+**Method 2: Using tsconfig.json**
+
 ```json
 {
   "compilerOptions": {
@@ -396,15 +428,16 @@ import { logger } from "@/utils/logger.ts";
 import { config } from "~/config.ts";
 ```
 
-路径解析会自动处理这些别名，无需额外配置。
+Path resolution automatically handles these aliases, no extra configuration
+needed.
 
 ---
 
-## 📚 API 文档
+## 📚 API Documentation
 
 ### Builder
 
-统一的构建器，支持同时构建服务端和客户端代码。
+Unified builder supporting simultaneous server and client code builds.
 
 ```typescript
 import { Builder, createBuilder } from "@dreamer/esbuild";
@@ -412,20 +445,20 @@ import { Builder, createBuilder } from "@dreamer/esbuild";
 const builder = createBuilder(config);
 ```
 
-#### 方法
+#### Methods
 
-| 方法 | 说明 |
-|------|------|
-| `build(options?)` | 同时构建服务端和客户端 |
-| `buildServer(options?)` | 仅构建服务端代码 |
-| `buildClient(options?)` | 仅构建客户端代码 |
-| `clean()` | 清理构建产物 |
-| `watch(options?)` | 启动 Watch 模式 |
-| `stopWatch()` | 停止 Watch 模式 |
+| Method                  | Description                            |
+| ----------------------- | -------------------------------------- |
+| `build(options?)`       | Build server and client simultaneously |
+| `buildServer(options?)` | Build server code only                 |
+| `buildClient(options?)` | Build client code only                 |
+| `clean()`               | Clean build output                     |
+| `watch(options?)`       | Start Watch mode                       |
+| `stopWatch()`           | Stop Watch mode                        |
 
 ### BuilderClient
 
-客户端构建器，用于打包客户端代码。
+Client builder for bundling client code.
 
 ```typescript
 import { BuilderClient } from "@dreamer/esbuild";
@@ -433,47 +466,53 @@ import { BuilderClient } from "@dreamer/esbuild";
 const builder = new BuilderClient(config);
 ```
 
-#### 构造函数
+#### Constructor
 
 ```typescript
 new BuilderClient(config: ClientConfig)
 ```
 
-**ClientConfig 调试与日志**：
-- `debug?: boolean`：是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息。
-- `logger?: BuildLogger`：日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console。
+**ClientConfig debugging and logging**:
 
-**ClientConfig.cssImport**（CSS 导入处理）：
-- `enabled?: boolean`：是否启用（默认：true）
-- `extract?: boolean`：是否提取为独立文件（默认：false，内联进 JS）。true 时需配合 css-injector 手动注入 HTML
-- `cssOnly?: boolean`：内联模式仅处理 .css（scss/sass/less 需预处理器，默认：true）
+- `debug?: boolean`: Whether to enable debug logging (default: false), outputs
+  detailed resolver/build debug info when enabled.
+- `logger?: BuildLogger`: Logger instance (uses library default logger when not
+  provided), info/debug output through logger, not console.
 
-#### 方法
+**ClientConfig.cssImport** (CSS import handling):
 
-| 方法 | 说明 |
-|------|------|
-| `build(options?)` | 构建客户端代码，支持 `{ mode, write }` 参数 |
-| `createContext(mode?)` | 创建增量构建上下文 |
-| `rebuild()` | 增量重新构建 |
-| `dispose()` | 清理构建上下文 |
-| `registerPlugin(plugin)` | 注册插件 |
-| `getPluginManager()` | 获取插件管理器 |
-| `getConfig()` | 获取配置 |
+- `enabled?: boolean`: Whether to enable (default: true)
+- `extract?: boolean`: Whether to extract to separate file (default: false,
+  inline into JS). When true, use css-injector to manually inject HTML
+- `cssOnly?: boolean`: Inline mode only process .css (scss/sass/less need
+  preprocessor, default: true)
+
+#### Methods
+
+| Method                   | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `build(options?)`        | Build client code, supports `{ mode, write }` parameters |
+| `createContext(mode?)`   | Create incremental build context                         |
+| `rebuild()`              | Incremental rebuild                                      |
+| `dispose()`              | Clean build context                                      |
+| `registerPlugin(plugin)` | Register plugin                                          |
+| `getPluginManager()`     | Get plugin manager                                       |
+| `getConfig()`            | Get configuration                                        |
 
 #### ClientBuildOptions
 
 ```typescript
 interface ClientBuildOptions {
-  /** 构建模式（默认：prod） */
+  /** Build mode (default: prod) */
   mode?: "dev" | "prod";
-  /** 是否写入文件（默认：true），设为 false 返回编译代码 */
+  /** Whether to write to file (default: true), set false to return compiled code */
   write?: boolean;
 }
 ```
 
 ### BuilderServer
 
-服务端构建器，用于编译服务端代码。
+Server builder for compiling server code.
 
 ```typescript
 import { BuilderServer } from "@dreamer/esbuild";
@@ -481,53 +520,53 @@ import { BuilderServer } from "@dreamer/esbuild";
 const builder = new BuilderServer(config);
 ```
 
-#### 构造函数
+#### Constructor
 
 ```typescript
 new BuilderServer(config: ServerConfig)
 ```
 
-#### 方法
+#### Methods
 
-| 方法 | 说明 |
-|------|------|
-| `build(options?)` | 构建服务端代码，支持 `{ mode, write }` 参数或字符串模式 |
-| `getConfig()` | 获取配置 |
+| Method            | Description                                                             |
+| ----------------- | ----------------------------------------------------------------------- |
+| `build(options?)` | Build server code, supports `{ mode, write }` parameters or string mode |
+| `getConfig()`     | Get configuration                                                       |
 
 #### ServerBuildOptions
 
 ```typescript
 interface ServerBuildOptions {
-  /** 构建模式（默认：prod） */
+  /** Build mode (default: prod) */
   mode?: "dev" | "prod";
-  /** 是否写入文件（默认：true），设为 false 返回编译代码 */
+  /** Whether to write to file (default: true), set false to return compiled code */
   write?: boolean;
 }
 ```
 
-#### ServerConfig 高级选项
+#### ServerConfig Advanced Options
 
 ```typescript
 interface ServerConfig {
-  /** 入口文件路径 */
+  /** Entry file path */
   entry: string;
-  /** 输出目录 */
+  /** Output directory */
   output: string;
-  /** 目标运行时（默认：deno） */
+  /** Target runtime (default: deno) */
   target?: "deno" | "bun";
-  /** 外部依赖（不打包），支持通配符 */
+  /** External dependencies (not bundled), supports wildcards */
   external?: string[];
-  /** 使用原生编译器生成可执行文件（Deno: deno compile, Bun: bun build --compile） */
+  /** Use native compiler to generate executable (Deno: deno compile, Bun: bun build --compile) */
   useNativeCompile?: boolean;
-  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息，便于排查 */
+  /** Whether to enable debug logging (default: false), outputs detailed resolver/build debug info when enabled for troubleshooting */
   debug?: boolean;
-  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  /** Logger instance (uses library default logger when not provided), info/debug output through logger, not console */
   logger?: BuildLogger;
-  // ... 其他配置
+  // ... other config
 }
 ```
 
-**示例：排除外部依赖**
+**Example: Exclude external dependencies**
 
 ```typescript
 const builder = new BuilderServer({
@@ -535,43 +574,44 @@ const builder = new BuilderServer({
   output: "./dist/server",
   target: "deno",
   external: [
-    "better-sqlite3",     // 排除原生模块
-    "@prisma/*",          // 通配符排除
-    "node:*",             // 排除所有 Node.js 内置模块
+    "better-sqlite3", // Exclude native module
+    "@prisma/*", // Wildcard exclude
+    "node:*", // Exclude all Node.js built-in modules
   ],
 });
 ```
 
-**示例：生成可执行文件**
+**Example: Generate executable**
 
 ```typescript
 const builder = new BuilderServer({
   entry: "./src/server.ts",
   output: "./dist/server",
   target: "deno",
-  useNativeCompile: true,  // 使用 deno compile 或 bun build --compile
+  useNativeCompile: true, // Use deno compile or bun build --compile
 });
 
 await builder.build("prod");
-// Deno 环境：生成 ./dist/server (可执行文件)
-// Bun 环境：生成 ./dist/server (可执行文件)
+// Deno environment: Generates ./dist/server (executable)
+// Bun environment: Generates ./dist/server (executable)
 ```
 
 ### BuilderBundle
 
-简单打包器，用于快速将代码打包为浏览器可用格式。适用于浏览器测试、服务端渲染等场景。
+Simple bundler for quickly bundling code into browser-ready format. Suitable for
+browser testing, server-side rendering, etc.
 
 ```typescript
-import { BuilderBundle, buildBundle } from "@dreamer/esbuild";
+import { buildBundle, BuilderBundle } from "@dreamer/esbuild";
 
-// 使用类
+// Using class
 const bundler = new BuilderBundle();
 const result = await bundler.build({
   entryPoint: "./src/client/mod.ts",
   globalName: "MyClient",
 });
 
-// 使用函数
+// Using function
 const result = await buildBundle({
   entryPoint: "./src/client/mod.ts",
   format: "esm",
@@ -579,39 +619,39 @@ const result = await buildBundle({
 });
 ```
 
-#### 方法
+#### Methods
 
-| 方法 | 说明 |
-|------|------|
-| `build(options)` | 打包代码，返回打包结果 |
+| Method           | Description                        |
+| ---------------- | ---------------------------------- |
+| `build(options)` | Bundle code, returns bundle result |
 
 #### BundleOptions
 
 ```typescript
 interface BundleOptions {
-  /** 入口文件路径 */
+  /** Entry file path */
   entryPoint: string;
-  /** 全局变量名（IIFE 格式时使用） */
+  /** Global variable name (used with IIFE format) */
   globalName?: string;
-  /** 目标平台（默认：browser） */
+  /** Target platform (default: browser) */
   platform?: "browser" | "node" | "neutral";
-  /** 目标 ES 版本（默认：es2020） */
+  /** Target ES version (default: es2020) */
   target?: string | string[];
-  /** 是否压缩（默认：false） */
+  /** Whether to minify (default: false) */
   minify?: boolean;
-  /** 输出格式（默认：iife） */
+  /** Output format (default: iife) */
   format?: "iife" | "esm" | "cjs";
-  /** 是否生成 sourcemap（默认：false） */
+  /** Whether to generate sourcemap (default: false) */
   sourcemap?: boolean;
-  /** 外部依赖（不打包） */
+  /** External dependencies (not bundled) */
   external?: string[];
-  /** 定义替换 */
+  /** Define replacement */
   define?: Record<string, string>;
-  /** 是否打包依赖（默认：true） */
+  /** Whether to bundle dependencies (default: true) */
   bundle?: boolean;
-  /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息 */
+  /** Whether to enable debug logging (default: false), outputs detailed resolver/build debug info when enabled */
   debug?: boolean;
-  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  /** Logger instance (uses library default logger when not provided), info/debug output through logger, not console */
   logger?: BuildLogger;
 }
 ```
@@ -620,16 +660,17 @@ interface BundleOptions {
 
 ```typescript
 interface BundleResult {
-  /** 打包后的代码 */
+  /** Bundled code */
   code: string;
-  /** Source Map（如果启用） */
+  /** Source Map (if enabled) */
   map?: string;
 }
 ```
 
 ### AssetsProcessor
 
-静态资源处理器，负责复制、图片处理、路径更新、生成 asset-manifest。
+Static resource processor, responsible for copying, image processing, path
+updates, generating asset-manifest.
 
 ```typescript
 import { AssetsProcessor } from "jsr:@dreamer/esbuild/builder";
@@ -642,7 +683,7 @@ const config = {
 const processor = new AssetsProcessor(
   config,
   "./dist/client",
-  ["./dist/server"],  // 可选，SSR 场景下需更新的额外目录
+  ["./dist/server"], // Optional, additional directories to update in SSR scenario
 );
 await processor.processAssets();
 ```
@@ -651,68 +692,74 @@ await processor.processAssets();
 
 ```typescript
 interface AssetsConfig {
-  /** 静态资源目录 */
+  /** Static resource directory */
   publicDir?: string;
-  /** 资源输出目录（默认：assets） */
+  /** Resource output directory (default: assets) */
   assetsDir?: string;
-  /** 复制时排除的文件，如 ["tailwind.css", "uno.css"] */
+  /** Files to exclude when copying, e.g. ["tailwind.css", "uno.css"] */
   exclude?: string[];
-  /** 图片处理（需 @dreamer/image） */
+  /** Image processing (requires @dreamer/image) */
   images?: {
     compress?: boolean;
     format?: "webp" | "avif" | "original";
     hash?: boolean;
-    quality?: number;  // 0-100，默认 80（有损）或 100（PNG/GIF 无损）
+    quality?: number; // 0-100, default 80 (lossy) or 100 (PNG/GIF lossless)
   };
 }
 ```
 
-**输出**：`outputDir/asset-manifest.json`，格式 `{ "/assets/原路径": "/assets/带hash新路径" }`，供 SSR 框架替换 HTML 中的资源路径。
+**Output**: `outputDir/asset-manifest.json`, format
+`{ "/assets/original-path": "/assets/hash-new-path" }`, for SSR framework to
+replace resource paths in HTML.
 
 ### BuildResult
 
-构建结果类型。
+Build result type.
 
 ```typescript
 interface BuildResult {
-  /** 输出文件列表（文件路径） */
+  /** Output file list (file paths) */
   outputFiles: string[];
-  /** 输出文件内容列表（当 write 为 false 时有值） */
+  /** Output file content list (has value when write is false) */
   outputContents?: OutputFileContent[];
-  /** 构建元数据 */
+  /** Build metadata */
   metafile?: unknown;
-  /** 构建时间（毫秒） */
+  /** Build duration (milliseconds) */
   duration: number;
 }
 
 interface OutputFileContent {
-  /** 文件路径 */
+  /** File path */
   path: string;
-  /** 文件内容（字符串格式） */
+  /** File content (string format) */
   text: string;
-  /** 文件内容（二进制格式） */
+  /** File content (binary format) */
   contents: Uint8Array;
 }
 ```
 
 ---
 
-## 🔧 调试与日志
+## 🔧 Debugging and Logging
 
-服务端/客户端构建与简单打包均支持 **debug** 和 **logger** 参数，便于排查构建与解析问题：
+Server/client build and simple bundling all support **debug** and **logger**
+parameters for troubleshooting build and resolution issues:
 
-- **debug**（`boolean`，默认 `false`）：设为 `true` 时输出 resolver、build 等详细调试信息。
-- **logger**（`BuildLogger`，可选）：日志实例；未传时使用库内默认 logger。所有 info/debug 输出均通过 logger，不使用 `console`。
+- **debug** (`boolean`, default `false`): When set to `true`, outputs detailed
+  resolver, build debug info.
+- **logger** (`BuildLogger`, optional): Logger instance; uses library default
+  logger when not provided. All info/debug output goes through logger, not
+  `console`.
 
-**示例**：
+**Example**:
 
 ```typescript
 import { createLogger } from "@dreamer/logger";
-import { BuilderServer, BuilderClient, buildBundle } from "@dreamer/esbuild";
+import { buildBundle, BuilderClient, BuilderServer } from "@dreamer/esbuild";
 
 const logger = createLogger({ level: "debug", format: "text" });
 
-// 服务端构建：开启调试并传入自定义 logger
+// Server build: Enable debug and pass custom logger
 const serverBuilder = new BuilderServer({
   entry: "./src/server.ts",
   output: "./dist",
@@ -720,7 +767,7 @@ const serverBuilder = new BuilderServer({
   logger,
 });
 
-// 客户端构建：同上
+// Client build: Same as above
 const clientBuilder = new BuilderClient({
   entry: "./src/client/index.tsx",
   output: "./dist/client",
@@ -729,7 +776,7 @@ const clientBuilder = new BuilderClient({
   logger,
 });
 
-// 简单打包：BundleOptions 同样支持 debug、logger
+// Simple bundling: BundleOptions also supports debug, logger
 const result = await buildBundle({
   entryPoint: "./src/client/mod.ts",
   format: "esm",
@@ -740,9 +787,9 @@ const result = await buildBundle({
 
 ---
 
-## 🔧 高级配置
+## 🔧 Advanced Configuration
 
-### 代码分割策略
+### Code Splitting Strategy
 
 ```typescript
 const builder = new BuilderClient({
@@ -752,15 +799,15 @@ const builder = new BuilderClient({
   bundle: {
     splitting: {
       enabled: true,
-      byRoute: true,      // 按路由分割
-      byComponent: true,  // 按组件分割
-      bySize: 50000,      // 按大小分割（50KB）
+      byRoute: true, // Split by route
+      byComponent: true, // Split by component
+      bySize: 50000, // Split by size (50KB)
     },
   },
 });
 ```
 
-### Source Map 配置
+### Source Map Configuration
 
 ```typescript
 const builder = new BuilderClient({
@@ -769,12 +816,12 @@ const builder = new BuilderClient({
   engine: "react",
   sourcemap: {
     enabled: true,
-    mode: "external",  // "inline" | "external" | "both"
+    mode: "external", // "inline" | "external" | "both"
   },
 });
 ```
 
-### 缓存配置
+### Cache Configuration
 
 ```typescript
 const builder = createBuilder({
@@ -784,14 +831,15 @@ const builder = createBuilder({
     engine: "react",
   },
   build: {
-    cache: true,  // 或指定缓存目录: "./cache"
+    cache: true, // Or specify cache directory: "./cache"
   },
 });
 ```
 
-### 静态资源与 asset-manifest
+### Static Resources and asset-manifest
 
-配置 `assets` 后，Builder 会在构建时调用 `AssetsProcessor` 处理静态资源，并生成 `asset-manifest.json`。
+When `assets` is configured, Builder will call `AssetsProcessor` to process
+static resources during build and generate `asset-manifest.json`.
 
 ```typescript
 const builder = createBuilder({
@@ -807,12 +855,12 @@ const builder = createBuilder({
   assets: {
     publicDir: "./public",
     assetsDir: "assets",
-    exclude: ["tailwind.css", "uno.css"],  // 排除会被其他插件编译的源文件
+    exclude: ["tailwind.css", "uno.css"], // Exclude source files that will be compiled by other plugins
     images: {
       compress: true,
-      format: "webp",   // "webp" | "avif" | "original"
-      hash: true,       // 文件名加 content hash，用于缓存失效
-      quality: 80,      // 0-100，JPEG/WebP/AVIF 默认 80，PNG/GIF 默认 100
+      format: "webp", // "webp" | "avif" | "original"
+      hash: true, // Add content hash to filename for cache invalidation
+      quality: 80, // 0-100, JPEG/WebP/AVIF default 80, PNG/GIF default 100
     },
   },
 });
@@ -820,22 +868,28 @@ const builder = createBuilder({
 await builder.build();
 ```
 
-**流程**：
-1. 复制 `public/` 到 `outputDir/assets/`（排除 `exclude` 配置的文件）
-2. 图片压缩、格式转换、content hash
-3. 更新 HTML/CSS/JS 中的资源引用路径
-4. 生成 `outputDir/asset-manifest.json`，格式：`{ "/assets/logo.png": "/assets/logo.abc12345.webp" }`
+**Flow**:
 
-**SSR 场景**：当同时配置 `server` 时，`pathUpdateDirs` 会自动包含 server output 目录，确保服务端 bundle 中的资源路径也被更新。SSR 框架（如 dweb）可在输出 HTML 前用 manifest 替换路径。
+1. Copy `public/` to `outputDir/assets/` (excluding files in `exclude` config)
+2. Image compression, format conversion, content hash
+3. Update resource reference paths in HTML/CSS/JS
+4. Generate `outputDir/asset-manifest.json`, format:
+   `{ "/assets/logo.png": "/assets/logo.abc12345.webp" }`
 
-### css-injector 使用场景
+**SSR scenario**: When `server` is also configured, `pathUpdateDirs`
+automatically includes server output directory, ensuring resource paths in
+server bundle are also updated. SSR frameworks (e.g. dweb) can replace paths
+with manifest before outputting HTML.
 
-`css-injector` 适用于 **extract 模式**：将 CSS 提取为独立文件，再手动将 `<link>` 路径注入 HTML。
+### css-injector Use Case
+
+`css-injector` is for **extract mode**: Extract CSS to separate files, then
+manually inject `<link>` paths into HTML.
 
 ```typescript
 import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
-// 构建后得到 CSS 文件路径列表（如 createCSSImportHandlerPlugin extract 模式）
+// Get CSS file path list after build (e.g. createCSSImportHandlerPlugin extract mode)
 const cssFiles = ["dist/main.css", "dist/chunk-1.css"];
 
 const html = `<!DOCTYPE html><html><head></head><body></body></html>`;
@@ -846,140 +900,164 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 });
 ```
 
-**导出函数**：`generateCSSTag`、`generateCSSTags`、`injectCSSIntoHTML`、`injectCSSFromDependencies`、`getCSSRelativePath`。
+**Exported functions**: `generateCSSTag`, `generateCSSTags`,
+`injectCSSIntoHTML`, `injectCSSFromDependencies`, `getCSSRelativePath`.
 
-**注意**：dweb 框架使用内联模式（`extract: false`），CSS 直接 `<style>` 注入，无需 css-injector。
-
----
-
-## ⚙️ 编译方式
-
-本库根据运行时环境自动选择最优的编译方式：
-
-| 构建器 | Deno 环境 | Bun 环境 |
-|--------|-----------|----------|
-| **BuilderClient** | esbuild + Deno 解析器插件 | esbuild + Bun 解析器插件 |
-| **BuilderServer** | esbuild + Deno 解析器插件 | esbuild + Bun 解析器插件 |
-| **BuilderServer** (useNativeCompile) | `deno compile` 原生编译 | `bun build --compile` 原生编译 |
-| **BuilderBundle** | esbuild + Deno 解析器插件 | `bun build` 原生打包 |
-
-### Deno 解析器插件
-
-在 Deno 环境下，会自动启用 Deno 解析器插件（`denoResolverPlugin`），用于：
-
-- 解析 `deno.json` 的 `imports` 配置（路径别名）
-- 支持 JSR 包的导入（`jsr:` 协议）
-- 支持 npm 包的导入（`npm:` 协议）
-- 支持相对路径解析（`./`, `../`）
-- 支持 JSR 包的子路径导出（如 `@dreamer/logger/client`）
-
-### Bun 解析器插件
-
-在 Bun 环境下，会自动启用 Bun 解析器插件（`bunResolverPlugin`），用于：
-
-- 解析 `package.json` 的 `imports` 配置（路径别名）
-- 解析 `tsconfig.json` 的 `paths` 配置（路径别名）
-- 支持 npm 包的导入（`npm:` 协议）
-- 支持 JSR 包的导入（`jsr:` 协议，Bun 原生支持）
-- 支持相对路径解析（`./`, `../`）
-- **不读取** `deno.json` 配置（Bun 环境专用）
-
-### Bun 原生打包
-
-`BuilderBundle` 在 Bun 环境下使用 `bun build` 原生命令进行打包，具有更快的编译速度。`BuilderClient` 和 `BuilderServer` 统一使用 esbuild + 解析器插件以保证跨平台一致性和功能完整性。
-
-### 原生编译器（生成可执行文件）
-
-当启用 `useNativeCompile` 选项时，`BuilderServer` 会使用平台原生编译器生成独立可执行文件：
-
-| 运行时 | 编译命令 | 输出 |
-|--------|----------|------|
-| **Deno** | `deno compile --allow-all --output <output> <entry>` | 独立可执行文件 |
-| **Bun** | `bun build --compile --outfile <output> <entry>` | 独立可执行文件 |
-
-**注意事项**：
-- 原生编译会将所有依赖打包进可执行文件
-- Deno 的 `deno compile` 不支持 `external` 选项，会输出警告
-- Bun 的 `bun build --compile` 支持 `--external` 选项排除依赖
+**Note**: dweb framework uses inline mode (`extract: false`), CSS directly
+injected as `<style>`, no need for css-injector.
 
 ---
 
-## 📊 测试报告
+## ⚙️ Compilation Methods
 
-本库经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+This library automatically selects the optimal compilation method based on
+runtime environment:
 
-**测试统计**：
-- **测试总数**: 518
-- **通过**: 全部通过 ✅
-- **失败**: 0
-- **通过率**: 100% ✅
-- **测试执行时间**: 约 30 秒（`deno test -A`）
-- **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理
-- **测试环境**: Deno 2.x, Bun 1.3.5
+| Builder                              | Deno Environment                  | Bun Environment                          |
+| ------------------------------------ | --------------------------------- | ---------------------------------------- |
+| **BuilderClient**                    | esbuild + Deno resolver plugin    | esbuild + Bun resolver plugin            |
+| **BuilderServer**                    | esbuild + Deno resolver plugin    | esbuild + Bun resolver plugin            |
+| **BuilderServer** (useNativeCompile) | `deno compile` native compilation | `bun build --compile` native compilation |
+| **BuilderBundle**                    | esbuild + Deno resolver plugin    | `bun build` native bundling              |
 
-**测试类型**：
-- ✅ 单元测试（约 440 个）
-- ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 48 个）
+### Deno Resolver Plugin
 
-**测试亮点**：
-- ✅ 子路径导出测试（entry-builder、entry-client、entry-server、entry-bundle、css-injector）
-- ✅ AssetsProcessor 高级功能（asset-manifest、quality、pathUpdateDirs）
-- ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
-- ✅ 集成测试验证了端到端的完整流程
-- ✅ 内存模式（write: false）功能完整测试
-- ✅ BuilderBundle 简单打包器完整测试（28 个）
-  - ESM 和 IIFE 格式测试
-  - 全局变量设置测试（window/global/globalThis）
-  - 平台特定行为测试（browser/node/neutral）
-- ✅ 路径解析功能测试（Deno 和 Bun 环境）
-  - 解析器插件测试（18 个）+ 解析器高级测试（11 个）
-  - 服务端构建器路径解析测试（5 个）
-  - 客户端构建器路径解析测试（6 个）
-  - 客户端构建路径解析测试（6 个）
-- ✅ 服务端构建器高级功能测试（19 个）
-  - 外部依赖配置（external）测试
-  - 原生编译器（useNativeCompile）测试
-  - 多平台编译测试（Linux、macOS、Windows）
+In Deno environment, Deno resolver plugin (`denoResolverPlugin`) is
+automatically enabled for:
 
-查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
+- Resolving `deno.json` `imports` config (path aliases)
+- Supporting JSR package imports (`jsr:` protocol)
+- Supporting npm package imports (`npm:` protocol)
+- Supporting relative path resolution (`./`, `../`)
+- Supporting JSR package subpath exports (e.g. `@dreamer/logger/client`)
 
----
+### Bun Resolver Plugin
 
-## 📝 注意事项
+In Bun environment, Bun resolver plugin (`bunResolverPlugin`) is automatically
+enabled for:
 
-- **依赖要求**：需要安装 `npm:esbuild`、`@dreamer/runtime-adapter`；图片处理需 `@dreamer/image`
-- **运行环境**：构建工具仅在服务端运行，不能在浏览器中使用
-- **内存模式**：使用 `write: false` 时，内存模式不支持代码分割（splitting）
-- **平台编译**：服务端多平台编译需要对应平台的编译工具链
-- **缓存管理**：生产环境建议启用构建缓存以提升性能
-- **路径解析**：
-  - Deno 环境：需要 `deno.json` 配置 `imports` 字段来使用路径别名
-  - Bun 环境：可以使用 `package.json` 的 `imports` 或 `tsconfig.json` 的 `paths` 来配置路径别名
-  - Bun 环境不会读取 `deno.json` 配置
+- Resolving `package.json` `imports` config (path aliases)
+- Resolving `tsconfig.json` `paths` config (path aliases)
+- Supporting npm package imports (`npm:` protocol)
+- Supporting JSR package imports (`jsr:` protocol, Bun native support)
+- Supporting relative path resolution (`./`, `../`)
+- **Does not read** `deno.json` config (Bun environment only)
 
----
+### Bun Native Bundling
 
-## 📦 依赖
+`BuilderBundle` uses `bun build` native command for bundling in Bun environment,
+with faster compilation speed. `BuilderClient` and `BuilderServer` uniformly use
+esbuild + resolver plugin to ensure cross-platform consistency and feature
+completeness.
 
-| 依赖 | 用途 |
-|------|------|
-| `npm:esbuild` | 核心打包引擎 |
-| `@dreamer/runtime-adapter` | 跨运行时 API（Deno/Bun） |
-| `@dreamer/image` | 图片压缩、格式转换（仅当配置 `assets.images` 时） |
-| `postcss`、`autoprefixer`、`cssnano` | CSS 优化（仅当配置 CSS 处理时） |
+### Native Compiler (Generate Executable)
+
+When `useNativeCompile` option is enabled, `BuilderServer` uses platform native
+compiler to generate standalone executable:
+
+| Runtime  | Compile Command                                      | Output                |
+| -------- | ---------------------------------------------------- | --------------------- |
+| **Deno** | `deno compile --allow-all --output <output> <entry>` | Standalone executable |
+| **Bun**  | `bun build --compile --outfile <output> <entry>`     | Standalone executable |
+
+**Notes**:
+
+- Native compilation bundles all dependencies into executable
+- Deno's `deno compile` does not support `external` option, will output warning
+- Bun's `bun build --compile` supports `--external` option to exclude
+  dependencies
 
 ---
 
-## 🤝 贡献
+## 📊 Test Report
 
-欢迎提交 Issue 和 Pull Request！
+This library has been thoroughly tested, all test cases passed, with 100% test
+coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
+
+**Test statistics**:
+
+- **Total tests**: 518
+- **Passed**: All passed ✅
+- **Failed**: 0
+- **Pass rate**: 100% ✅
+- **Test execution time**: ~30 seconds (`deno test -A`)
+- **Test coverage**: All public APIs, subpath exports, edge cases, error
+  handling
+- **Test environment**: Deno 2.x, Bun 1.3.5
+
+**Test types**:
+
+- ✅ Unit tests (~440)
+- ✅ Integration tests (~30)
+- ✅ Edge case and error handling tests (~48)
+
+**Test highlights**:
+
+- ✅ Subpath export tests (entry-builder, entry-client, entry-server,
+  entry-bundle, css-injector)
+- ✅ AssetsProcessor advanced features (asset-manifest, quality, pathUpdateDirs)
+- ✅ Complete test coverage for all features, edge cases, error handling
+- ✅ Integration tests verify end-to-end full flow
+- ✅ Memory mode (write: false) complete feature tests
+- ✅ BuilderBundle simple bundler complete tests (28)
+  - ESM and IIFE format tests
+  - Global variable setting tests (window/global/globalThis)
+  - Platform-specific behavior tests (browser/node/neutral)
+- ✅ Path resolution feature tests (Deno and Bun environments)
+  - Resolver plugin tests (18) + resolver advanced tests (11)
+  - Server builder path resolution tests (5)
+  - Client builder path resolution tests (6)
+  - Client build path resolution tests (6)
+- ✅ Server builder advanced feature tests (19)
+  - External dependency config (external) tests
+  - Native compiler (useNativeCompile) tests
+  - Multi-platform compilation tests (Linux, macOS, Windows)
+
+View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ---
 
-## 📄 许可证
+## 📝 Notes
 
-MIT License - 详见 [LICENSE.md](./LICENSE.md)
+- **Dependency requirements**: Requires `npm:esbuild`,
+  `@dreamer/runtime-adapter`; image processing requires `@dreamer/image`
+- **Runtime environment**: Build tool runs on server only, cannot be used in
+  browser
+- **Memory mode**: When using `write: false`, memory mode does not support code
+  splitting (splitting)
+- **Platform compilation**: Server multi-platform compilation requires
+  corresponding platform's compilation toolchain
+- **Cache management**: Production environment recommends enabling build cache
+  for better performance
+- **Path resolution**:
+  - Deno environment: Need `deno.json` to configure `imports` field for path
+    aliases
+  - Bun environment: Can use `package.json` `imports` or `tsconfig.json` `paths`
+    for path aliases
+  - Bun environment does not read `deno.json` config
+
+---
+
+## 📦 Dependencies
+
+| Dependency                           | Purpose                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| `npm:esbuild`                        | Core bundling engine                                                        |
+| `@dreamer/runtime-adapter`           | Cross-runtime API (Deno/Bun)                                                |
+| `@dreamer/image`                     | Image compression, format conversion (only when `assets.images` configured) |
+| `postcss`, `autoprefixer`, `cssnano` | CSS optimization (only when CSS processing configured)                      |
+
+---
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome!
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE.md](./LICENSE.md)
 
 ---
 

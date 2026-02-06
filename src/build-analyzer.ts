@@ -80,7 +80,11 @@ export class BuildAnalyzer {
     this.t = t;
   }
 
-  private tr(key: string, fallback: string, params?: Record<string, string | number | boolean>): string {
+  private tr(
+    key: string,
+    fallback: string,
+    params?: Record<string, string | number | boolean>,
+  ): string {
     const r = this.t?.(key, params);
     return (r != null && r !== key) ? r : fallback;
   }
@@ -221,10 +225,18 @@ export class BuildAnalyzer {
   generateReport(result: AnalysisResult): string {
     const lines: string[] = [];
 
-    lines.push(`=== ${this.tr("log.esbuild.analyzer.reportTitle", "构建产物分析报告")} ===\n`);
+    lines.push(
+      `=== ${
+        this.tr("log.esbuild.analyzer.reportTitle", "构建产物分析报告")
+      } ===\n`,
+    );
 
     // 总文件大小
-    lines.push(`${this.tr("log.esbuild.analyzer.totalSize", "总文件大小")}: ${this.formatSize(result.totalSize)}\n`);
+    lines.push(
+      `${this.tr("log.esbuild.analyzer.totalSize", "总文件大小")}: ${
+        this.formatSize(result.totalSize)
+      }\n`,
+    );
 
     // 文件列表
     lines.push(this.tr("log.esbuild.analyzer.fileList", "文件列表") + ":");
@@ -236,17 +248,27 @@ export class BuildAnalyzer {
 
     // 重复代码
     if (result.duplicates.length > 0) {
-      lines.push(`\n${this.tr("log.esbuild.analyzer.duplicates", "重复代码检测")}:`);
+      lines.push(
+        `\n${this.tr("log.esbuild.analyzer.duplicates", "重复代码检测")}:`,
+      );
       for (const dup of result.duplicates) {
         lines.push(
-          `  ${dup.code} ${this.tr("log.esbuild.analyzer.dupInFiles", `出现在 ${dup.count} 个文件中`, { count: String(dup.count) })}: ${dup.files.join(", ")}`,
+          `  ${dup.code} ${
+            this.tr(
+              "log.esbuild.analyzer.dupInFiles",
+              `出现在 ${dup.count} 个文件中`,
+              { count: String(dup.count) },
+            )
+          }: ${dup.files.join(", ")}`,
         );
       }
     }
 
     // 未使用的代码
     if (result.unused.length > 0) {
-      lines.push(`\n${this.tr("log.esbuild.analyzer.unused", "未使用的代码")}:`);
+      lines.push(
+        `\n${this.tr("log.esbuild.analyzer.unused", "未使用的代码")}:`,
+      );
       for (const unused of result.unused) {
         lines.push(`  ${unused}`);
       }
@@ -287,9 +309,19 @@ export class BuildAnalyzer {
     if (largeFiles.length > 0) {
       suggestions.push({
         type: "warning",
-        title: this.tr("log.esbuild.analyzer.largeFilesTitle", "检测到过大的文件"),
-        description: this.tr("log.esbuild.analyzer.largeFilesDesc", "有 {count} 个文件超过 5MB，可能影响加载性能", { count: String(largeFiles.length) }),
-        fix: this.tr("log.esbuild.analyzer.largeFilesFix", "考虑进行代码分割，将大文件拆分为多个较小的 chunk"),
+        title: this.tr(
+          "log.esbuild.analyzer.largeFilesTitle",
+          "检测到过大的文件",
+        ),
+        description: this.tr(
+          "log.esbuild.analyzer.largeFilesDesc",
+          "有 {count} 个文件超过 5MB，可能影响加载性能",
+          { count: String(largeFiles.length) },
+        ),
+        fix: this.tr(
+          "log.esbuild.analyzer.largeFilesFix",
+          "考虑进行代码分割，将大文件拆分为多个较小的 chunk",
+        ),
         files: largeFiles.map((f) => f.path),
       });
     }
@@ -303,8 +335,18 @@ export class BuildAnalyzer {
       suggestions.push({
         type: "info",
         title: this.tr("log.esbuild.analyzer.dupCodeTitle", "检测到重复代码"),
-        description: this.tr("log.esbuild.analyzer.dupCodeDesc", "发现 {places} 处重复代码，共重复 {count} 次", { places: String(analysis.duplicates.length), count: String(duplicateCount) }),
-        fix: this.tr("log.esbuild.analyzer.dupCodeFix", "考虑提取公共代码到共享模块，减少重复打包"),
+        description: this.tr(
+          "log.esbuild.analyzer.dupCodeDesc",
+          "发现 {places} 处重复代码，共重复 {count} 次",
+          {
+            places: String(analysis.duplicates.length),
+            count: String(duplicateCount),
+          },
+        ),
+        fix: this.tr(
+          "log.esbuild.analyzer.dupCodeFix",
+          "考虑提取公共代码到共享模块，减少重复打包",
+        ),
         files: analysis.duplicates.flatMap((dup) => dup.files),
       });
     }
@@ -313,9 +355,19 @@ export class BuildAnalyzer {
     if (analysis.unused.length > 0) {
       suggestions.push({
         type: "info",
-        title: this.tr("log.esbuild.analyzer.unusedTitle", "检测到未使用的代码"),
-        description: this.tr("log.esbuild.analyzer.unusedDesc", "发现 {count} 个文件未被使用", { count: String(analysis.unused.length) }),
-        fix: this.tr("log.esbuild.analyzer.unusedFix", "考虑移除未使用的文件，减少构建产物大小"),
+        title: this.tr(
+          "log.esbuild.analyzer.unusedTitle",
+          "检测到未使用的代码",
+        ),
+        description: this.tr(
+          "log.esbuild.analyzer.unusedDesc",
+          "发现 {count} 个文件未被使用",
+          { count: String(analysis.unused.length) },
+        ),
+        fix: this.tr(
+          "log.esbuild.analyzer.unusedFix",
+          "考虑移除未使用的文件，减少构建产物大小",
+        ),
         files: analysis.unused,
       });
     }
@@ -327,9 +379,22 @@ export class BuildAnalyzer {
       if (buildTime > totalTime * 0.7) {
         suggestions.push({
           type: "warning",
-          title: this.tr("log.esbuild.analyzer.buildSlowTitle", "构建阶段耗时过长"),
-          description: this.tr("log.esbuild.analyzer.buildSlowDesc", "构建阶段耗时 {time}s，占总时间的 {pct}%", { time: (buildTime / 1000).toFixed(2), pct: ((buildTime / totalTime) * 100).toFixed(1) }),
-          fix: this.tr("log.esbuild.analyzer.buildSlowFix", "考虑启用缓存、优化依赖或使用增量构建"),
+          title: this.tr(
+            "log.esbuild.analyzer.buildSlowTitle",
+            "构建阶段耗时过长",
+          ),
+          description: this.tr(
+            "log.esbuild.analyzer.buildSlowDesc",
+            "构建阶段耗时 {time}s，占总时间的 {pct}%",
+            {
+              time: (buildTime / 1000).toFixed(2),
+              pct: ((buildTime / totalTime) * 100).toFixed(1),
+            },
+          ),
+          fix: this.tr(
+            "log.esbuild.analyzer.buildSlowFix",
+            "考虑启用缓存、优化依赖或使用增量构建",
+          ),
         });
       }
 
@@ -338,8 +403,15 @@ export class BuildAnalyzer {
         suggestions.push({
           type: "warning",
           title: this.tr("log.esbuild.analyzer.totalSlowTitle", "构建耗时较长"),
-          description: this.tr("log.esbuild.analyzer.totalSlowDesc", "总构建时间 {time}s，超过 10 秒", { time: (totalTime / 1000).toFixed(2) }),
-          fix: this.tr("log.esbuild.analyzer.totalSlowFix", "检查是否启用了缓存，考虑并行构建或优化构建配置"),
+          description: this.tr(
+            "log.esbuild.analyzer.totalSlowDesc",
+            "总构建时间 {time}s，超过 10 秒",
+            { time: (totalTime / 1000).toFixed(2) },
+          ),
+          fix: this.tr(
+            "log.esbuild.analyzer.totalSlowFix",
+            "检查是否启用了缓存，考虑并行构建或优化构建配置",
+          ),
         });
       }
     }
@@ -348,9 +420,19 @@ export class BuildAnalyzer {
     if (analysis.files.length > 50) {
       suggestions.push({
         type: "info",
-        title: this.tr("log.esbuild.analyzer.manyFilesTitle", "输出文件数量较多"),
-        description: this.tr("log.esbuild.analyzer.manyFilesDesc", "构建产物包含 {count} 个文件，可能影响加载性能", { count: String(analysis.files.length) }),
-        fix: this.tr("log.esbuild.analyzer.manyFilesFix", "考虑合并小文件或调整代码分割策略"),
+        title: this.tr(
+          "log.esbuild.analyzer.manyFilesTitle",
+          "输出文件数量较多",
+        ),
+        description: this.tr(
+          "log.esbuild.analyzer.manyFilesDesc",
+          "构建产物包含 {count} 个文件，可能影响加载性能",
+          { count: String(analysis.files.length) },
+        ),
+        fix: this.tr(
+          "log.esbuild.analyzer.manyFilesFix",
+          "考虑合并小文件或调整代码分割策略",
+        ),
       });
     }
 
@@ -359,9 +441,19 @@ export class BuildAnalyzer {
     if (totalSizeMB > 10) {
       suggestions.push({
         type: "warning",
-        title: this.tr("log.esbuild.analyzer.totalSizeTitle", "构建产物总大小较大"),
-        description: this.tr("log.esbuild.analyzer.totalSizeDesc", "总大小 {size}MB，可能影响加载性能", { size: totalSizeMB.toFixed(2) }),
-        fix: this.tr("log.esbuild.analyzer.totalSizeFix", "考虑启用压缩、代码分割或移除未使用的代码"),
+        title: this.tr(
+          "log.esbuild.analyzer.totalSizeTitle",
+          "构建产物总大小较大",
+        ),
+        description: this.tr(
+          "log.esbuild.analyzer.totalSizeDesc",
+          "总大小 {size}MB，可能影响加载性能",
+          { size: totalSizeMB.toFixed(2) },
+        ),
+        fix: this.tr(
+          "log.esbuild.analyzer.totalSizeFix",
+          "考虑启用压缩、代码分割或移除未使用的代码",
+        ),
       });
     }
 
@@ -803,7 +895,10 @@ export class BuildAnalyzer {
   private getStageName(stage: string): string {
     const stageMap: Record<string, string> = {
       clean: this.tr("log.esbuild.builder.stageNameClean", "清理"),
-      cacheCheck: this.tr("log.esbuild.builder.stageNameCacheCheck", "缓存检查"),
+      cacheCheck: this.tr(
+        "log.esbuild.builder.stageNameCacheCheck",
+        "缓存检查",
+      ),
       build: this.tr("log.esbuild.builder.stageNameBuild", "构建"),
       assets: this.tr("log.esbuild.builder.stageNameAssets", "资源处理"),
       html: this.tr("log.esbuild.builder.stageNameHtml", "HTML 生成"),
