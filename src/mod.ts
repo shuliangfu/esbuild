@@ -36,14 +36,7 @@ export { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 export type { ResolverOptions as DenoResolverOptions } from "./plugins/resolver-deno.ts";
 export { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 export type { ServerModuleDetectorOptions } from "./plugins/server-module-detector.ts";
-export {
-  generateCSSTag,
-  generateCSSTags,
-  getCSSRelativePath,
-  injectCSSFromDependencies,
-  injectCSSIntoHTML,
-} from "./utils/css-injector.ts";
-export type { CSSFileInfo, CSSInjectOptions } from "./utils/css-injector.ts";
+// css-injector 拆至子路径，按需导入：import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector"
 
 export type {
   BuilderConfig,

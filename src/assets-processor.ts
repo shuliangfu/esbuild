@@ -9,6 +9,7 @@
 import { compress, convert } from "@dreamer/image";
 import {
   copyFile,
+  cwd,
   join,
   mkdir,
   readdir,
@@ -38,37 +39,64 @@ export class AssetsProcessor {
    */
   private assetPathMap = new Map<string, string>();
 
-  constructor(config: AssetsConfig, outputDir: string) {
+  /**
+   * 额外需要更新路径的目录（如服务端 bundle，SSR 渲染的 HTML 来自服务端）
+   */
+  private pathUpdateDirs: string[] = [];
+
+  constructor(
+    config: AssetsConfig,
+    outputDir: string,
+    /** 额外扫描并更新路径的目录（如 server output，用于 SSR 场景） */
+    pathUpdateDirs?: string[],
+  ) {
     this.config = config;
     this.outputDir = outputDir;
+    this.pathUpdateDirs = pathUpdateDirs ?? [];
   }
 
   /**
    * 处理所有资源
    *
-   * 优化：并行处理不同类型的资源（静态资源、图片、字体），减少总处理时间
+   * 流程：先复制静态资源到输出目录，再对图片做压缩/hash 处理，最后更新引用路径。
+   * 注意：processImages 依赖 copyStaticAssets 的输出，必须串行执行。
    */
   async processAssets(): Promise<void> {
-    const tasks: Promise<void>[] = [];
-
-    // 1. 复制静态资源（如果配置了）
+    // 1. 先复制静态资源到 outputDir/assets（图片等依赖此步骤才能被后续处理）
     if (this.config.publicDir) {
-      tasks.push(this.copyStaticAssets());
+      await this.copyStaticAssets();
     }
 
-    // 2. 处理图片（如果配置了）
+    // 2. 并行处理图片和字体（图片在复制后的目录中做压缩、格式转换、hash）
+    const tasks: Promise<void>[] = [];
     if (this.config.images) {
       tasks.push(this.processImages());
     }
-
-    // 3. 处理字体文件
     tasks.push(this.processFonts());
-
-    // 并行执行所有资源处理任务
     await Promise.all(tasks);
 
-    // 4. 更新资源路径（必须在所有资源处理完成后执行）
+    // 3. 更新 HTML/CSS/JS 中的资源引用路径（替换为带 hash 的新路径）
     await this.updateAssetPaths();
+
+    // 4. 生成 asset-manifest.json，供 SSR 在渲染 HTML 时替换资源路径（Hybrid 模式首屏来自服务端）
+    if (this.assetPathMap.size > 0) {
+      await this.writeAssetManifest();
+    }
+  }
+
+  /**
+   * 写入 asset-manifest.json
+   *
+   * 供 SSR 在渲染 HTML 时替换资源路径。Hybrid 模式下服务端从源码加载路由，
+   * 源码中的路径未经过构建替换，需在 HTML 输出前用此 manifest 做运行时替换。
+   */
+  private async writeAssetManifest(): Promise<void> {
+    const manifest: Record<string, string> = {};
+    for (const [oldRel, newRel] of this.assetPathMap) {
+      manifest[`/${oldRel}`] = `/${newRel}`;
+    }
+    const manifestPath = join(this.outputDir, "asset-manifest.json");
+    await writeTextFile(manifestPath, JSON.stringify(manifest, null, 0));
   }
 
   /**
@@ -94,20 +122,46 @@ export class AssetsProcessor {
     // 创建目标目录
     await mkdir(targetDir, { recursive: true });
 
-    // 递归复制文件
-    await this.copyDirectory(publicDir, targetDir);
+    // 递归复制文件（排除会被其他插件编译的源文件）
+    await this.copyDirectory(publicDir, targetDir, "");
+  }
+
+  /**
+   * 检查路径是否在排除列表中
+   * @param relativePath 相对于 publicDir 的路径，如 "tailwind.css" 或 "images/0.png"
+   */
+  private isExcluded(relativePath: string): boolean {
+    const exclude = this.config.exclude;
+    if (!exclude || exclude.length === 0) return false;
+    const normalized = relativePath.replace(/\\/g, "/");
+    return exclude.some((pattern) => {
+      const p = pattern.replace(/\\/g, "/");
+      return normalized === p || normalized.endsWith("/" + p);
+    });
   }
 
   /**
    * 递归复制目录
+   * @param sourceDir 源目录
+   * @param targetDir 目标目录
+   * @param relativeFromPublic 当前源目录相对于 publicDir 的路径（用于 exclude 匹配）
    */
   private async copyDirectory(
     sourceDir: string,
     targetDir: string,
+    relativeFromPublic: string,
   ): Promise<void> {
     const entries = await readdir(sourceDir);
 
     for (const entry of entries) {
+      const relPath = relativeFromPublic
+        ? `${relativeFromPublic}/${entry.name}`
+        : entry.name;
+
+      if (this.isExcluded(relPath)) {
+        continue;
+      }
+
       const sourcePath = join(sourceDir, entry.name);
       const targetPath = join(targetDir, entry.name);
 
@@ -115,7 +169,7 @@ export class AssetsProcessor {
       if (entryStat.isDirectory) {
         // 递归复制子目录
         await mkdir(targetPath, { recursive: true });
-        await this.copyDirectory(sourcePath, targetPath);
+        await this.copyDirectory(sourcePath, targetPath, relPath);
       } else {
         // 复制文件
         await copyFile(sourcePath, targetPath);
@@ -160,6 +214,7 @@ export class AssetsProcessor {
       compress?: boolean;
       format?: "webp" | "avif" | "original";
       hash?: boolean;
+      quality?: number;
     },
   ): Promise<void> {
     const entries = await readdir(dir);
@@ -195,7 +250,8 @@ export class AssetsProcessor {
   /**
    * 处理单个图片文件
    *
-   * 支持格式转换、压缩、content hash 化（用于缓存失效）
+   * 支持格式转换、压缩、content hash 化（用于缓存失效）。
+   * 格式转换或压缩失败时，回退到原图并仍执行 hash，确保页面链接能被更新。
    */
   private async processImageFile(
     filePath: string,
@@ -203,51 +259,55 @@ export class AssetsProcessor {
       compress?: boolean;
       format?: "webp" | "avif" | "original";
       hash?: boolean;
+      quality?: number;
     },
   ): Promise<void> {
+    let imageData: Uint8Array;
     try {
-      // 读取原始图片数据
-      const imageData = await readFile(filePath);
+      imageData = await readFile(filePath);
+    } catch (error) {
+      logger.warn("读取图片失败", {
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
 
-      let processedData = imageData;
-      let outputPath = filePath;
+    let processedData = imageData;
+    let outputPath = filePath;
 
-      // 格式转换
-      if (config.format && config.format !== "original") {
+    // 格式转换（失败时保持原格式，仍继续 hash）
+    if (config.format && config.format !== "original") {
+      try {
         const formatMap: Record<string, "jpeg" | "png" | "webp" | "avif"> = {
           webp: "webp",
           avif: "avif",
         };
-
         const targetFormat = formatMap[config.format];
         if (targetFormat) {
+          const quality = config.quality ?? (config.compress ? 80 : 100);
           processedData = await convert(processedData, {
             format: targetFormat,
-            quality: config.compress ? 80 : 100, // 如果同时压缩，使用较低质量
+            quality,
           });
-
-          // 更新输出路径（更改文件扩展名）
           const ext = targetFormat === "jpeg" ? "jpg" : targetFormat;
           outputPath = filePath.replace(/\.[^.]+$/, `.${ext}`);
         }
+      } catch (error) {
+        logger.warn("图片格式转换失败，保持原格式并继续 hash", {
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
 
-      // 图片压缩
-      if (config.compress) {
-        // 如果已经进行了格式转换，使用转换后的数据
-        // 否则使用原始数据
-        const dataToCompress = processedData;
-
-        // 根据文件格式确定压缩质量
+    // 图片压缩（失败时保持当前数据，仍继续 hash）
+    if (config.compress) {
+      try {
         const ext = outputPath.split(".").pop()?.toLowerCase();
-        let quality = 80; // 默认质量
-
-        // PNG 和 GIF 使用无损压缩（quality = 100）
-        if (ext === "png" || ext === "gif") {
-          quality = 100;
-        }
-
-        processedData = await compress(dataToCompress, {
+        const quality = config.quality ??
+          (ext === "png" || ext === "gif" ? 100 : 80);
+        processedData = await compress(processedData, {
           quality,
           format: ext as
             | "jpeg"
@@ -259,30 +319,36 @@ export class AssetsProcessor {
             | "avif"
             | undefined,
         });
+      } catch (error) {
+        logger.warn("图片压缩失败，保持原样并继续 hash", {
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
 
-      // content hash 化（默认开启，用于缓存失效）
-      const useHash = config.hash !== false;
-      if (useHash) {
+    // content hash 化（格式/压缩失败时仍执行，确保页面链接能更新）
+    const useHash = config.hash !== false;
+    if (useHash) {
+      try {
         const contentHash = await this.computeContentHash(processedData);
         const dir = filePath.substring(0, filePath.lastIndexOf("/") + 1);
         const basename = outputPath.split("/").pop() ?? "";
-        const ext = basename.includes(".") ? basename.split(".").pop() ?? "" : "";
+        const ext = basename.includes(".")
+          ? basename.split(".").pop() ?? ""
+          : "";
         const nameWithoutExt = basename.slice(0, -(ext.length + 1));
         const hashedBasename = `${nameWithoutExt}.${contentHash}.${ext}`;
         outputPath = join(dir, hashedBasename);
 
-        // 记录路径映射，用于更新 HTML/CSS/JS 中的引用
         const oldRelPath = relative(this.outputDir, filePath);
         const newRelPath = relative(this.outputDir, outputPath);
         this.assetPathMap.set(oldRelPath, newRelPath);
-      }
 
-      // 如果数据有变化或路径变化，写回文件
-      if (processedData !== imageData || outputPath !== filePath) {
         await writeFile(outputPath, processedData);
-
-        // 如果输出路径不同，删除原文件
+        // 输出处理后的图片路径（与 builder 产物列表格式一致）
+        const displayPath = relative(cwd(), outputPath);
+        logger.info(`./${displayPath}`);
         if (outputPath !== filePath) {
           try {
             await remove(filePath);
@@ -290,13 +356,24 @@ export class AssetsProcessor {
             // 忽略删除错误
           }
         }
+      } catch (error) {
+        logger.warn("图片 hash 化失败", {
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-    } catch (error) {
-      // 图片处理失败，记录警告但不中断构建
-      logger.warn("图片处理失败", {
-        filePath,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } else if (processedData !== imageData || outputPath !== filePath) {
+      await writeFile(outputPath, processedData);
+      // 输出处理后的图片路径（无 hash 时，压缩/转换后仍输出）
+      const displayPath = relative(cwd(), outputPath);
+      logger.info(`./${displayPath}`);
+      if (outputPath !== filePath) {
+        try {
+          await remove(filePath);
+        } catch {
+          // 忽略删除错误
+        }
+      }
     }
   }
 
@@ -327,11 +404,18 @@ export class AssetsProcessor {
   /**
    * 更新资源路径
    *
-   * 更新 HTML、CSS、JS 文件中的资源路径引用
+   * 更新 HTML、CSS、JS 文件中的资源路径引用（含 client 与 server output，SSR 需更新服务端 bundle）
    */
   private async updateAssetPaths(): Promise<void> {
-    // 扫描输出目录中的 HTML、CSS、JS 文件
-    await this.updatePathsInDirectory(this.outputDir);
+    const dirsToUpdate = [this.outputDir, ...this.pathUpdateDirs];
+    for (const dir of dirsToUpdate) {
+      try {
+        await stat(dir);
+        await this.updatePathsInDirectory(dir);
+      } catch {
+        // 目录不存在则跳过
+      }
+    }
   }
 
   /**
@@ -372,25 +456,31 @@ export class AssetsProcessor {
 
     /**
      * 将路径替换为带 hash 的新路径（若存在映射）
-     * @param path 原始引用路径（如 assets/logo.png）
+     * @param path 原始引用路径（如 assets/logo.png 或 /assets/images/0.png）
      * @returns 替换后的路径，若无需替换则返回原路径
      */
     const replaceWithHashedPath = (path: string): string => {
       if (
         path.startsWith("http://") ||
         path.startsWith("https://") ||
-        path.startsWith("data:") ||
-        path.startsWith("/")
+        path.startsWith("data:")
       ) {
         return path;
       }
-      // 解析为相对于 outputDir 的路径
+      // 处理绝对路径 /assets/images/0.png：去掉首斜杠后查映射
+      const isAbsolute = path.startsWith("/");
+      const pathWithoutSlash = isAbsolute ? path.slice(1) : path;
+      const newRelPath = this.assetPathMap.get(pathWithoutSlash);
+      if (newRelPath) {
+        return isAbsolute ? `/${newRelPath}` : newRelPath;
+      }
+      if (isAbsolute) return path;
+      // 相对路径：解析后查映射
       const resolvedPath = resolve(fileDir, path);
       const oldRelPath = relative(this.outputDir, resolvedPath);
-      const newRelPath = this.assetPathMap.get(oldRelPath);
-      if (newRelPath) {
-        // 计算从当前文件到新资源路径的相对路径
-        return relative(fileDir, resolve(this.outputDir, newRelPath));
+      const newPath = this.assetPathMap.get(oldRelPath);
+      if (newPath) {
+        return relative(fileDir, resolve(this.outputDir, newPath));
       }
       return this.resolveAssetPath(path, relativePath);
     };

@@ -273,6 +273,13 @@ export interface ImageOptions {
   format?: "webp" | "avif" | "original";
   /** 是否在文件名中添加 content hash（用于缓存失效，默认 true） */
   hash?: boolean;
+  /**
+   * 压缩质量（0-100）
+   * - 100：无损，文件较大
+   * - 80：默认有损，平衡质量与体积（JPEG/WebP/AVIF）
+   * - PNG/GIF 通常用 100 保持无损
+   */
+  quality?: number;
 }
 
 /**
@@ -287,6 +294,12 @@ export interface AssetsConfig {
   publicDir?: string;
   /** 资源输出目录 */
   assetsDir?: string;
+  /**
+   * 复制时排除的文件/目录（相对于 publicDir）
+   * 用于排除会被其他插件编译的源文件，如 tailwind.css、uno.css 等
+   * 支持 glob 或精确路径，如 ["tailwind.css", "uno.css", "index.css"]
+   */
+  exclude?: string[];
 }
 
 /**

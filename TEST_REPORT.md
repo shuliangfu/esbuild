@@ -2,10 +2,10 @@
 
 ## 测试概览
 
-- **测试库版本**: @dreamer/test@^1.0.0-beta.14
-- **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.17
+- **测试库版本**: @dreamer/test@^1.0.0-beta.40
+- **运行时适配器版本**: @dreamer/runtime-adapter@^1.0.0-beta.22
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-02-03
+- **测试时间**: 2026-02-06
 - **测试环境**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
@@ -15,11 +15,11 @@
 
 ### 总体统计
 
-- **测试总数**: 502
-- **通过**: 502 ✅
+- **测试总数**: 518
+- **通过**: 518 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~19 秒 (Deno 环境 `deno test -A`)
+- **测试执行时间**: ~30 秒 (Deno 环境 `deno test -A`)
 
 > **注意**: Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等），这些测试仅在 Deno 环境下运行。
 
@@ -27,7 +27,7 @@
 
 | 测试文件                            | 测试数 | 状态        | 说明                     |
 | ----------------------------------- | ------ | ----------- | ------------------------ |
-| `assets-processor-advanced.test.ts` | 8      | ✅ 全部通过 | 资源处理器高级功能测试   |
+| `assets-processor-advanced.test.ts` | 15     | ✅ 全部通过 | 资源处理器高级功能测试   |
 | `assets-processor.test.ts`          | 13     | ✅ 全部通过 | 资源处理器基础功能测试   |
 | `browser-compile-socket-io.test.ts` | 5      | ✅ 全部通过 | 浏览器编译 Socket.IO 等  |
 | `browser-resolver.test.ts`          | 4      | ✅ 全部通过 | 浏览器解析器相对路径等   |
@@ -46,7 +46,7 @@
 | `cache-manager-advanced.test.ts`    | 5      | ✅ 全部通过 | 缓存管理器高级功能测试   |
 | `cache-manager-cleanup.test.ts`     | 8      | ✅ 全部通过 | 缓存清理功能测试         |
 | `cache-manager.test.ts`             | 16     | ✅ 全部通过 | 缓存管理器基础功能测试   |
-| `cli.test.ts`                       | 10     | ✅ 全部通过 | CLI 工具测试             |
+| `entry-exports.test.ts`             | 19     | ✅ 全部通过 | 子路径导出测试           |
 | `builder-client-advanced.test.ts`   | 14     | ✅ 全部通过 | 客户端构建器高级功能测试 |
 | `builder-client-context.test.ts`    | 8      | ✅ 全部通过 | 客户端构建上下文测试     |
 | `builder-client.test.ts`            | 28     | ✅ 全部通过 | 客户端构建器功能测试     |
@@ -73,7 +73,7 @@
 
 ## 功能测试详情
 
-### 1. 资源处理器高级功能 (assets-processor-advanced.test.ts) - 8 个测试
+### 1. 资源处理器高级功能 (assets-processor-advanced.test.ts) - 15 个测试
 
 **测试场景**:
 
@@ -81,12 +81,19 @@
 - ✅ 应该处理图片压缩配置
 - ✅ 应该处理 AVIF 格式转换
 - ✅ 应该保持原始格式
+- ✅ 应该为图片添加 content hash 并更新引用
+- ✅ 应该对 HTML/CSS/JS 中的图片链接进行 hash 化替换
+- ✅ 应该支持 quality 参数配置
+- ✅ 应该在处理图片后生成 asset-manifest.json
+- ✅ 应该在 compress: true 时尝试压缩图片（失败时保持原样不中断）
+- ✅ 应该更新 pathUpdateDirs 指定目录下的资源引用（SSR 场景）
 - ✅ 应该更新 HTML 中的资源路径
 - ✅ 应该更新 CSS 中的资源路径
+- ✅ 应该排除 exclude 配置的文件
 - ✅ 应该复制多种类型的文件
 - ✅ 应该清理测试输出目录
 
-**测试结果**: 8 个测试全部通过
+**测试结果**: 15 个测试全部通过
 
 ### 2. 资源处理器 (assets-processor.test.ts) - 13 个测试
 
@@ -106,7 +113,23 @@
 
 **测试结果**: 13 个测试全部通过
 
-### 3. 构建分析器内部方法 (build-analyzer-internal.test.ts) - 9 个测试
+### 3. 子路径导出 (entry-exports.test.ts) - 19 个测试
+
+**测试场景**:
+
+- ✅ entry-builder：应该导出 Builder、AssetsProcessor、createBuilder
+- ✅ entry-builder：createBuilder 应该返回 Builder 实例
+- ✅ entry-client：应该导出 BuilderClient，支持 ClientBuildOptions
+- ✅ entry-client：应该能创建 BuilderClient 实例
+- ✅ entry-server：应该导出 BuilderServer，支持 ServerBuildOptions
+- ✅ entry-server：应该能创建 BuilderServer 实例
+- ✅ entry-bundle：应该导出 buildBundle、BuilderBundle
+- ✅ entry-bundle：应该支持 BundleOptions、BundleResult 类型
+- ✅ css-injector：应该导出 generateCSSTag、generateCSSTags、injectCSSIntoHTML、injectCSSFromDependencies、getCSSRelativePath
+
+**测试结果**: 19 个测试全部通过
+
+### 4. 构建分析器内部方法 (build-analyzer-internal.test.ts) - 9 个测试
 
 **测试场景**:
 
@@ -121,7 +144,7 @@
 
 **测试结果**: 9 个测试全部通过
 
-### 4. 构建分析器 (build-analyzer.test.ts) - 17 个测试
+### 5. 构建分析器 (build-analyzer.test.ts) - 17 个测试
 
 **测试场景**:
 
@@ -144,7 +167,7 @@
 
 **测试结果**: 17 个测试全部通过
 
-### 5. 构建产物验证 (builder-build-validation.test.ts) - 6 个测试
+### 6. 构建产物验证 (builder-build-validation.test.ts) - 6 个测试
 
 **测试场景**:
 
@@ -155,7 +178,7 @@
 
 **测试结果**: 6 个测试全部通过
 
-### 6. 简单打包器 (builder-bundle.test.ts) - 28 个测试
+### 7. 简单打包器 (builder-bundle.test.ts) - 28 个测试
 
 **测试场景**:
 
@@ -188,7 +211,7 @@
 
 **测试结果**: 28 个测试全部通过
 
-### 7. 构建配置验证 (builder-config-validation.test.ts) - 9 个测试
+### 8. 构建配置验证 (builder-config-validation.test.ts) - 9 个测试
 
 **测试场景**:
 
@@ -202,7 +225,7 @@
 
 **测试结果**: 9 个测试全部通过
 
-### 8. 构建错误处理 (builder-error-handling.test.ts) - 6 个测试
+### 9. 构建错误处理 (builder-error-handling.test.ts) - 6 个测试
 
 **测试场景**:
 
@@ -213,7 +236,7 @@
 
 **测试结果**: 6 个测试全部通过
 
-### 9. 构建器内部方法 (builder-internal-methods.test.ts) - 11 个测试
+### 10. 构建器内部方法 (builder-internal-methods.test.ts) - 11 个测试
 
 **测试场景**:
 
@@ -229,7 +252,7 @@
 
 **测试结果**: 11 个测试全部通过
 
-### 10. 多入口构建 (builder-multi-entry.test.ts) - 5 个测试
+### 11. 多入口构建 (builder-multi-entry.test.ts) - 5 个测试
 
 **测试场景**:
 
@@ -239,7 +262,7 @@
 
 **测试结果**: 5 个测试全部通过
 
-### 11. 构建性能监控 (builder-performance.test.ts) - 7 个测试
+### 12. 构建性能监控 (builder-performance.test.ts) - 7 个测试
 
 **测试场景**:
 
@@ -251,7 +274,7 @@
 
 **测试结果**: 7 个测试全部通过
 
-### 12. Watch 模式 (builder-watch.test.ts) - 9 个测试
+### 13. Watch 模式 (builder-watch.test.ts) - 9 个测试
 
 **测试场景**:
 
@@ -265,7 +288,7 @@
 
 **测试结果**: 9 个测试全部通过
 
-### 13. 构建器 (builder.test.ts) - 17 个测试
+### 14. 构建器 (builder.test.ts) - 17 个测试
 
 **测试场景**:
 
@@ -287,7 +310,7 @@
 
 **测试结果**: 17 个测试全部通过
 
-### 14. 缓存管理器高级功能 (cache-manager-advanced.test.ts) - 5 个测试
+### 15. 缓存管理器高级功能 (cache-manager-advanced.test.ts) - 5 个测试
 
 **测试场景**:
 
@@ -297,7 +320,7 @@
 
 **测试结果**: 5 个测试全部通过
 
-### 15. 缓存清理功能 (cache-manager-cleanup.test.ts) - 8 个测试
+### 16. 缓存清理功能 (cache-manager-cleanup.test.ts) - 8 个测试
 
 **测试场景**:
 
@@ -310,7 +333,7 @@
 
 **测试结果**: 8 个测试全部通过
 
-### 16. 缓存管理器 (cache-manager.test.ts) - 16 个测试
+### 17. 缓存管理器 (cache-manager.test.ts) - 16 个测试
 
 **测试场景**:
 
@@ -330,21 +353,6 @@
 - ✅ 应该在禁用缓存时返回 null
 
 **测试结果**: 16 个测试全部通过
-
-### 17. CLI 工具 (cli.test.ts) - 10 个测试
-
-**测试场景**:
-
-- ✅ 应该查找 esbuild.config.json
-- ✅ 应该查找 esbuild.config.ts
-- ✅ 应该查找 esbuild.json
-- ✅ 应该加载 JSON 配置文件
-- ✅ 应该处理无效的 JSON 配置文件
-- ✅ 应该支持构建模式选项
-- ✅ 应该支持缓存选项
-- ✅ 应该支持日志级别选项
-
-**测试结果**: 10 个测试全部通过
 
 ### 18. 客户端构建器高级功能 (builder-client-advanced.test.ts) - 14 个测试
 
@@ -898,16 +906,16 @@
 
 **测试总数**:
 
-- **502** 个测试（`deno test -A`，全部通过）
+- **518** 个测试（`deno test -A`，全部通过）
 - 执行时间: **约 15 秒**
 
 > 注：Bun 环境测试数量较少是因为部分测试使用 Deno 特有功能（如 `jsr:` 协议、`deno.json` 配置等）
 
 **测试类型**:
 
-- ✅ 单元测试（约 420 个）
+- ✅ 单元测试（约 440 个）
 - ✅ 集成测试（约 30 个）
-- ✅ 边界情况和错误处理测试（约 52 个）
+- ✅ 边界情况和错误处理测试（约 48 个）
 
 **测试执行环境**:
 
@@ -920,6 +928,7 @@
 
 **测试覆盖**:
 
+- ✅ 子路径导出测试（/builder、/client、/server、/bundle、/css-injector）
 - ✅ 解析器插件测试（Deno 和 Bun 环境）
 - ✅ 服务端构建器路径解析测试（Deno 和 Bun 环境）
 - ✅ 客户端构建器路径解析测试（Deno 和 Bun 环境）
