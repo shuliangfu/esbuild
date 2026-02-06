@@ -46,6 +46,8 @@ export interface ClientBuildOptions {
 export class BuilderClient {
   private config: ClientConfig;
   private buildContext?: esbuild.BuildContext;
+  /** 创建 context 时传入的 write 选项，rebuild 时用于判断是否返回 outputContents */
+  private contextWrite?: boolean;
   private pluginManager: PluginManager;
 
   constructor(config: ClientConfig) {
@@ -81,6 +83,18 @@ export class BuilderClient {
   }
 
   /**
+   * 获取翻译文本，无 t 或翻译缺失时返回 fallback（硬编码中文）
+   */
+  private tr(
+    key: string,
+    fallback: string,
+    params?: Record<string, string | number | boolean>,
+  ): string {
+    const r = this.config.t?.(key, params);
+    return (r != null && r !== key) ? r : fallback;
+  }
+
+  /**
    * 构建客户端代码
    *
    * @param options - 构建选项，可以是 BuildMode 字符串或 ClientBuildOptions 对象
@@ -112,7 +126,7 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error("客户端配置缺少入口文件 (entry)");
+      throw new Error(this.tr("log.esbuild.clientMissingEntry", "客户端配置缺少入口文件 (entry)"));
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -133,7 +147,7 @@ export class BuilderClient {
     // 写入文件或代码分割时都需要 output（代码分割时 outdir 用于路径解析，write: false 时不写盘）
     if (write || splittingEnabled) {
       if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error("客户端配置缺少输出目录 (output)");
+        throw new Error(this.tr("log.esbuild.clientMissingOutput", "客户端配置缺少输出目录 (output)"));
       }
       if (write) {
         await mkdir(this.config.output, { recursive: true });
@@ -293,14 +307,18 @@ export class BuilderClient {
   /**
    * 创建增量构建上下文
    *
+   * 使用 context + rebuild 可实现增量编译，复用上次构建的缓存（文件、AST），加快 HMR 重建速度。
+   *
    * @param mode - 构建模式，影响 minify 和 sourcemap 的默认值
+   * @param options - 可选，write: false 时 rebuild 返回 outputContents（内存输出，不写盘）
    */
   async createContext(
     mode: BuildMode = "dev",
+    options?: { write?: boolean },
   ): Promise<esbuild.BuildContext> {
     // 验证输出目录配置
     if (!this.config.output || this.config.output.trim() === "") {
-      throw new Error("客户端配置缺少输出目录 (output)");
+      throw new Error(this.tr("log.esbuild.clientMissingOutput", "客户端配置缺少输出目录 (output)"));
     }
 
     // 确保输出目录存在
@@ -308,7 +326,7 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error("客户端配置缺少入口文件 (entry)");
+      throw new Error(this.tr("log.esbuild.clientMissingEntry", "客户端配置缺少入口文件 (entry)"));
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -357,6 +375,8 @@ export class BuilderClient {
       jsxConfig.jsxImportSource = "react";
     }
 
+    const writeToDisk = options?.write !== false;
+
     // esbuild 构建上下文选项
     const buildOptions: esbuild.BuildOptions = {
       entryPoints: [entryPoint],
@@ -373,6 +393,7 @@ export class BuilderClient {
       chunkNames,
       treeShaking: true,
       metafile: true,
+      write: writeToDisk,
       // JSX 配置（根据渲染引擎）
       ...jsxConfig,
       // 禁用 node_modules 自动查找，防止扫描到系统目录
@@ -409,6 +430,7 @@ export class BuilderClient {
     buildOptions.plugins = plugins;
 
     // 创建构建上下文
+    this.contextWrite = writeToDisk;
     this.buildContext = await esbuild.context(buildOptions);
 
     return this.buildContext;
@@ -416,10 +438,12 @@ export class BuilderClient {
 
   /**
    * 增量重新构建
+   *
+   * 复用上次构建的缓存（文件、AST），比全量 build 更快，适用于 HMR 场景。
    */
   async rebuild(): Promise<BuildResult> {
     if (!this.buildContext) {
-      throw new Error("构建上下文未创建，请先调用 createContext()");
+      throw new Error(this.tr("log.esbuild.contextNotCreated", "构建上下文未创建，请先调用 createContext()"));
     }
 
     const startTime = Date.now();
@@ -437,6 +461,23 @@ export class BuilderClient {
 
     const duration = Date.now() - startTime;
 
+    // 当 createContext 时 write: false，result.outputFiles 包含内存中的输出
+    if (this.contextWrite === false && result.outputFiles && result.outputFiles.length > 0) {
+      const outputContents: OutputFileContent[] = result.outputFiles.map(
+        (file) => ({
+          path: file.path,
+          text: file.text,
+          contents: file.contents,
+        }),
+      );
+      return {
+        outputFiles: outputContents.map((f) => f.path),
+        outputContents,
+        metafile: result.metafile,
+        duration,
+      };
+    }
+
     return {
       outputFiles,
       metafile: result.metafile,
@@ -451,6 +492,7 @@ export class BuilderClient {
     if (this.buildContext) {
       await this.buildContext.dispose();
       this.buildContext = undefined;
+      this.contextWrite = undefined;
     }
   }
 
