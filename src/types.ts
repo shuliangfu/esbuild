@@ -236,6 +236,15 @@ export interface ClientConfig {
   plugins?: import("./plugin.ts").BuildPlugin[];
   /** Source Map 配置 */
   sourcemap?: SourceMapConfig | boolean;
+  /** CSS 导入处理配置（import "./xxx.css"） */
+  cssImport?: {
+    /** 是否启用（默认 true） */
+    enabled?: boolean;
+    /** 是否提取到单独文件（默认 false，内联进 JS 并自动注入） */
+    extract?: boolean;
+    /** 内联模式仅处理 .css（默认 true） */
+    cssOnly?: boolean;
+  };
   /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息 */
   debug?: boolean;
   /** 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console */
@@ -262,6 +271,8 @@ export interface ImageOptions {
   compress?: boolean;
   /** 输出格式 */
   format?: "webp" | "avif" | "original";
+  /** 是否在文件名中添加 content hash（用于缓存失效，默认 true） */
+  hash?: boolean;
 }
 
 /**
@@ -379,6 +390,8 @@ export interface BuildOptions {
   logLevel?: LogLevel;
   /** HTML 报告路径（false 表示不生成，字符串表示路径，默认在开发模式下生成） */
   reportHTML?: boolean | string;
+  /** 跳过输出构建产物列表（内部使用：build() 调用 buildServer/buildClient 时设为 true，避免重复输出） */
+  skipOutputLog?: boolean;
 }
 
 /**

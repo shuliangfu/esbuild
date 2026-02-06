@@ -3,23 +3,30 @@
  *
  * 功能：
  * - 检测组件中的 CSS 导入（import "./styles.css"）
- * - 提取 CSS 文件路径
- * - 在构建时或运行时生成 <link> 标签并注入到 HTML
+ * - extract: true - 提取模式，收集 CSS 路径供后续生成 <link> 注入 HTML
+ * - extract: false - 内联模式，CSS 打包进 JS，模块加载时自动注入 <style>
  */
 
-import { readTextFile } from "@dreamer/runtime-adapter";
-import type { BuildPlugin, OnLoadArgs, OnLoadResult } from "../plugin.ts";
+import { join, readTextFile, resolve } from "@dreamer/runtime-adapter";
+import type {
+  BuildPlugin,
+  OnLoadArgs,
+  OnLoadResult,
+  OnResolveArgs,
+} from "../plugin.ts";
 
 /**
  * CSS 导入处理选项
  */
 export interface CSSImportHandlerOptions {
-  /** 是否启用 CSS 提取（默认 true） */
+  /** 是否启用（默认 true） */
   enabled?: boolean;
-  /** CSS 文件输出目录（相对于输出目录） */
+  /** CSS 文件输出目录（相对于输出目录，仅 extract 模式有效） */
   cssOutputDir?: string;
-  /** 是否提取到单独文件（默认 true，false 则内联） */
+  /** 是否提取到单独文件（默认 true），false 则内联进 JS 并自动注入 */
   extract?: boolean;
+  /** 内联模式仅处理 .css（scss/sass/less/styl 需预处理器，默认 true） */
+  cssOnly?: boolean;
 }
 
 /**
@@ -46,10 +53,21 @@ export interface CSSImportHandlerPluginInstance extends BuildPlugin {
  * @param options 插件选项
  * @returns CSS 导入处理插件（可以直接作为 BuildPlugin 使用，也可以访问工具方法）
  */
+/**
+ * 简单 hash：用于 style 元素 id，防重复注入
+ */
+function simpleHash(str: string): string {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i) | 0;
+  }
+  return "d" + (h >>> 0).toString(36);
+}
+
 export function createCSSImportHandlerPlugin(
   options: CSSImportHandlerOptions = {},
 ): CSSImportHandlerPluginInstance {
-  const { enabled = true, extract = true } = options;
+  const { enabled = true, extract = true, cssOnly = true } = options;
 
   // 收集到的 CSS 文件路径
   const cssFiles = new Set<string>();
@@ -64,14 +82,9 @@ export function createCSSImportHandlerPlugin(
       // 拦截 CSS 文件的导入
       build.onResolve(
         { filter: /\.(css|scss|sass|less|styl)$/ },
-        (args: any) => {
-          // 标记为外部资源，不打包到 JS 中
-          // 这样 CSS 文件会被单独处理
+        (args: OnResolveArgs) => {
           if (extract) {
-            // 收集 CSS 文件路径
             cssFiles.add(args.path);
-            // 返回 undefined，继续处理，在 onLoad 中提取
-            return undefined;
           }
           return undefined;
         },
@@ -80,29 +93,38 @@ export function createCSSImportHandlerPlugin(
       // 处理 CSS 文件加载
       build.onLoad(
         { filter: /\.(css|scss|sass|less|styl)$/ },
-        async (args: OnLoadArgs): Promise<OnLoadResult | null | undefined> => {
-          // 收集 CSS 文件路径
+        async (args: OnLoadArgs & { resolveDir?: string }): Promise<OnLoadResult | null | undefined> => {
           cssFiles.add(args.path);
 
           if (extract) {
-            // 提取模式：返回空内容，CSS 文件会被单独处理
-            // 实际文件会被复制到输出目录
             return {
-              contents: "", // 空内容，不打包到 JS 中
+              contents: "",
               loader: "css",
             };
-          } else {
-            // 内联模式：读取 CSS 内容，返回为字符串
-            try {
-              const content = await readTextFile(args.path);
-              // 将 CSS 内容作为字符串导出，供运行时使用
-              return {
-                contents: `export default ${JSON.stringify(content)};`,
-                loader: "js",
-              };
-            } catch {
-              return undefined;
+          }
+
+          // 内联模式：仅处理 .css（scss/sass/less/styl 需预处理器）
+          if (cssOnly && !/\.css$/i.test(args.path)) {
+            return undefined;
+          }
+
+          try {
+            let filePath = args.path;
+            if (args.path.startsWith("./") || args.path.startsWith("../")) {
+              const baseDir = args.resolveDir || ".";
+              filePath = await resolve(join(baseDir, args.path));
             }
+            const content = await readTextFile(filePath);
+            const escaped = JSON.stringify(content);
+            const hash = simpleHash(content);
+            // 注入前检查 data-dweb-css-id，避免重复注入
+            const injectCode = `const __css=${escaped};if(typeof document!=="undefined"){const id="dweb-css-${hash}";if(!document.getElementById(id)){const s=document.createElement("style");s.id=id;s.setAttribute("data-dweb-css-id",id);s.textContent=__css;(document.head||document.documentElement).appendChild(s);}}export default __css;`;
+            return {
+              contents: injectCode,
+              loader: "js",
+            };
+          } catch {
+            return undefined;
           }
         },
       );

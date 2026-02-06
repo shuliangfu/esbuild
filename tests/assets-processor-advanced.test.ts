@@ -6,6 +6,7 @@ import { describe, expect, it } from "@dreamer/test";
 import {
   join,
   mkdir,
+  readdir,
   readFile,
   readTextFile,
   remove,
@@ -75,6 +76,50 @@ describe("AssetsProcessor 高级功能", () => {
       const processor = new AssetsProcessor(config, outputDir);
 
       expect(config.images?.format).toBe("original");
+    });
+
+    it("应该为图片添加 content hash 并更新引用", async () => {
+      // 创建 PNG 图片（PNG magic bytes），copyStaticAssets 会复制到 outputDir/assets
+      // 使用 format: "original" 和 compress: false 仅测试 hash，避免 ImageMagick 处理无效图片
+      const imagePath = join(publicDir, "logo.png");
+      await writeFile(
+        imagePath,
+        new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+      );
+
+      // 创建输出目录和引用该图片的 HTML（需在 processAssets 前存在）
+      await mkdir(outputDir, { recursive: true });
+      const htmlPath = join(outputDir, "index.html");
+      await writeTextFile(
+        htmlPath,
+        '<img src="assets/logo.png" alt="logo" />',
+      );
+
+      const config: AssetsConfig = {
+        publicDir: publicDir,
+        assetsDir: "assets",
+        images: {
+          compress: false,
+          format: "original",
+          hash: true,
+        },
+      };
+      const processor = new AssetsProcessor(config, outputDir);
+      await processor.processAssets();
+
+      // 验证：原 logo.png 应被替换为带 hash 的 logo.xxxxxxxx.png
+      const assetsOutputDir = join(outputDir, "assets");
+      const files = await readdir(assetsOutputDir);
+      const hashedFile = files.find(
+        (f) => f.name.startsWith("logo.") && f.name.endsWith(".png"),
+      );
+      expect(hashedFile).toBeTruthy();
+      expect(hashedFile!.name).toMatch(/^logo\.[a-f0-9]{8}\.png$/);
+
+      // 验证：HTML 中的引用应已更新为带 hash 的路径
+      const htmlContent = await readTextFile(htmlPath);
+      expect(htmlContent).toContain(hashedFile!.name);
+      expect(htmlContent).not.toContain("assets/logo.png");
     });
   });
 

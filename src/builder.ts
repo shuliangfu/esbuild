@@ -121,7 +121,7 @@ export class Builder implements IBuilder {
 
     // 清理输出目录（如果需要）
     if (buildOptions.clean) {
-      this.reportProgress(buildOptions, "清理", 10);
+      this.reportProgress(buildOptions, "清理", 10, undefined, undefined, true);
       const cleanStart = Date.now();
       await this.cleanServer();
       performance.stages.clean = Date.now() - cleanStart;
@@ -130,7 +130,14 @@ export class Builder implements IBuilder {
     // 检查缓存（如果启用了缓存）
     let cacheCheckTime = 0;
     if (this.cacheManager && buildOptions.cache !== false) {
-      this.reportProgress(buildOptions, "缓存检查", 20);
+      this.reportProgress(
+        buildOptions,
+        "缓存检查",
+        20,
+        undefined,
+        undefined,
+        true,
+      );
       const cacheStart = Date.now();
       const entryFile = await resolve(this.config.server!.entry);
       const cacheKey = await this.cacheManager.getCacheKey(
@@ -141,7 +148,14 @@ export class Builder implements IBuilder {
       cacheCheckTime = Date.now() - cacheStart;
       performance.stages.cacheCheck = cacheCheckTime;
       if (cachedResult) {
-        this.reportProgress(buildOptions, "完成", 100);
+        this.reportProgress(
+          buildOptions,
+          "完成",
+          100,
+          undefined,
+          undefined,
+          true,
+        );
         performance.total = Date.now() - buildStartTime;
         return {
           ...cachedResult,
@@ -154,11 +168,11 @@ export class Builder implements IBuilder {
     }
 
     // 构建服务端
-    this.reportProgress(buildOptions, "构建", 50);
+    this.reportProgress(buildOptions, "构建", 50, undefined, undefined, true);
     const buildStart = Date.now();
     const result = await this.serverBuilder.build();
     performance.stages.build = Date.now() - buildStart;
-    this.reportProgress(buildOptions, "完成", 100);
+    this.reportProgress(buildOptions, "完成", 100, undefined, undefined, true);
 
     // 保存缓存（如果启用了缓存）
     if (this.cacheManager && buildOptions.cache !== false) {
@@ -180,9 +194,18 @@ export class Builder implements IBuilder {
       },
     };
 
-    // 输出性能报告
-    if (performance.total > 0) {
+    // 输出性能报告（仅当无客户端构建时，联合构建由 build() 统一输出）
+    if (performance.total > 0 && !this.clientBuilder) {
       logger.info(this.generatePerformanceReport(performance, buildOptions));
+    }
+
+    // 构建完成时立即输出产物列表（实时输出，路径从根 outputDir 开始如 server.js）
+    if (this.config.server?.output) {
+      this.logOutputFiles(
+        finalResult.outputFiles,
+        this.config.server.output,
+        buildOptions,
+      );
     }
 
     return finalResult;
@@ -256,6 +279,7 @@ export class Builder implements IBuilder {
       );
     }
 
+    this.reportProgress(buildOptions, "构建", 50);
     const buildStart = Date.now();
     const result = await this.clientBuilder.build(mode);
     performance.stages.build = Date.now() - buildStart;
@@ -388,7 +412,17 @@ export class Builder implements IBuilder {
       logger.info(this.generatePerformanceReport(performance, buildOptions));
     }
 
-    this.reportProgress(buildOptions, "完成", 100);
+    // 构建完成时立即输出产物列表（实时输出，路径从根 outputDir 开始如 server.js、client/xxx.js）
+    if (this.config.client?.output) {
+      const rootDir = this.config.server?.output ??
+        dirname(this.config.client.output);
+      this.logOutputFiles(
+        finalResult.outputFiles,
+        rootDir,
+        buildOptions,
+        this.config.client.output,
+      );
+    }
 
     return finalResult;
   }
@@ -402,7 +436,7 @@ export class Builder implements IBuilder {
     const buildStartTime = Date.now();
     const promises: Promise<BuildResult>[] = [];
 
-    // 并行构建服务端和客户端（如果都配置了）
+    // 并行构建服务端和客户端，各自在完成时实时输出构建产物（不统一收集后打印）
     if (this.serverBuilder) {
       promises.push(this.buildServer(options));
     }
@@ -420,6 +454,21 @@ export class Builder implements IBuilder {
 
     // 合并性能统计
     const combinedPerformance = this.mergePerformance(results);
+
+    // 联合构建时统一输出性能报告
+    if (
+      this.serverBuilder && this.clientBuilder && combinedPerformance.total > 0
+    ) {
+      if (!options?.silent && !this.config.build?.silent) {
+        const report = this.generatePerformanceReport(
+          combinedPerformance,
+          options,
+        );
+        for (const line of report.split("\n")) {
+          if (line.trim()) logger.info(line);
+        }
+      }
+    }
 
     return {
       outputFiles: allOutputFiles,
@@ -475,6 +524,11 @@ export class Builder implements IBuilder {
     },
     options?: BuildOptions,
   ): string {
+    // 快速构建（<500ms）时仅输出单行
+    if (performance.total > 0 && performance.total < 500) {
+      return `构建完成 (${this.formatDuration(performance.total)})`;
+    }
+
     const lines: string[] = [];
     lines.push("=== 构建性能报告 ===\n");
 
@@ -833,8 +887,13 @@ export class Builder implements IBuilder {
     progress: number,
     currentFile?: string,
     totalFiles?: number,
+    skipWhenCombined?: boolean,
   ): void {
     if (options?.silent || this.config.build?.silent) {
+      return;
+    }
+    // 服务端+客户端联合构建时，仅由 buildClient 报告进度，避免重复
+    if (skipWhenCombined && this.clientBuilder) {
       return;
     }
 
@@ -846,15 +905,40 @@ export class Builder implements IBuilder {
         totalFiles,
       };
       options.onProgress(progressInfo);
-    } else {
-      // 默认进度输出
-      const progressBar = "=".repeat(Math.floor(progress / 2)) +
-        ">".repeat(progress % 2 === 0 ? 0 : 1) +
-        " ".repeat(50 - Math.floor(progress / 2));
-      const fileInfo = currentFile ? ` [${currentFile}]` : "";
-      logger.info(
-        `[${stage}] ${progressBar} ${progress.toFixed(1)}%${fileInfo}`,
-      );
+    }
+    // 不再输出默认进度条，改为在构建结束时输出构建产物列表
+  }
+
+  /**
+   * 输出构建产物文件列表
+   * 路径从根 outputDir 开始，使用相对路径（如 server.js、client/chunk-xxx.js）
+   *
+   * @param outputFiles 构建产出的文件路径列表（可为绝对路径）
+   * @param rootOutputDir 根输出目录（如 dist 或 dist/backend），所有路径相对此目录
+   * @param options 构建选项（用于 silent 判断）
+   */
+  private logOutputFiles(
+    outputFiles: string[],
+    _rootOutputDir: string,
+    options?: BuildOptions,
+    /** 客户端 outputDir，用于处理 esbuild 返回的相对于 outdir 的路径 */
+    _clientOutputDir?: string,
+  ): void {
+    if (
+      options?.silent ||
+      options?.skipOutputLog ||
+      this.config.build?.silent
+    ) {
+      return;
+    }
+
+    const rootPath = cwd();
+
+    if (outputFiles.length === 0) return;
+    for (let file of outputFiles) {
+      file = file.replace(rootPath + "/", "");
+      file = file.startsWith(".") ? file : "./" + file;
+      logger.info(file);
     }
   }
 
@@ -1292,6 +1376,13 @@ export class Builder implements IBuilder {
     }
 
     performance.total = Date.now() - buildStartTime;
+
+    // 输出构建产物列表（路径从根 outputDir 开始）
+    const outputDirs = buildResults.map((r) => r.outputDir);
+    const rootDir = outputDirs.length > 0
+      ? outputDirs.reduce((a, b) => (a.length <= b.length ? a : b))
+      : this.config.client!.output;
+    this.logOutputFiles(allOutputFiles, rootDir, buildOptions);
 
     return {
       outputFiles: allOutputFiles,

@@ -10,6 +10,7 @@ import { dirname, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
+import { createCSSImportHandlerPlugin } from "./plugins/css-import-handler.ts";
 import {
   buildModuleCache,
   denoResolverPlugin,
@@ -58,6 +59,20 @@ export class BuilderClient {
 
     // 方案二：自动注册条件编译插件
     this.pluginManager.register(createConditionalCompilePlugin());
+
+    // 方案三：自动注册 CSS 导入处理插件
+    // 默认内联模式：将 import "./xxx.css" 打包进 JS，模块加载时自动注入 <style>
+    const cssImportOpts = this.config.cssImport ?? {};
+    const cssImportEnabled = cssImportOpts.enabled !== false;
+    if (cssImportEnabled) {
+      this.pluginManager.register(
+        createCSSImportHandlerPlugin({
+          enabled: true,
+          extract: cssImportOpts.extract ?? false,
+          cssOnly: cssImportOpts.cssOnly ?? true,
+        }),
+      );
+    }
 
     // 注册配置中的插件（用户自定义插件）
     if (config.plugins) {
