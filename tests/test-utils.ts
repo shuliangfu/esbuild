@@ -3,6 +3,9 @@
  *
  * 提供测试数据目录管理和清理功能
  * 所有测试输出文件都应该放在 tests/data/ 目录下
+ *
+ * Windows 兼容：file URL pathname 在 Windows 上为 /D:/a/...，
+ * Deno/Bun 的 fs API 需要 D:/a/...（无前导斜杠），否则 mkdir/writeFile 报错 123/3
  */
 
 import {
@@ -23,6 +26,22 @@ import {
 export const CLEANUP_AFTER_TEST = false;
 
 /**
+ * 将 file URL pathname 转为文件系统可用路径（Windows 兼容）
+ *
+ * Windows 下 pathname 为 /D:/a/...，Deno/Bun fs API 需要 D:/a/...
+ */
+function pathnameToFsPath(pathname: string): string {
+  if (
+    pathname.length >= 3 &&
+    pathname.startsWith("/") &&
+    /^\/[A-Za-z]:/.test(pathname)
+  ) {
+    return pathname.slice(1);
+  }
+  return pathname;
+}
+
+/**
  * 获取测试数据目录路径
  *
  * 每个库的测试数据目录是独立的：{库目录}/tests/data/
@@ -30,7 +49,9 @@ export const CLEANUP_AFTER_TEST = false;
  * @returns 测试数据目录的绝对路径
  */
 export function getTestDataDir(): string {
-  const testDir = new URL(".", import.meta.url).pathname;
+  const testDir = pathnameToFsPath(
+    new URL(".", import.meta.url).pathname,
+  );
   return resolve(join(testDir, "data"));
 }
 
@@ -149,7 +170,9 @@ export async function cleanupRootTempFiles(): Promise<void> {
   }
   try {
     // 获取库的根目录（tests 目录的父目录）
-    const testDir = new URL(".", import.meta.url).pathname;
+    const testDir = pathnameToFsPath(
+      new URL(".", import.meta.url).pathname,
+    );
     const rootDir = resolve(join(testDir, ".."));
 
     // 检查根目录是否存在

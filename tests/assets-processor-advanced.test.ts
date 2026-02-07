@@ -23,11 +23,13 @@ describe("AssetsProcessor 高级功能", () => {
   let publicDir: string;
   let testDataDir: string;
 
-  // 测试前创建测试目录
+  // 测试前创建测试目录（Windows CI 上 tests/data 可能不存在，需显式创建）
   it("应该创建测试目录", async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("assets-processor-advanced");
     publicDir = join(testDataDir, "public");
+    await mkdir(testDataDir, { recursive: true });
+    await mkdir(outputDir, { recursive: true });
     await mkdir(publicDir, { recursive: true });
     expect(testDataDir).toBeTruthy();
   });
