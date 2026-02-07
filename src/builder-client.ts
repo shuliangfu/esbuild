@@ -6,11 +6,12 @@
  * 使用 esbuild 进行客户端代码打包
  */
 
-import { dirname, mkdir, resolve } from "@dreamer/runtime-adapter";
+import { dirname, IS_BUN, mkdir, resolve } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
 import { createCSSImportHandlerPlugin } from "./plugins/css-import-handler.ts";
+import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import {
   buildModuleCache,
   denoResolverPlugin,
@@ -249,31 +250,33 @@ export class BuilderClient {
       buildOptions.chunkNames = chunkNames;
     }
 
-    // 构建模块缓存：一次性获取所有依赖的本地缓存路径
-    // 这避免了在解析每个模块时都启动子进程或发送 HTTP 请求
+    // 添加插件：Bun 环境使用 bunResolverPlugin，Deno 环境使用 denoResolverPlugin
     const log = this.config.logger ?? logger;
-    const moduleCache = await buildModuleCache(
-      entryPoint,
-      dirname(entryPoint),
-      this.config.debug,
-      log,
-    );
-
-    // 添加插件（包括 denoResolverPlugin，传递模块缓存）
     const plugins = this.pluginManager.toEsbuildPlugins(
       esbuild,
       buildOptions,
     );
-    // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
-    // projectDir 用于 node_modules 内 require('react') 等 bare specifier 解析时查找 deno.json
-    plugins.unshift(denoResolverPlugin({
-      isServerBuild: false,
-      moduleCache,
-      projectDir: dirname(entryPoint),
-      debug: this.config.debug,
-      logger: log,
-      forceRuntimeExternal: hasRuntimeExternal,
-    }));
+
+    if (IS_BUN) {
+      // Bun 环境：使用 bunResolverPlugin 解析 tsconfig 和 package.json
+      plugins.unshift(bunResolverPlugin());
+    } else {
+      // Deno 环境：构建模块缓存 + denoResolverPlugin
+      const moduleCache = await buildModuleCache(
+        entryPoint,
+        dirname(entryPoint),
+        this.config.debug,
+        log,
+      );
+      plugins.unshift(denoResolverPlugin({
+        isServerBuild: false,
+        moduleCache,
+        projectDir: dirname(entryPoint),
+        debug: this.config.debug,
+        logger: log,
+        forceRuntimeExternal: hasRuntimeExternal,
+      }));
+    }
     buildOptions.plugins = plugins;
 
     // 执行构建
@@ -423,30 +426,31 @@ export class BuilderClient {
       // 注意：incremental 选项已废弃，使用 context() API 即可实现增量编译
     };
 
-    // 构建模块缓存：一次性获取所有依赖的本地缓存路径
+    // 添加插件：Bun 环境使用 bunResolverPlugin，Deno 环境使用 denoResolverPlugin
     const log = this.config.logger ?? logger;
-    const moduleCache = await buildModuleCache(
-      entryPoint,
-      dirname(entryPoint),
-      this.config.debug,
-      log,
-    );
-
-    // 添加插件（包括 denoResolverPlugin，传递模块缓存）
     const plugins = this.pluginManager.toEsbuildPlugins(
       esbuild,
       buildOptions,
     );
-    // 客户端构建：isServerBuild: false，使用 moduleCache 从 Deno 缓存读取依赖并打包
-    // projectDir 用于 node_modules 内 require('react') 等 bare specifier 解析时查找 deno.json
-    plugins.unshift(denoResolverPlugin({
-      isServerBuild: false,
-      moduleCache,
-      projectDir: dirname(entryPoint),
-      debug: this.config.debug,
-      logger: log,
-      forceRuntimeExternal: hasRuntimeExternalCtx,
-    }));
+
+    if (IS_BUN) {
+      plugins.unshift(bunResolverPlugin());
+    } else {
+      const moduleCache = await buildModuleCache(
+        entryPoint,
+        dirname(entryPoint),
+        this.config.debug,
+        log,
+      );
+      plugins.unshift(denoResolverPlugin({
+        isServerBuild: false,
+        moduleCache,
+        projectDir: dirname(entryPoint),
+        debug: this.config.debug,
+        logger: log,
+        forceRuntimeExternal: hasRuntimeExternalCtx,
+      }));
+    }
     buildOptions.plugins = plugins;
 
     // 创建构建上下文
