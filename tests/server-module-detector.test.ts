@@ -29,10 +29,11 @@ describe("ServerModuleDetectorPlugin", () => {
   let testDataDir: string;
   let outputDir: string;
 
-  // 测试前创建测试目录
+  // 测试前创建测试目录（Windows CI 上 tests/data 可能不存在，需显式创建）
   it("应该创建测试目录", async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("server-module-detector");
+    await mkdir(testDataDir, { recursive: true });
     await mkdir(outputDir, { recursive: true });
     expect(testDataDir).toBeTruthy();
   });
