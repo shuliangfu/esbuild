@@ -41,7 +41,7 @@ if (IS_DENO) {
  */
 
 // 导入 JSR 包
-import { ClientSocket } from "@dreamer/socket-io/client";
+import { Client } from "@dreamer/socket-io/client";
 import { createLogger, type Logger } from "@dreamer/logger/client";
 
 // 创建 logger 实例
@@ -56,8 +56,8 @@ export function createSocketClient(url: string) {
   try {
     logger.info("创建 Socket 客户端", { url });
 
-    // 创建 ClientSocket 实例
-    const socket = new ClientSocket({
+    // 创建 Client 实例（socket-io 客户端）
+    const socket = new Client({
       url: url,
       autoConnect: false,
     });
@@ -103,6 +103,7 @@ export function testLogger() {
       );
 
       // 在测试数据目录创建 deno.json，确保 resolver 插件能找到导入配置
+      // 必须显式 mapping 子路径（如 /client），否则 resolver 可能解析失败返回空字符串
       const testDenoJsonPath = join(testDataDir, "deno.json");
       await writeTextFile(
         testDenoJsonPath,
@@ -110,7 +111,11 @@ export function testLogger() {
           {
             imports: {
               "@dreamer/socket-io": "jsr:@dreamer/socket-io@^1.0.0-beta.2",
+              "@dreamer/socket-io/client":
+                "jsr:@dreamer/socket-io@^1.0.0-beta.2/client",
               "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
+              "@dreamer/logger/client":
+                "jsr:@dreamer/logger@^1.0.0-beta.7/client",
             },
           },
           null,
@@ -527,7 +532,7 @@ export function testLoggerFunctions() {
  */
 
 // 导入 JSR 包
-import { ClientSocket } from "@dreamer/socket-io/client";
+import { Client } from "@dreamer/socket-io/client";
 import { createLogger, type Logger } from "@dreamer/logger/client";
 
 // 创建 logger 实例
@@ -542,8 +547,8 @@ export function createSocketClient(url: string) {
   try {
     logger.info("创建 Socket 客户端", { url });
 
-    // 创建 ClientSocket 实例
-    const socket = new ClientSocket({
+    // 创建 Client 实例（socket-io 客户端）
+    const socket = new Client({
       url: url,
       autoConnect: false,
     });
