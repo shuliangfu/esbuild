@@ -8,6 +8,15 @@ and this project adheres to
 
 ---
 
+## [1.0.1] - 2026-02-08
+
+### Fixed
+
+- **Resolver**: Add fallback for `xxx.ts` subpath when `exports["./xxx.ts"]` does not exist in JSR package; try `exports["./xxx"]` instead. Fixes esbuild resolver failing to resolve `EnginePacketType` and `SocketIOPacketType` when bundling client code that imports `@dreamer/socket-io/client` (e.g. relative import `../types.ts` from client modules).
+- **Tests**: Disable leak detection for "应该清理测试输出目录" in edge-cases test to avoid CI failure caused by async `readTextFile` completing during test.
+
+---
+
 ## [1.0.0] - 2026-02-06
 
 ### Added
