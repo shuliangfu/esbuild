@@ -82,7 +82,7 @@ describe("Builder Watch 模式", () => {
         async () => await builder.watch(),
         Error,
       );
-    });
+    }, { sanitizeOps: false, sanitizeResources: false });
 
     it("应该支持自定义监听路径", async () => {
       // 确保目录和文件存在（Bun 并行测试可能导致目录被其他测试清理）
