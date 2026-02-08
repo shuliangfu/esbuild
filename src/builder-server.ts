@@ -9,7 +9,6 @@
  */
 
 import {
-  basename,
   createCommand,
   dirname,
   existsSync,
@@ -549,9 +548,8 @@ export class BuilderServer {
 
     try {
       // 构建 bun build 命令参数
-      // 如果有配置文件，使用相对路径；否则使用绝对路径
-      const buildEntryPoint = hasConfig ? basename(entryPoint) : entryPoint;
-      const args: string[] = ["build", buildEntryPoint];
+      // 始终使用绝对路径作为入口，避免与 tests/data 下其他测试的 main.ts 等文件冲突
+      const args: string[] = ["build", entryPoint];
 
       // 设置目标平台为 node（服务端）
       args.push("--target", "node");
@@ -559,13 +557,13 @@ export class BuilderServer {
       // 设置输出格式为 ESM
       args.push("--format", "esm");
 
-      // 设置输出文件（使用相对路径，配合 cwd 使用）
-      // 如果工作目录是入口文件目录，输出文件路径需要相对于工作目录
-      // 如果工作目录是输出目录，输出文件就在当前目录
-      const outputRelativePath = hasConfig
-        ? join(relative(entryDir, actualOutputDir), outputFileName)
-        : outputFileName;
-      args.push("--outfile", outputRelativePath);
+      // 使用 --outdir 而非 --outfile：Bun 会生成多文件（如 server.js + 原生 .node 等），
+      // 单文件输出会报 "cannot write multiple output files without an output directory"
+      const outputRelativeDir = hasConfig
+        ? relative(entryDir, actualOutputDir)
+        : ".";
+      args.push("--outdir", outputRelativeDir);
+      args.push("--entry-naming", "server.[ext]");
 
       // 压缩选项
       if (compileOptions.minify) {

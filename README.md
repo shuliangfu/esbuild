@@ -12,7 +12,7 @@ English | [中文 (Chinese)](./README-zh.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-518%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -976,14 +976,16 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 **Test statistics**:
 
-- **Total tests**: 518
-- **Passed**: All passed ✅
-- **Failed**: 0
-- **Pass rate**: 100% ✅
-- **Test execution time**: ~30 seconds (`deno test -A`)
+| Runtime | Tests | Passed | Failed | Pass Rate |
+|--------|-------|--------|--------|-----------|
+| Deno (`deno test -A`) | 518 | 518 | 0 | 100% ✅ |
+| Bun (`bun test`) | 503 | 503 | 0 | 100% ✅ |
+
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
   handling
 - **Test environment**: Deno 2.x, Bun 1.3.5
+- **Note**: Bun has fewer tests because `builder-server-bun.test.ts` (2 tests)
+  runs only in Bun; some tests use Deno-specific features and run only in Deno
 
 **Test types**:
 
@@ -1006,6 +1008,7 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 - ✅ Path resolution feature tests (Deno and Bun environments)
   - Resolver plugin tests (18) + resolver advanced tests (11)
   - Server builder path resolution tests (5)
+  - Builder server Bun tests (2, Bun only)
   - Client builder path resolution tests (6)
   - Client build path resolution tests (6)
 - ✅ Server builder advanced feature tests (19)

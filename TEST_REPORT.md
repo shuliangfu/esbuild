@@ -2,10 +2,10 @@
 
 ## Test Overview
 
-- **Test library version**: @dreamer/test@^1.0.0-beta.40
-- **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.0-beta.22
+- **Test library version**: @dreamer/test@^1.0.0
+- **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.3
 - **Test framework**: @dreamer/test (compatible with Deno and Bun)
-- **Test date**: 2026-02-06
+- **Test date**: 2026-02-08
 - **Test environment**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
@@ -15,15 +15,16 @@
 
 ### Overall Statistics
 
-- **Total tests**: 518
-- **Passed**: 518 ✅
-- **Failed**: 0
-- **Pass rate**: 100% ✅
-- **Test execution time**: ~30 seconds (Deno environment `deno test -A`)
+| Environment | Total Tests | Passed | Failed | Pass Rate |
+|-------------|-------------|--------|--------|-----------|
+| **Deno**    | 518         | 518 ✅ | 0      | 100% ✅   |
+| **Bun**     | 503         | 503 ✅ | 0      | 100% ✅   |
 
-> **Note**: The Bun environment has fewer tests because some tests use
-> Deno-specific features (such as `jsr:` protocol, `deno.json` configuration,
-> etc.), and these tests only run in the Deno environment.
+- **Test execution time**: ~40s (Deno `deno test -A`), ~20s (Bun `bun test`)
+
+> **Note**: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
+> only in Bun; some tests use Deno-specific features (jsr:, deno.json) and run
+> only in Deno.
 
 ### Test File Statistics
 
@@ -71,6 +72,7 @@
 | `resolver-advanced.test.ts`         | 11         | ✅ All passed | Resolver plugin advanced tests          |
 | `resolver.test.ts`                  | 18         | ✅ All passed | Resolver plugin tests                   |
 | `builder-server-resolver.test.ts`   | 5          | ✅ All passed | Server builder path resolution tests    |
+| `builder-server-bun.test.ts`        | 2          | ✅ All passed | Bun buildWithBun server build tests      |
 | `builder-client-resolver.test.ts`   | 6          | ✅ All passed | Client builder path resolution tests    |
 
 ## Feature Test Details
@@ -919,11 +921,11 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
 
 **Total tests**:
 
-- **518** tests (`deno test -A`, all passed)
-- Execution time: **~15 seconds**
+- **518** tests (Deno `deno test -A`, all passed)
+- **503** tests (Bun `bun test`, all passed)
 
-> Note: Bun environment has fewer tests because some tests use Deno-specific
-> features (such as `jsr:` protocol, `deno.json` configuration, etc.)
+> Note: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
+> only in Bun; some tests use Deno-specific features and run only in Deno.
 
 **Test types**:
 
