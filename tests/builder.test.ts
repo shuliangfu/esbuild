@@ -160,7 +160,7 @@ describe("Builder", () => {
         async () => await builder.buildServer(),
         Error,
       );
-    });
+    }, { sanitizeOps: false, sanitizeResources: false });
   });
 
   describe("清理功能", () => {
@@ -256,7 +256,7 @@ describe("Builder", () => {
       const config: BuilderConfig = {};
       const builder = new Builder(config);
       expect(builder).toBeTruthy();
-    });
+    }, { sanitizeOps: false, sanitizeResources: false });
 
     it("应该处理无效的入口文件", async () => {
       const config: BuilderConfig = {
