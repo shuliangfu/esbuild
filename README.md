@@ -1054,10 +1054,11 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-### [1.0.1] - 2026-02-08
+### [1.0.2] - 2026-02-08
 
-- **Fixed**: Resolver fallback for `xxx.ts` → `exports["./xxx"]` when bundling JSR packages (fixes socket-io types resolution)
-- **Fixed**: Disable leak detection for edge-cases cleanup test
+- **Added**: builder-server-bun.test.ts for Bun buildWithBun server build tests (2 tests, Bun only)
+- **Fixed**: BuilderServer use absolute path for entry when buildWithBun to avoid wrong file being built
+- **Changed**: Update TEST_REPORT.md and README with Deno/Bun test statistics (518 Deno, 503 Bun)
 
 See [CHANGELOG.md](./CHANGELOG.md) for full history.
 

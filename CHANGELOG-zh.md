@@ -7,6 +7,23 @@
 
 ---
 
+## [1.0.2] - 2026-02-08
+
+### 新增
+
+- **BuilderServer**：新增 `builder-server-bun.test.ts`，用于 Bun `buildWithBun` 服务端构建测试（2 个用例，仅 Bun）
+
+### 修复
+
+- **BuilderServer**：`buildWithBun` 解析入口时使用绝对路径，避免构建到错误文件（如 cwd 中存在 `main.ts` 时）
+
+### 变更
+
+- **文档**：更新 TEST_REPORT.md，补充 Deno/Bun 测试统计（Deno 518、Bun 503）
+- **文档**：更新 README 与 README-zh 的测试徽章和统计表格
+
+---
+
 ## [1.0.1] - 2026-02-08
 
 ### 修复

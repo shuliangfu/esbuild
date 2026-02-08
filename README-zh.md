@@ -1030,10 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-### [1.0.1] - 2026-02-08
+### [1.0.2] - 2026-02-08
 
-- **修复**：Resolver 支持 `xxx.ts` 回退到 `exports["./xxx"]`，修复 socket-io types 解析
-- **修复**：edge-cases 清理测试禁用 leak 检测
+- **新增**：builder-server-bun.test.ts 用于 Bun buildWithBun 服务端构建测试（2 个用例，仅 Bun）
+- **修复**：BuilderServer 使用绝对路径解析 buildWithBun 入口，避免构建到错误文件
+- **变更**：更新 TEST_REPORT.md 与 README 的 Deno/Bun 测试统计（Deno 518、Bun 503）
 
 完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
 
