@@ -1025,6 +1025,17 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ---
 
+## 📋 变更日志
+
+### [1.0.1] - 2026-02-08
+
+- **修复**：Resolver 支持 `xxx.ts` 回退到 `exports["./xxx"]`，修复 socket-io types 解析
+- **修复**：edge-cases 清理测试禁用 leak 检测
+
+完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
+
+---
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！

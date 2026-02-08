@@ -1049,6 +1049,17 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ---
 
+## 📋 Changelog
+
+### [1.0.1] - 2026-02-08
+
+- **Fixed**: Resolver fallback for `xxx.ts` → `exports["./xxx"]` when bundling JSR packages (fixes socket-io types resolution)
+- **Fixed**: Disable leak detection for edge-cases cleanup test
+
+See [CHANGELOG.md](./CHANGELOG.md) for full history.
+
+---
+
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome!
