@@ -8,6 +8,23 @@ and this project adheres to
 
 ---
 
+## [1.0.2] - 2026-02-08
+
+### Added
+
+- **BuilderServer**: Add `builder-server-bun.test.ts` for Bun `buildWithBun` server build tests (2 tests, Bun only)
+
+### Fixed
+
+- **BuilderServer**: Use absolute path for entry when `buildWithBun` resolves to avoid wrong file being built (e.g. when `main.ts` exists in cwd)
+
+### Changed
+
+- **Docs**: Update TEST_REPORT.md with Deno/Bun test statistics (518 Deno, 503 Bun)
+- **Docs**: Update README and README-zh test badges and statistics tables
+
+---
+
 ## [1.0.1] - 2026-02-08
 
 ### Fixed
