@@ -511,6 +511,27 @@ async function fetchJsrSourceViaMeta(
     }
     if (code != null) return code;
   }
+  // 子路径为 xxx.ts 时，若 exports["./xxx.ts"] 不存在，尝试 exports["./xxx"]（JSR 包常用 ./types 而非 ./types.ts）
+  if (subpath && subpath.endsWith(".ts")) {
+    const subpathNoExt = subpath.slice(0, -3);
+    const fallbackExportKey = `./${subpathNoExt}`;
+    let fallbackPath = exports[fallbackExportKey];
+    if (fallbackPath && typeof fallbackPath === "string") {
+      fallbackPath = fallbackPath.replace(/^\.\//, "");
+      if (typeof manifest[`/${fallbackPath}`] === "object") {
+        const fileUrl = `${base}/${fallbackPath}`;
+        const code = await fetchSourceFromUrl(fileUrl);
+        if (debug) {
+          log.debug(
+            `${PREFIX} fetchJsrSourceViaMeta 第一路径 fallback ${fallbackExportKey} fileUrl=${fileUrl} code=${
+              code != null ? `${code.length} chars` : "null"
+            }`,
+          );
+        }
+        if (code != null) return code;
+      }
+    }
+  }
   // 主入口只认 meta 里的 exports["."]，可能是 mod.ts、index.ts、main.ts 等，不写死
   if (!subpath) {
     return null;

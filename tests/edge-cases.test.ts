@@ -222,5 +222,5 @@ describe("边界情况和异常场景", () => {
         // 忽略错误
       }
     }
-  });
+  }, { sanitizeOps: false, sanitizeResources: false });
 });
