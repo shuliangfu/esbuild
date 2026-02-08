@@ -7,6 +7,14 @@
 
 ---
 
+## [1.0.3] - 2026-02-08
+
+### 新增
+
+- **Resolver**：在传入 `debug: true` 时，为 React/Preact 主包及子路径解析输出调试日志（projectDir、startDir、denoJson、import、importer），便于构建时排查问题（如 dweb CSR/SSR 客户端构建）。
+
+---
+
 ## [1.0.2] - 2026-02-08
 
 ### 新增

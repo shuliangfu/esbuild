@@ -1120,6 +1120,16 @@ export function denoResolverPlugin(
             return undefined;
           }
 
+          // 调试：react/preact 解析路径（便于排查 createElement 互操作问题）
+          if (isRuntimePackage) {
+            debugLog(
+              `[react/preact] resolver: pkg=${packageName} ` +
+                `projectDir=${projectDir ?? "null"} startDir=${startDir} ` +
+                `denoJson=${projectDenoJsonPath} import=${packageImport} ` +
+                `importer=${args.importer?.slice(0, 80) ?? "null"}`,
+            );
+          }
+
           // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external
           if (
             isServerBuild &&
@@ -1197,6 +1207,16 @@ export function denoResolverPlugin(
 
           if (!packageImport) {
             return undefined;
+          }
+
+          // 调试：react/preact 子路径解析（便于排查 createElement 互操作问题）
+          if (isRuntimePackage) {
+            debugLog(
+              `[react/preact] subpath resolver: ${path} ` +
+                `projectDir=${projectDir ?? "null"} startDir=${startDir} ` +
+                `denoJson=${projectDenoJsonPath} import=${packageImport} ` +
+                `importer=${args.importer?.slice(0, 80) ?? "null"}`,
+            );
           }
 
           // 服务端构建且非浏览器模式：如果是 jsr:/npm: 协议，直接标记为 external

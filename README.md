@@ -1054,11 +1054,9 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-### [1.0.2] - 2026-02-08
+**v1.0.3** (2026-02-08)
 
-- **Added**: builder-server-bun.test.ts for Bun buildWithBun server build tests (2 tests, Bun only)
-- **Fixed**: BuilderServer use absolute path for entry when buildWithBun to avoid wrong file being built
-- **Changed**: Update TEST_REPORT.md and README with Deno/Bun test statistics (518 Deno, 503 Bun)
+- **Added**: Debug logging for React/Preact resolution in resolver when `debug: true` (projectDir, startDir, denoJson, import, importer) for build-time debugging
 
 See [CHANGELOG.md](./CHANGELOG.md) for full history.
 
