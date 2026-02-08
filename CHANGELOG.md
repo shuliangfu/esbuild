@@ -8,6 +8,14 @@ and this project adheres to
 
 ---
 
+## [1.0.3] - 2026-02-08
+
+### Added
+
+- **Resolver**: Debug logging for React/Preact main package and subpath resolution when `debug: true` is passed (projectDir, startDir, denoJson, import, importer) to aid build-time debugging (e.g. dweb CSR/SSR client builds).
+
+---
+
 ## [1.0.2] - 2026-02-08
 
 ### Added

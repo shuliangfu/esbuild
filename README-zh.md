@@ -1030,11 +1030,9 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-### [1.0.2] - 2026-02-08
+**v1.0.3**（2026-02-08）
 
-- **新增**：builder-server-bun.test.ts 用于 Bun buildWithBun 服务端构建测试（2 个用例，仅 Bun）
-- **修复**：BuilderServer 使用绝对路径解析 buildWithBun 入口，避免构建到错误文件
-- **变更**：更新 TEST_REPORT.md 与 README 的 Deno/Bun 测试统计（Deno 518、Bun 503）
+- **新增**：Resolver 在 `debug: true` 时输出 React/Preact 解析调试日志（projectDir、startDir、denoJson、import、importer），便于构建时排查问题
 
 完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
 
