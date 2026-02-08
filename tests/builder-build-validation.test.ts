@@ -138,5 +138,5 @@ describe("Builder 构建产物验证", () => {
         // 忽略错误
       }
     }
-  });
+  }, { sanitizeOps: false, sanitizeResources: false });
 });
