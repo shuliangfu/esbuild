@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.5] - 2026-02-09
+
+### 变更
+
+- **Resolver**：重构 npm 子路径解析逻辑。不再解析 package.json exports（Deno 工程不使用 package.json），改为通过子进程调用 Deno 的 `import.meta.resolve` 解析子路径（如 `preact/jsx-runtime`）。新增 `runtimeResolveCache` 避免同模块重复调用子进程。
+
+### 新增
+
+- **测试**：在 `resolver-advanced.test.ts` 中新增 npm 子路径解析测试（lodash/map 通过 Deno import.meta.resolve 解析）。
+
+---
+
 ## [1.0.4] - 2026-02-09
 
 ### 修复

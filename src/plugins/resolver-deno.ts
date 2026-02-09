@@ -136,6 +136,7 @@ export async function buildModuleCache(
     const info: DenoInfoOutput = JSON.parse(stdout);
 
     // 构建 specifier -> local 映射
+    const npmSpecifiersToResolve = new Set<string>();
     for (const mod of info.modules) {
       if (mod.local && mod.specifier) {
         // 存储 https:// URL 到本地路径的映射
@@ -166,6 +167,47 @@ export async function buildModuleCache(
             `buildModuleCache 添加映射: ${jsrSpecifier} -> ${mod.local}`,
           );
         }
+      } else if (mod.specifier?.startsWith("npm:")) {
+        // deno info 对 npm 模块常返回 empty local，需子进程 resolve 补全
+        // 统一 npm:/preact@x -> npm:preact@x，便于后续缓存查找
+        const spec = mod.specifier.replace(/^npm:\/+/, "npm:");
+        npmSpecifiersToResolve.add(spec);
+      }
+    }
+
+    // npm 模块：deno info 不提供 local，用子进程 import.meta.resolve 补全
+    for (const spec of npmSpecifiersToResolve) {
+      if (cache.has(spec)) continue;
+      try {
+        const proc = createCommand("deno", {
+          args: [
+            "eval",
+            ...(projectDenoJson ? ["--config", projectDenoJson] : []),
+            "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
+            spec,
+          ],
+          cwd: workDir,
+          stdout: "piped",
+          stderr: "piped",
+        });
+        const out = await proc.output();
+        if (out.success && out.stdout) {
+          const line = new TextDecoder().decode(out.stdout).trim();
+          if (line.startsWith("file://")) {
+            let localPath = line.slice(7);
+            try {
+              localPath = decodeURIComponent(localPath);
+            } catch {
+              /* ignore */
+            }
+            if (existsSync(localPath)) {
+              cache.set(spec, localPath);
+              debugLog(`buildModuleCache npm resolve: ${spec} -> ${localPath}`);
+            }
+          }
+        }
+      } catch {
+        debugLog(`buildModuleCache npm resolve 失败: ${spec}`);
       }
     }
 
@@ -779,6 +821,12 @@ export function denoResolverPlugin(
       const protocolResolveDirCache = new Map<string, string>();
 
       /**
+       * 子进程 resolve 结果缓存，避免同模块重复调用 deno eval import.meta.resolve。
+       * Deno 工程不用 package.json，子路径（如 preact/jsx-runtime）由 Deno 的 import.meta.resolve 解析。
+       */
+      const runtimeResolveCache = new Map<string, string>();
+
+      /**
        * 从预构建的模块缓存中查找本地路径
        * @param specifier - 模块 specifier（支持 jsr:、https://jsr.io/ 等格式）
        * @returns 本地文件路径，如果未找到返回 undefined
@@ -789,6 +837,11 @@ export function denoResolverPlugin(
       }
 
       function getLocalPathFromCache(specifier: string): string | undefined {
+        // 优先命中子进程 resolve 缓存
+        const runtimeCached = runtimeResolveCache.get(specifier);
+        if (runtimeCached && existsSync(runtimeCached)) {
+          return runtimeCached;
+        }
         if (!moduleCache) return undefined;
 
         // 直接查找
@@ -813,18 +866,26 @@ export function denoResolverPlugin(
           if (slashIdx > 0) {
             const mainSpec = specifier.slice(0, slashIdx);
             const subpath = specifier.slice(slashIdx + 1);
-            const mainPath = moduleCache.get(mainSpec) ??
+            // 主包路径：deno info 可能用 npm:preact@10.28.0 或 npm:preact@^10.28.0，或 Windows 下其他格式
+            let mainPath = moduleCache.get(mainSpec) ??
               moduleCache.get(mainSpec.replace(/@\^/, "@").replace(/@~/, "@"));
-            if (mainPath && existsSync(mainPath)) {
-              let pkgRoot = dirname(mainPath);
-              // 主包可能是 dist/xxx.mjs，向上找 package.json 得包根目录
-              for (let i = 0; i < 5; i++) {
-                if (existsSync(join(pkgRoot, "package.json"))) break;
-                const parent = dirname(pkgRoot);
-                if (parent === pkgRoot) break;
-                pkgRoot = parent;
+            if (!mainPath) {
+              // 回退：遍历缓存找到同包任意条目（如 npm:preact@10.28.0 或 deno.land npm 格式）
+              const pkgName = mainSpec.replace(/^npm:/, "").split("@")[0];
+              for (const [k, v] of moduleCache.entries()) {
+                if (
+                  (k.startsWith(`npm:${pkgName}@`) || k.includes(`/${pkgName}@`)) &&
+                  existsSync(v)
+                ) {
+                  mainPath = v;
+                  break;
+                }
               }
+            }
+            if (mainPath && existsSync(mainPath)) {
+              const pkgRoot = dirname(mainPath);
               const subNorm = subpath.replace(/\\/g, "/");
+              // 仅回退常见子路径模式；复杂子路径（如 preact/jsx-runtime）由 onLoad 内子进程 Deno import.meta.resolve 解析
               const candidates = [
                 join(pkgRoot, subNorm + ".mjs"),
                 join(pkgRoot, subNorm + ".js"),
@@ -1691,6 +1752,7 @@ export function denoResolverPlugin(
               } catch {
                 // 忽略解码错误
               }
+              runtimeResolveCache.set(protocolPath, filePath);
 
               // 客户端构建且为 npm 包时，若解析到 CJS 文件则改用 ESM 入口
               if (

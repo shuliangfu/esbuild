@@ -8,6 +8,18 @@ and this project adheres to
 
 ---
 
+## [1.0.5] - 2026-02-09
+
+### Changed
+
+- **Resolver**: Refactor npm subpath resolution. Instead of parsing package.json exports (Deno projects do not use package.json), use Deno's `import.meta.resolve` via subprocess to resolve subpaths like `preact/jsx-runtime`. Add `runtimeResolveCache` to avoid repeated subprocess calls for the same module.
+
+### Added
+
+- **Tests**: Add npm subpath resolution test in `resolver-advanced.test.ts` (lodash/map via Deno import.meta.resolve).
+
+---
+
 ## [1.0.4] - 2026-02-09
 
 ### Fixed
