@@ -7,6 +7,15 @@
 
 ---
 
+## [1.0.6] - 2026-02-09
+
+### 修复
+
+- **Resolver**：新增 `fileUrlToPath` 辅助函数，规范化 Windows `file://` URL。解析 `file:///C:/Users/...` 时去掉开头的 `/`，使 `existsSync` 能正确工作（如 `C:/Users/...` 而非 `/C:/Users/...`）。
+- **Resolver**：当 `import.meta.resolve` 返回的 `file://` 路径不存在时（如 Windows monorepo 缓存路径不一致），为 `npm:` 包增加子进程回退，在项目目录下解析以获取正确的缓存路径。
+
+---
+
 ## [1.0.5] - 2026-02-09
 
 ### 变更

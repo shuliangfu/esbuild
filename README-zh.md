@@ -1030,10 +1030,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.5**（2026-02-09）
+**v1.0.6**（2026-02-09）
 
-- **变更**：重构 npm 子路径解析，改用 Deno 的 `import.meta.resolve` 替代 package.json
-- **新增**：npm 子路径解析测试（lodash/map）
+- **修复**：规范化 Windows `file://` 路径（去掉 `C:/` 前的斜杠）
+- **修复**：解析到的文件路径不存在时对 npm 包增加子进程回退（如 Windows monorepo）
 
 完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
 
