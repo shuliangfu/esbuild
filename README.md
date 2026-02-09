@@ -1054,12 +1054,12 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.5** (2026-02-09)
+**v1.0.6** (2026-02-09)
 
-- **Changed**: Refactor npm subpath resolution to use Deno's `import.meta.resolve` instead of package.json
-- **Added**: npm subpath resolution test (lodash/map)
+- **Fixed**: Normalize Windows `file://` path (remove leading slash for `C:/`)
+- **Fixed**: npm subprocess fallback when resolved file path does not exist (e.g. Windows monorepo)
 
-See [CHANGELOG.md](./CHANGELOG.md) for full history.
+Full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ---
 

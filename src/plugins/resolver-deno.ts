@@ -31,6 +31,23 @@ import type { BuildLogger } from "../types.ts";
 
 const PREFIX = "[resolver-deno]";
 
+/**
+ * 将 file:// URL 转为本地文件系统路径
+ * Windows: file:///C:/Users/... -> C:/Users/...（去掉开头的 /，否则 existsSync 可能失败）
+ */
+function fileUrlToPath(fileUrl: string): string {
+  let path = fileUrl.slice(7);
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    /* ignore */
+  }
+  if (path.length >= 3 && /^\/[A-Za-z]:[/\\]/.test(path)) {
+    path = path.slice(1);
+  }
+  return path;
+}
+
 /** 未传入 logger 时使用的空实现，避免使用 console */
 const NOOP_LOGGER: BuildLogger = {
   debug: () => {},
@@ -194,12 +211,7 @@ export async function buildModuleCache(
         if (out.success && out.stdout) {
           const line = new TextDecoder().decode(out.stdout).trim();
           if (line.startsWith("file://")) {
-            let localPath = line.slice(7);
-            try {
-              localPath = decodeURIComponent(localPath);
-            } catch {
-              /* ignore */
-            }
+            const localPath = fileUrlToPath(line);
             if (existsSync(localPath)) {
               cache.set(spec, localPath);
               debugLog(`buildModuleCache npm resolve: ${spec} -> ${localPath}`);
@@ -1404,12 +1416,7 @@ export function denoResolverPlugin(
             }
 
             if (importerUrl && importerUrl.startsWith("file://")) {
-              let importerPath = importerUrl.slice(7);
-              try {
-                importerPath = decodeURIComponent(importerPath);
-              } catch {
-                // 忽略解码错误
-              }
+              const importerPath = fileUrlToPath(importerUrl);
 
               if (existsSync(importerPath)) {
                 // 从 importer 的目录解析相对路径
@@ -1544,14 +1551,9 @@ export function denoResolverPlugin(
                   resolvedProtocolUrl &&
                   resolvedProtocolUrl.startsWith("file://")
                 ) {
-                  let resolvedProtocolPath = resolvedProtocolUrl.slice(7);
-                  try {
-                    resolvedProtocolPath = decodeURIComponent(
-                      resolvedProtocolPath,
-                    );
-                  } catch {
-                    // 忽略解码错误
-                  }
+                  const resolvedProtocolPath = fileUrlToPath(
+                    resolvedProtocolUrl,
+                  );
 
                   if (existsSync(resolvedProtocolPath)) {
                     let pathToReturn = resolvedProtocolPath;
@@ -1746,12 +1748,7 @@ export function denoResolverPlugin(
 
             // 步骤 4: 如果 resolve 返回 file:// URL，读取文件内容
             if (fileUrl && fileUrl.startsWith("file://")) {
-              let filePath = fileUrl.slice(7);
-              try {
-                filePath = decodeURIComponent(filePath);
-              } catch {
-                // 忽略解码错误
-              }
+              let filePath = fileUrlToPath(fileUrl);
               runtimeResolveCache.set(protocolPath, filePath);
 
               // 客户端构建且为 npm 包时，若解析到 CJS 文件则改用 ESM 入口
@@ -1790,8 +1787,9 @@ export function denoResolverPlugin(
               debugLog(
                 `onLoad 分支 file:// 文件不存在 path=${filePath}，对 jsr: 尝试 fetchJsrSourceViaMeta`,
               );
-              // 文件不存在（如缓存路径在另一台机器或已清理）：对 jsr: 回退到 fetchJsrSourceViaMeta，避免返回空内容导致 "No matching export"
+              // 文件不存在（如 Windows 缓存路径与当前解析不一致、跨机器、缓存已清理）
               if (protocolPath.startsWith("jsr:")) {
+                // 对 jsr: 回退到 fetchJsrSourceViaMeta
                 const contents = await fetchJsrSourceViaMeta(
                   protocolPath,
                   debug,
@@ -1801,15 +1799,54 @@ export function denoResolverPlugin(
                   const loader = getLoaderFromPath(protocolPath);
                   return { contents, loader, resolveDir };
                 }
-              } else {
-                // 非 jsr: 且文件不存在时仍设置 resolveDir，返回空内容
-                const loader = getLoaderFromPath(filePath);
-                return {
-                  contents: "",
-                  loader,
-                  resolveDir,
-                };
+              } else if (protocolPath.startsWith("npm:")) {
+                // 对 npm: 尝试子进程在项目目录下 resolve，可拿到项目/工作区正确的缓存路径（如 Windows monorepo 下示例与根目录缓存不一致）
+                try {
+                  const projectDir =
+                    (build.initialOptions.absWorkingDir as string | undefined) ||
+                    cwd();
+                  const projectDenoJson = findProjectDenoJson(projectDir);
+                  const proc = createCommand("deno", {
+                    args: [
+                      "eval",
+                      ...(projectDenoJson ? ["--config", projectDenoJson] : []),
+                      "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
+                      protocolPath,
+                    ],
+                    cwd: projectDir,
+                    stdout: "piped",
+                    stderr: "piped",
+                  });
+                  const out = await proc.output();
+                if (out.success && out.stdout && out.stdout.length > 0) {
+                  const line = new TextDecoder().decode(out.stdout).trim();
+                  if (line.startsWith("file://")) {
+                    const altPath = fileUrlToPath(line);
+                    if (existsSync(altPath)) {
+                        const contents = await readTextFile(altPath);
+                        const altResolveDir = dirname(altPath);
+                        debugLog(
+                          `onLoad npm: 子进程 resolve 回退成功 path=${altPath} contentsLen=${contents.length}`,
+                        );
+                        const loader = getLoaderFromPath(altPath);
+                        return { contents, loader, resolveDir: altResolveDir };
+                      }
+                    }
+                  }
+                } catch {
+                  /* ignore */
+                }
+                debugLog(
+                  `onLoad npm: 子进程 resolve 回退失败，返回空内容 protocolPath=${protocolPath}`,
+                );
               }
+              // 最终回退：返回空内容（可能导致构建失败）
+              const loader = getLoaderFromPath(filePath);
+              return {
+                contents: "",
+                loader,
+                resolveDir,
+              };
             } else if (
               fileUrl &&
               (fileUrl.startsWith("https://") || fileUrl.startsWith("http://"))

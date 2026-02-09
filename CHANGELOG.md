@@ -8,6 +8,15 @@ and this project adheres to
 
 ---
 
+## [1.0.6] - 2026-02-09
+
+### Fixed
+
+- **Resolver**: Add `fileUrlToPath` helper to normalize Windows `file://` URLs. When `file:///C:/Users/...` is parsed, remove the leading slash so `existsSync` works correctly (e.g. `C:/Users/...` instead of `/C:/Users/...`).
+- **Resolver**: When `import.meta.resolve` returns a `file://` path that does not exist (e.g. Windows monorepo cache mismatch), add subprocess fallback for `npm:` packages to resolve in project directory and get the correct cache path.
+
+---
+
 ## [1.0.5] - 2026-02-09
 
 ### Changed
