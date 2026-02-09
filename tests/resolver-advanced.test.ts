@@ -419,6 +419,62 @@ export { logger };
         }, { sanitizeOps: false, sanitizeResources: false });
       });
 
+      describe("npm 子路径解析（Deno import.meta.resolve）", () => {
+        it("应该能够解析 npm 子路径（如 lodash/map）并通过子进程 resolve 打包", async () => {
+          try {
+            // 创建 deno.json 配置 lodash
+            const denoJsonPath = join(testDataDir, "deno.json");
+            const denoJson = {
+              imports: {
+                "lodash": "npm:lodash@4.17.21",
+                "lodash/map": "npm:lodash@4.17.21/map",
+                "preact/jsx-runtime": "npm:preact@10.28.0/jsx-runtime",
+                "react/jsx-runtime": "npm:react@18.3.1/jsx-runtime",
+              },
+            };
+            writeTextFileSync(
+              denoJsonPath,
+              JSON.stringify(denoJson, null, 2),
+            );
+
+            // 创建测试入口，导入 lodash/map（子路径，由 Deno import.meta.resolve 解析）
+            const testFile = join(testDataDir, "test-npm-subpath.ts");
+            await writeTextFile(
+              testFile,
+              `// 测试 npm 子路径 lodash/map 解析
+// 由 Deno 的 import.meta.resolve 解析，不依赖 package.json
+import map from "lodash/map";
+
+const result = map([1, 2, 3], (x: number) => x * 2);
+export const TestNpmSubpath = result;
+`,
+            );
+
+            // browserMode: false 会触发 buildModuleCache + isServerBuild: false，打包依赖
+            const result = await buildBundle({
+              entryPoint: testFile,
+              globalName: "TestNpmSubpath",
+              platform: "browser",
+              format: "iife",
+              bundle: true,
+              browserMode: false,
+            });
+
+            expect(result).toBeDefined();
+            expect(result.code).toBeDefined();
+            expect(result.code.length).toBeGreaterThan(100);
+            // 应包含 map 实现，而非空 stub
+            expect(result.code).toMatch(/map|iteratee|array/i);
+          } catch (error) {
+            const errorMessage = error instanceof Error
+              ? error.message
+              : String(error);
+            console.error("npm 子路径解析测试失败:", errorMessage);
+            throw error;
+          }
+        }, { sanitizeOps: false, sanitizeResources: false });
+      });
+
       describe("路径别名边界情况测试", () => {
         it("应该能够解析根路径别名 @/", async () => {
           try {

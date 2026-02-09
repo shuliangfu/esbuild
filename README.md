@@ -1054,9 +1054,10 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.4** (2026-02-09)
+**v1.0.5** (2026-02-09)
 
-- **Fixed**: npm subpath fallback resolution for `preact/jsx-runtime` in resolver (fixes empty stub causing hydration error)
+- **Changed**: Refactor npm subpath resolution to use Deno's `import.meta.resolve` instead of package.json
+- **Added**: npm subpath resolution test (lodash/map)
 
 See [CHANGELOG.md](./CHANGELOG.md) for full history.
 
