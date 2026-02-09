@@ -1030,9 +1030,9 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.3**（2026-02-08）
+**v1.0.4**（2026-02-09）
 
-- **新增**：Resolver 在 `debug: true` 时输出 React/Preact 解析调试日志（projectDir、startDir、denoJson、import、importer），便于构建时排查问题
+- **修复**：Resolver 中为 `preact/jsx-runtime` 增加 npm 子路径回退解析，修复空 stub 导致 hydration 报错
 
 完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
 

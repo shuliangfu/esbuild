@@ -8,6 +8,14 @@ and this project adheres to
 
 ---
 
+## [1.0.4] - 2026-02-09
+
+### Fixed
+
+- **Resolver**: Add npm subpath fallback resolution in `getLocalPathFromCache`. When `npm:preact@x.x.x/jsx-runtime` (or similar subpaths) cannot be resolved directly, derive package root from main package path and try common subpath file patterns (e.g. `jsx-runtime.mjs`, `jsx-runtime.js`, `jsx-runtime/index.mjs`). Fixes Preact hybrid hydration error `(void 0) is not a function` caused by empty stub modules when esbuild bundles `preact/jsx-runtime`.
+
+---
+
 ## [1.0.3] - 2026-02-08
 
 ### Added
