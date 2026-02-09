@@ -1054,9 +1054,9 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.3** (2026-02-08)
+**v1.0.4** (2026-02-09)
 
-- **Added**: Debug logging for React/Preact resolution in resolver when `debug: true` (projectDir, startDir, denoJson, import, importer) for build-time debugging
+- **Fixed**: npm subpath fallback resolution for `preact/jsx-runtime` in resolver (fixes empty stub causing hydration error)
 
 See [CHANGELOG.md](./CHANGELOG.md) for full history.
 

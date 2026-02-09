@@ -7,6 +7,14 @@
 
 ---
 
+## [1.0.4] - 2026-02-09
+
+### 修复
+
+- **Resolver**：在 `getLocalPathFromCache` 中增加 npm 子路径回退解析。当 `npm:preact@x.x.x/jsx-runtime`（或类似子路径）无法直接解析时，从主包路径推导包根，并尝试常见子路径文件（如 `jsx-runtime.mjs`、`jsx-runtime.js`、`jsx-runtime/index.mjs`）。修复 Preact 混合应用 hydration 报错 `(void 0) is not a function`（因 esbuild 打包 `preact/jsx-runtime` 时得到空 stub 模块导致）。
+
+---
+
 ## [1.0.3] - 2026-02-08
 
 ### 新增

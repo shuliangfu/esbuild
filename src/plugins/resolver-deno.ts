@@ -806,6 +806,41 @@ export function denoResolverPlugin(
               return localPath;
             }
           }
+
+          // npm 子路径回退：deno info 可能只缓存主包，子路径如 preact/jsx-runtime 需从主包目录解析
+          // 避免 onLoad 返回空内容导致 jsx-runtime 成空 stub、(void 0) is not a function
+          const slashIdx = specifier.indexOf("/");
+          if (slashIdx > 0) {
+            const mainSpec = specifier.slice(0, slashIdx);
+            const subpath = specifier.slice(slashIdx + 1);
+            const mainPath = moduleCache.get(mainSpec) ??
+              moduleCache.get(mainSpec.replace(/@\^/, "@").replace(/@~/, "@"));
+            if (mainPath && existsSync(mainPath)) {
+              let pkgRoot = dirname(mainPath);
+              // 主包可能是 dist/xxx.mjs，向上找 package.json 得包根目录
+              for (let i = 0; i < 5; i++) {
+                if (existsSync(join(pkgRoot, "package.json"))) break;
+                const parent = dirname(pkgRoot);
+                if (parent === pkgRoot) break;
+                pkgRoot = parent;
+              }
+              const subNorm = subpath.replace(/\\/g, "/");
+              const candidates = [
+                join(pkgRoot, subNorm + ".mjs"),
+                join(pkgRoot, subNorm + ".js"),
+                join(pkgRoot, subNorm, "index.mjs"),
+                join(pkgRoot, subNorm, "index.js"),
+              ];
+              for (const cand of candidates) {
+                if (existsSync(cand)) {
+                  debugLog(
+                    `getLocalPathFromCache npm 子路径: ${specifier} -> ${cand}`,
+                  );
+                  return cand;
+                }
+              }
+            }
+          }
         }
 
         // 对于 jsr: 协议，尝试转换为 https:// URL 格式查找
