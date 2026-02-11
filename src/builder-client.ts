@@ -280,6 +280,8 @@ export class BuilderClient {
         debug: this.config.debug,
         logger: log,
         forceRuntimeExternal: hasRuntimeExternal,
+        // 将 bundle alias（如 solid-js/jsx-runtime -> shim）传给 resolver，在解析时优先使用
+        resolveOverrides: bundleOptions.alias,
       }));
     }
     buildOptions.plugins = plugins;
@@ -459,6 +461,8 @@ export class BuilderClient {
         debug: this.config.debug,
         logger: log,
         forceRuntimeExternal: hasRuntimeExternalCtx,
+        // 将 bundle alias（如 solid-js/jsx-runtime -> shim）传给 resolver，在解析时优先使用
+        resolveOverrides: bundleOptions.alias,
       }));
     }
     buildOptions.plugins = plugins;

@@ -187,8 +187,7 @@ export function testLogger() {
           try {
             // 预加载 JSR 包，这会触发所有依赖的下载和缓存，包括包内的相对路径导入
             // 使用完全动态的导入字符串，避免 TypeScript 类型检查
-            const socketIoModule =
-              "jsr:@dreamer/socket-io@^1.0.3/client";
+            const socketIoModule = "jsr:@dreamer/socket-io@^1.0.3/client";
             const loggerModule = "jsr:@dreamer/logger@^1.0.0-beta.7/client";
 
             // 预加载主模块

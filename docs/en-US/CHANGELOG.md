@@ -8,16 +8,39 @@ and this project adheres to
 
 ---
 
+## [1.0.8] - 2026-02-11
+
+### Added
+
+- **BuilderServer**: `compileSolidRouteForSSR()` for Solid route single-file SSR
+  compile using esbuild-plugin-solid with `generate: "ssr"`. Exported from main
+  entry and `/server` subpath for use by frameworks (e.g. @dreamer/dweb).
+- **Tests**: `builder-server-solid-ssr.test.ts` — SSR compile fixture, output
+  contains server runtime (escape/ssrElement), contentHash cache.
+
+### Changed
+
+- **Docs**: TEST_REPORT and README test statistics updated (Deno 570, Bun 509
+  passed).
+
+---
+
 ## [1.0.7] - 2026-02-11
 
 ### Added
 
-- **BuilderClient**: Client build support for Solid.js. `engine` option now accepts `"solid"` alongside `"preact"` and `"react"`. When `engine: "solid"`, JSX uses `jsxImportSource: "solid-js"` and `solid-js` / `solid-js/` are treated as runtime externals.
-- **Tests**: Add "Multi-engine (preact / react / solid)" cases in `builder-client.test.ts` for client builds with preact, react, and solid.
+- **BuilderClient**: Client build support for Solid.js. `engine` option now
+  accepts `"solid"` alongside `"preact"` and `"react"`. When `engine: "solid"`,
+  JSX uses `jsxImportSource: "solid-js"` and `solid-js` / `solid-js/` are
+  treated as runtime externals.
+- **Tests**: Add "Multi-engine (preact / react / solid)" cases in
+  `builder-client.test.ts` for client builds with preact, react, and solid.
 
 ### Changed
 
-- **Docs**: Restructure docs into `docs/en-US/` and `docs/zh-CN/` by locale; remove root CHANGELOG and Chinese docs; update all doc links; add Chinese test report at `docs/zh-CN/TEST_REPORT.md`.
+- **Docs**: Restructure docs into `docs/en-US/` and `docs/zh-CN/` by locale;
+  remove root CHANGELOG and Chinese docs; update all doc links; add Chinese test
+  report at `docs/zh-CN/TEST_REPORT.md`.
 
 ---
 
@@ -25,8 +48,13 @@ and this project adheres to
 
 ### Fixed
 
-- **Resolver**: Add `fileUrlToPath` helper to normalize Windows `file://` URLs. When `file:///C:/Users/...` is parsed, remove the leading slash so `existsSync` works correctly (e.g. `C:/Users/...` instead of `/C:/Users/...`).
-- **Resolver**: When `import.meta.resolve` returns a `file://` path that does not exist (e.g. Windows monorepo cache mismatch), add subprocess fallback for `npm:` packages to resolve in project directory and get the correct cache path.
+- **Resolver**: Add `fileUrlToPath` helper to normalize Windows `file://` URLs.
+  When `file:///C:/Users/...` is parsed, remove the leading slash so
+  `existsSync` works correctly (e.g. `C:/Users/...` instead of `/C:/Users/...`).
+- **Resolver**: When `import.meta.resolve` returns a `file://` path that does
+  not exist (e.g. Windows monorepo cache mismatch), add subprocess fallback for
+  `npm:` packages to resolve in project directory and get the correct cache
+  path.
 
 ---
 
@@ -34,11 +62,16 @@ and this project adheres to
 
 ### Changed
 
-- **Resolver**: Refactor npm subpath resolution. Instead of parsing package.json exports (Deno projects do not use package.json), use Deno's `import.meta.resolve` via subprocess to resolve subpaths like `preact/jsx-runtime`. Add `runtimeResolveCache` to avoid repeated subprocess calls for the same module.
+- **Resolver**: Refactor npm subpath resolution. Instead of parsing package.json
+  exports (Deno projects do not use package.json), use Deno's
+  `import.meta.resolve` via subprocess to resolve subpaths like
+  `preact/jsx-runtime`. Add `runtimeResolveCache` to avoid repeated subprocess
+  calls for the same module.
 
 ### Added
 
-- **Tests**: Add npm subpath resolution test in `resolver-advanced.test.ts` (lodash/map via Deno import.meta.resolve).
+- **Tests**: Add npm subpath resolution test in `resolver-advanced.test.ts`
+  (lodash/map via Deno import.meta.resolve).
 
 ---
 
@@ -46,7 +79,13 @@ and this project adheres to
 
 ### Fixed
 
-- **Resolver**: Add npm subpath fallback resolution in `getLocalPathFromCache`. When `npm:preact@x.x.x/jsx-runtime` (or similar subpaths) cannot be resolved directly, derive package root from main package path and try common subpath file patterns (e.g. `jsx-runtime.mjs`, `jsx-runtime.js`, `jsx-runtime/index.mjs`). Fixes Preact hybrid hydration error `(void 0) is not a function` caused by empty stub modules when esbuild bundles `preact/jsx-runtime`.
+- **Resolver**: Add npm subpath fallback resolution in `getLocalPathFromCache`.
+  When `npm:preact@x.x.x/jsx-runtime` (or similar subpaths) cannot be resolved
+  directly, derive package root from main package path and try common subpath
+  file patterns (e.g. `jsx-runtime.mjs`, `jsx-runtime.js`,
+  `jsx-runtime/index.mjs`). Fixes Preact hybrid hydration error
+  `(void 0) is not a function` caused by empty stub modules when esbuild bundles
+  `preact/jsx-runtime`.
 
 ---
 
@@ -54,7 +93,10 @@ and this project adheres to
 
 ### Added
 
-- **Resolver**: Debug logging for React/Preact main package and subpath resolution when `debug: true` is passed (projectDir, startDir, denoJson, import, importer) to aid build-time debugging (e.g. dweb CSR/SSR client builds).
+- **Resolver**: Debug logging for React/Preact main package and subpath
+  resolution when `debug: true` is passed (projectDir, startDir, denoJson,
+  import, importer) to aid build-time debugging (e.g. dweb CSR/SSR client
+  builds).
 
 ---
 
@@ -62,15 +104,18 @@ and this project adheres to
 
 ### Added
 
-- **BuilderServer**: Add `builder-server-bun.test.ts` for Bun `buildWithBun` server build tests (2 tests, Bun only)
+- **BuilderServer**: Add `builder-server-bun.test.ts` for Bun `buildWithBun`
+  server build tests (2 tests, Bun only)
 
 ### Fixed
 
-- **BuilderServer**: Use absolute path for entry when `buildWithBun` resolves to avoid wrong file being built (e.g. when `main.ts` exists in cwd)
+- **BuilderServer**: Use absolute path for entry when `buildWithBun` resolves to
+  avoid wrong file being built (e.g. when `main.ts` exists in cwd)
 
 ### Changed
 
-- **Docs**: Update TEST_REPORT.md with Deno/Bun test statistics (518 Deno, 503 Bun)
+- **Docs**: Update TEST_REPORT.md with Deno/Bun test statistics (518 Deno, 503
+  Bun)
 - **Docs**: Update README and README-zh test badges and statistics tables
 
 ---
@@ -79,8 +124,14 @@ and this project adheres to
 
 ### Fixed
 
-- **Resolver**: Add fallback for `xxx.ts` subpath when `exports["./xxx.ts"]` does not exist in JSR package; try `exports["./xxx"]` instead. Fixes esbuild resolver failing to resolve `EnginePacketType` and `SocketIOPacketType` when bundling client code that imports `@dreamer/socket-io/client` (e.g. relative import `../types.ts` from client modules).
-- **Tests**: Disable leak detection for "应该清理测试输出目录" in edge-cases test to avoid CI failure caused by async `readTextFile` completing during test.
+- **Resolver**: Add fallback for `xxx.ts` subpath when `exports["./xxx.ts"]`
+  does not exist in JSR package; try `exports["./xxx"]` instead. Fixes esbuild
+  resolver failing to resolve `EnginePacketType` and `SocketIOPacketType` when
+  bundling client code that imports `@dreamer/socket-io/client` (e.g. relative
+  import `../types.ts` from client modules).
+- **Tests**: Disable leak detection for "应该清理测试输出目录" in edge-cases
+  test to avoid CI failure caused by async `readTextFile` completing during
+  test.
 
 ---
 

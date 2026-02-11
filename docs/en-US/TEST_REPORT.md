@@ -16,64 +16,65 @@
 ### Overall Statistics
 
 | Environment | Total Tests | Passed | Failed | Pass Rate |
-|-------------|-------------|--------|--------|-----------|
-| **Deno**    | 566         | 566 ✅ | 0      | 100% ✅   |
-| **Bun**     | 503         | 503 ✅ | 0      | 100% ✅   |
+| ----------- | ----------- | ------ | ------ | --------- |
+| **Deno**    | 570         | 570 ✅ | 0      | 100% ✅   |
+| **Bun**     | 509         | 509 ✅ | 0      | 100% ✅   |
 
-- **Test execution time**: ~24s (Deno `deno test -A`), ~20s (Bun `bun test`)
+- **Test execution time**: ~53s (Deno `deno test -A`), ~4s (Bun `bun test`)
 
-> **Note**: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
-> only in Bun; some tests use Deno-specific features (jsr:, deno.json) and run
-> only in Deno.
+> **Note**: Bun has fewer tests because builder-server-bun.test.ts (2 tests)
+> runs only in Bun; some tests use Deno-specific features (jsr:, deno.json) and
+> run only in Deno.
 
 ### Test File Statistics
 
-| Test File                           | Test Count | Status        | Description                             |
-| ----------------------------------- | ---------- | ------------- | --------------------------------------- |
-| `assets-processor-advanced.test.ts` | 15         | ✅ All passed | Assets processor advanced feature tests |
-| `assets-processor.test.ts`          | 13         | ✅ All passed | Assets processor basic feature tests    |
-| `browser-compile-socket-io.test.ts` | 5          | ✅ All passed | Browser compile Socket.IO, etc.         |
-| `browser-resolver.test.ts`          | 4          | ✅ All passed | Browser resolver relative paths, etc.   |
-| `build-analyzer-internal.test.ts`   | 9          | ✅ All passed | Build analyzer internal method tests    |
-| `build-analyzer.test.ts`            | 17         | ✅ All passed | Build analyzer feature tests            |
-| `build-client-resolver.test.ts`     | 6          | ✅ All passed | Client build path resolution tests      |
-| `builder-build-validation.test.ts`  | 6          | ✅ All passed | Build output validation tests           |
-| `builder-bundle.test.ts`            | 28         | ✅ All passed | Simple bundler feature tests            |
-| `builder-config-validation.test.ts` | 9          | ✅ All passed | Build configuration validation tests    |
-| `builder-error-handling.test.ts`    | 6          | ✅ All passed | Build error handling tests              |
-| `builder-internal-methods.test.ts`  | 11         | ✅ All passed | Builder internal method tests           |
-| `builder-multi-entry.test.ts`       | 5          | ✅ All passed | Multi-entry build tests                 |
-| `builder-performance.test.ts`       | 7          | ✅ All passed | Build performance monitoring tests      |
-| `builder-watch.test.ts`             | 9          | ✅ All passed | Watch mode tests                        |
-| `builder.test.ts`                   | 17         | ✅ All passed | Builder basic feature tests             |
-| `cache-manager-advanced.test.ts`    | 5          | ✅ All passed | Cache manager advanced feature tests    |
-| `cache-manager-cleanup.test.ts`     | 8          | ✅ All passed | Cache cleanup feature tests             |
-| `cache-manager.test.ts`             | 16         | ✅ All passed | Cache manager basic feature tests       |
-| `entry-exports.test.ts`             | 19         | ✅ All passed | Subpath export tests                    |
-| `builder-client-advanced.test.ts`   | 14         | ✅ All passed | Client builder advanced feature tests   |
-| `builder-client-context.test.ts`    | 8          | ✅ All passed | Client build context tests              |
+| Test File                           | Test Count | Status        | Description                                                    |
+| ----------------------------------- | ---------- | ------------- | -------------------------------------------------------------- |
+| `assets-processor-advanced.test.ts` | 15         | ✅ All passed | Assets processor advanced feature tests                        |
+| `assets-processor.test.ts`          | 13         | ✅ All passed | Assets processor basic feature tests                           |
+| `browser-compile-socket-io.test.ts` | 5          | ✅ All passed | Browser compile Socket.IO, etc.                                |
+| `browser-resolver.test.ts`          | 4          | ✅ All passed | Browser resolver relative paths, etc.                          |
+| `build-analyzer-internal.test.ts`   | 9          | ✅ All passed | Build analyzer internal method tests                           |
+| `build-analyzer.test.ts`            | 17         | ✅ All passed | Build analyzer feature tests                                   |
+| `build-client-resolver.test.ts`     | 6          | ✅ All passed | Client build path resolution tests                             |
+| `builder-build-validation.test.ts`  | 6          | ✅ All passed | Build output validation tests                                  |
+| `builder-bundle.test.ts`            | 28         | ✅ All passed | Simple bundler feature tests                                   |
+| `builder-config-validation.test.ts` | 9          | ✅ All passed | Build configuration validation tests                           |
+| `builder-error-handling.test.ts`    | 6          | ✅ All passed | Build error handling tests                                     |
+| `builder-internal-methods.test.ts`  | 11         | ✅ All passed | Builder internal method tests                                  |
+| `builder-multi-entry.test.ts`       | 5          | ✅ All passed | Multi-entry build tests                                        |
+| `builder-performance.test.ts`       | 7          | ✅ All passed | Build performance monitoring tests                             |
+| `builder-watch.test.ts`             | 9          | ✅ All passed | Watch mode tests                                               |
+| `builder.test.ts`                   | 17         | ✅ All passed | Builder basic feature tests                                    |
+| `cache-manager-advanced.test.ts`    | 5          | ✅ All passed | Cache manager advanced feature tests                           |
+| `cache-manager-cleanup.test.ts`     | 8          | ✅ All passed | Cache cleanup feature tests                                    |
+| `cache-manager.test.ts`             | 16         | ✅ All passed | Cache manager basic feature tests                              |
+| `entry-exports.test.ts`             | 19         | ✅ All passed | Subpath export tests                                           |
+| `builder-client-advanced.test.ts`   | 14         | ✅ All passed | Client builder advanced feature tests                          |
+| `builder-client-context.test.ts`    | 8          | ✅ All passed | Client build context tests                                     |
 | `builder-client.test.ts`            | 32         | ✅ All passed | Client builder feature tests (incl. preact/react/solid engine) |
-| `client-server-separation.test.ts`  | 14         | ✅ All passed | Client-server code separation tests     |
-| `css-import-handler.test.ts`        | 16         | ✅ All passed | CSS import handler plugin tests         |
-| `css-injector.test.ts`              | 28         | ✅ All passed | CSS injector utility tests              |
-| `css-integration.test.ts`           | 10         | ✅ All passed | CSS integration tests                   |
-| `css-optimizer-advanced.test.ts`    | 7          | ✅ All passed | CSS optimizer advanced feature tests    |
-| `css-optimizer.test.ts`             | 11         | ✅ All passed | CSS optimizer basic feature tests       |
-| `edge-cases.test.ts`                | 11         | ✅ All passed | Edge cases and exception scenario tests |
-| `html-generator-advanced.test.ts`   | 8          | ✅ All passed | HTML generator advanced feature tests   |
-| `html-generator-internal.test.ts`   | 8          | ✅ All passed | HTML generator internal method tests    |
-| `html-generator.test.ts`            | 14         | ✅ All passed | HTML generator feature tests            |
-| `integration.test.ts`               | 8          | ✅ All passed | Integration tests                       |
-| `plugin-advanced.test.ts`           | 5          | ✅ All passed | Plugin manager advanced feature tests   |
-| `plugin.test.ts`                    | 14         | ✅ All passed | Plugin manager basic feature tests      |
-| `builder-server-advanced.test.ts`   | 19         | ✅ All passed | Server builder advanced feature tests   |
-| `builder-server.test.ts`            | 16         | ✅ All passed | Server builder feature tests            |
-| `server-module-detector.test.ts`    | 24         | ✅ All passed | Server module detector plugin tests     |
-| `resolver-advanced.test.ts`         | 11         | ✅ All passed | Resolver plugin advanced tests          |
-| `resolver.test.ts`                  | 18         | ✅ All passed | Resolver plugin tests                   |
-| `builder-server-resolver.test.ts`   | 5          | ✅ All passed | Server builder path resolution tests    |
-| `builder-server-bun.test.ts`        | 2          | ✅ All passed | Bun buildWithBun server build tests      |
-| `builder-client-resolver.test.ts`   | 6          | ✅ All passed | Client builder path resolution tests    |
+| `client-server-separation.test.ts`  | 14         | ✅ All passed | Client-server code separation tests                            |
+| `css-import-handler.test.ts`        | 16         | ✅ All passed | CSS import handler plugin tests                                |
+| `css-injector.test.ts`              | 28         | ✅ All passed | CSS injector utility tests                                     |
+| `css-integration.test.ts`           | 10         | ✅ All passed | CSS integration tests                                          |
+| `css-optimizer-advanced.test.ts`    | 7          | ✅ All passed | CSS optimizer advanced feature tests                           |
+| `css-optimizer.test.ts`             | 11         | ✅ All passed | CSS optimizer basic feature tests                              |
+| `edge-cases.test.ts`                | 11         | ✅ All passed | Edge cases and exception scenario tests                        |
+| `html-generator-advanced.test.ts`   | 8          | ✅ All passed | HTML generator advanced feature tests                          |
+| `html-generator-internal.test.ts`   | 8          | ✅ All passed | HTML generator internal method tests                           |
+| `html-generator.test.ts`            | 14         | ✅ All passed | HTML generator feature tests                                   |
+| `integration.test.ts`               | 8          | ✅ All passed | Integration tests                                              |
+| `plugin-advanced.test.ts`           | 5          | ✅ All passed | Plugin manager advanced feature tests                          |
+| `plugin.test.ts`                    | 14         | ✅ All passed | Plugin manager basic feature tests                             |
+| `builder-server-advanced.test.ts`   | 19         | ✅ All passed | Server builder advanced feature tests                          |
+| `builder-server.test.ts`            | 16         | ✅ All passed | Server builder feature tests                                   |
+| `server-module-detector.test.ts`    | 24         | ✅ All passed | Server module detector plugin tests                            |
+| `resolver-advanced.test.ts`         | 11         | ✅ All passed | Resolver plugin advanced tests                                 |
+| `resolver.test.ts`                  | 18         | ✅ All passed | Resolver plugin tests                                          |
+| `builder-server-resolver.test.ts`   | 5          | ✅ All passed | Server builder path resolution tests                           |
+| `builder-server-solid-ssr.test.ts`  | 4          | ✅ All passed | Solid route SSR compile (compileSolidRouteForSSR)              |
+| `builder-server-bun.test.ts`        | 2          | ✅ All passed | Bun buildWithBun server build tests                            |
+| `builder-client-resolver.test.ts`   | 6          | ✅ All passed | Client builder path resolution tests                           |
 
 ## Feature Test Details
 
@@ -421,9 +422,12 @@
 - ✅ minify in config should override mode default behavior
 - ✅ Should disable minify and enable sourcemap in dev mode (createContext)
 - ✅ Should enable minify and disable sourcemap in prod mode (createContext)
-- ✅ **Multi-engine (preact / react / solid)**: engine preact should complete client build
-- ✅ **Multi-engine (preact / react / solid)**: engine react should complete client build
-- ✅ **Multi-engine (preact / react / solid)**: engine solid should complete client build
+- ✅ **Multi-engine (preact / react / solid)**: engine preact should complete
+  client build
+- ✅ **Multi-engine (preact / react / solid)**: engine react should complete
+  client build
+- ✅ **Multi-engine (preact / react / solid)**: engine solid should complete
+  client build
 - ✅ Should handle non-existent entry file
 - ✅ Should handle empty entry file
 
@@ -778,7 +782,24 @@
 - ✅ Supports `tsconfig.json` path alias configuration
 - ✅ Supports scenarios without config file
 
-### 39. Client Builder Path Resolution (builder-client-resolver.test.ts) - 6 tests
+### 39. Solid Route SSR Compile (builder-server-solid-ssr.test.ts) - 4 tests
+
+**Test scenarios**:
+
+- ✅ Should create Solid .tsx fixture and complete SSR compile
+- ✅ SSR compile output should contain server runtime features
+  (escape/ssrElement, not client insert/assign)
+- ✅ Same contentHash should hit cache and return same outPath
+
+**Test result**: All 4 tests passed
+
+**Implementation characteristics**:
+
+- ✅ Uses esbuild-plugin-solid with `generate: "ssr"` for Solid route
+  single-file compile
+- ✅ Output uses escape/ssrElement for server-side render; cache by contentHash
+
+### 40. Client Builder Path Resolution (builder-client-resolver.test.ts) - 6 tests
 
 **Test scenarios**:
 
@@ -795,7 +816,7 @@
 - ✅ Supports path resolution in code splitting scenarios
 - ✅ Supports `tsconfig.json` path alias configuration
 
-### 40. Client Build Path Resolution (build-client-resolver.test.ts) - 6 tests
+### 41. Client Build Path Resolution (build-client-resolver.test.ts) - 6 tests
 
 **Test scenarios**:
 
@@ -924,8 +945,8 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
 
 **Total tests**:
 
-- **566** tests (Deno `deno test -A`, all passed)
-- **503** tests (Bun `bun test`, all passed)
+- **570** tests (Deno `deno test -A`, all passed)
+- **509** tests (Bun `bun test`, all passed)
 
 > Note: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
 > only in Bun; some tests use Deno-specific features and run only in Deno.
@@ -956,5 +977,6 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
 - ✅ ESM and IIFE format tests
 - ✅ Server external dependency configuration tests
 - ✅ Native compiler (useNativeCompile) tests
+- ✅ Solid route SSR compile (compileSolidRouteForSSR) tests
 
 **Safe for production use.**

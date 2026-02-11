@@ -12,7 +12,7 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20570%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 ---
 
@@ -972,14 +972,15 @@ compiler to generate standalone executable:
 ## 📊 Test Report
 
 This library has been thoroughly tested, all test cases passed, with 100% test
-coverage. See [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md) for detailed test report.
+coverage. See [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md) for detailed test
+report.
 
 **Test statistics**:
 
-| Runtime | Tests | Passed | Failed | Pass Rate |
-|--------|-------|--------|--------|-----------|
-| Deno (`deno test -A`) | 518 | 518 | 0 | 100% ✅ |
-| Bun (`bun test`) | 503 | 503 | 0 | 100% ✅ |
+| Runtime               | Tests | Passed | Failed | Pass Rate |
+| --------------------- | ----- | ------ | ------ | --------- |
+| Deno (`deno test -A`) | 570   | 570    | 0      | 100% ✅   |
+| Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
   handling
@@ -1054,11 +1055,13 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.7** (2026-02-11)
+**v1.0.8** (2026-02-11)
 
-- **Added**: Solid.js client build support (`engine: "solid"`, JSX + runtime externals for solid-js).
-- **Added**: Multi-engine tests (preact / react / solid) in builder-client.test.ts.
-- **Changed**: Docs restructure (`docs/en-US/`, `docs/zh-CN/`), link updates, Chinese test report.
+- **Added**: `compileSolidRouteForSSR()` in BuilderServer for Solid route SSR
+  compile; exported from main and `/server`.
+- **Added**: `builder-server-solid-ssr.test.ts` (SSR compile, server runtime
+  output, contentHash cache).
+- **Changed**: TEST_REPORT and README test stats (Deno 570, Bun 509).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
