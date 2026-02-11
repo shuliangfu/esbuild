@@ -22,6 +22,7 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
+import * as solidPluginModule from "esbuild-plugin-solid";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import type {
@@ -650,4 +651,87 @@ export class BuilderServer {
   getConfig(): ServerConfig {
     return this.config;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Solid 路由 SSR 单文件编译（供 dweb 等框架在加载 Solid 路由前调用）
+// ---------------------------------------------------------------------------
+
+/** Solid 插件选项：generate 须为 "ssr" 以产出服务端用 escape/ssrElement */
+type SolidPluginOptions = {
+  solid?: { generate?: "ssr" | "dom" | "universal"; hydratable?: boolean };
+};
+
+/** 缓存：SSR 编译后的临时目录，按内容哈希复用 */
+const solidSsrCompileCache = new Map<
+  string,
+  { outPath: string; dispose: () => Promise<void> }
+>();
+
+/**
+ * 将单文件路由用 Solid SSR 模式编译到临时文件
+ *
+ * 按 Solid 官方要求，服务端须用 generate: "ssr" 编译 JSX（使用 escape/ssrElement），
+ * 否则会触发 "Client-only API called on the server side"。
+ * 供 @dreamer/dweb 等在 SSR 加载 Solid 路由前调用，编译产物由调用方 import。
+ *
+ * @param absPath 路由文件绝对路径（.tsx/.jsx）
+ * @param cwdPath 项目根目录（absWorkingDir）
+ * @param contentHash 可选，源码内容哈希，用于缓存
+ * @returns 编译产物的绝对路径，调用方 import 后需在适当时机清理
+ */
+export async function compileSolidRouteForSSR(
+  absPath: string,
+  cwdPath: string,
+  contentHash?: string,
+): Promise<string> {
+  const cacheKey = contentHash ?? absPath;
+  const cached = solidSsrCompileCache.get(cacheKey);
+  if (cached) return cached.outPath;
+
+  const mod = solidPluginModule as unknown as {
+    solidPlugin?: (opts?: SolidPluginOptions) => esbuild.Plugin;
+    default?: (opts?: SolidPluginOptions) => esbuild.Plugin;
+  };
+  const solidPlugin = mod.solidPlugin ?? mod.default;
+  if (!solidPlugin) {
+    throw new Error("esbuild-plugin-solid 未提供 solidPlugin 或 default 导出");
+  }
+
+  const outDir = await makeTempDir({ prefix: "dreamer-solid-ssr-" });
+  const outFile = join(outDir, "route.mjs");
+
+  await esbuild.build({
+    entryPoints: [absPath],
+    bundle: true,
+    format: "esm",
+    outfile: outFile,
+    platform: "neutral",
+    target: "esnext",
+    write: true,
+    plugins: [
+      solidPlugin({
+        solid: { generate: "ssr", hydratable: true },
+      }),
+    ],
+    external: [
+      "solid-js",
+      "solid-js/*",
+      "@dreamer/*",
+      "node:*",
+    ],
+    absWorkingDir: cwdPath,
+  });
+
+  const dispose = async () => {
+    try {
+      await remove(outDir);
+    } catch {
+      // ignore
+    }
+    solidSsrCompileCache.delete(cacheKey);
+  };
+
+  solidSsrCompileCache.set(cacheKey, { outPath: outFile, dispose });
+  return outFile;
 }

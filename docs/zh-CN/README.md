@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20570%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 [English](../en-US/README.md) | 中文 (Chinese)
 
@@ -958,10 +958,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 **测试统计**：
 
-| 运行时 | 测试数 | 通过 | 失败 | 通过率 |
-|--------|--------|------|------|--------|
-| Deno (`deno test -A`) | 518 | 518 | 0 | 100% ✅ |
-| Bun (`bun test`) | 503 | 503 | 0 | 100% ✅ |
+| 运行时                | 测试数 | 通过 | 失败 | 通过率  |
+| --------------------- | ------ | ---- | ---- | ------- |
+| Deno (`deno test -A`) | 570    | 570  | 0    | 100% ✅ |
+| Bun (`bun test`)      | 509    | 509  | 0    | 100% ✅ |
 
 - **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理
 - **测试环境**: Deno 2.x, Bun 1.3.5
@@ -1030,11 +1030,13 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.7**（2026-02-11）
+**v1.0.8**（2026-02-11）
 
-- **新增**：客户端构建支持 Solid.js（`engine: "solid"`，JSX 与 solid-js 运行时 external）。
-- **新增**：多引擎用例（preact / react / solid）于 builder-client.test.ts。
-- **变更**：文档按语言拆分（docs/en-US、docs/zh-CN）、链接更新、中文测试报告。
+- **新增**：BuilderServer 新增 `compileSolidRouteForSSR()`，用于 Solid 路由 SSR
+  编译；从主入口及 `/server` 导出。
+- **新增**：`builder-server-solid-ssr.test.ts`（SSR
+  编译、服务端运行时产物、contentHash 缓存）。
+- **变更**：TEST_REPORT 与 README 测试统计更新（Deno 570、Bun 509）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

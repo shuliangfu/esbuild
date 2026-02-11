@@ -20,13 +20,13 @@ import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 if (IS_BUN) {
   describe("BuilderServer Bun 环境 (buildWithBun)", () => {
-  let entryDir: string;
-  let entryFile: string;
-  let outputDir: string;
-  let testDataDir: string;
+    let entryDir: string;
+    let entryFile: string;
+    let outputDir: string;
+    let testDataDir: string;
 
-  beforeAll(async () => {
-    testDataDir = getTestDataDir();
+    beforeAll(async () => {
+      testDataDir = getTestDataDir();
       const bunTestDir = join(testDataDir, "bun-server-test");
       entryDir = join(bunTestDir, "src");
       entryFile = join(entryDir, "main.ts");
@@ -57,42 +57,42 @@ if (IS_BUN) {
       }
     });
 
-  it("应使用 buildWithBun 成功构建并输出 server.js", async () => {
-    const config: ServerConfig = {
-      entry: entryFile,
-      output: outputDir,
-      external: ["tailwindcss", "lightningcss"],
-    };
+    it("应使用 buildWithBun 成功构建并输出 server.js", async () => {
+      const config: ServerConfig = {
+        entry: entryFile,
+        output: outputDir,
+        external: ["tailwindcss", "lightningcss"],
+      };
 
-    const builder = new BuilderServer(config);
-    const result = await builder.build("prod");
+      const builder = new BuilderServer(config);
+      const result = await builder.build("prod");
 
-    expect(result).toBeTruthy();
-    expect(result.outputFiles).toBeTruthy();
-    expect(result.outputFiles!.length).toBeGreaterThan(0);
+      expect(result).toBeTruthy();
+      expect(result.outputFiles).toBeTruthy();
+      expect(result.outputFiles!.length).toBeGreaterThan(0);
 
-    const serverJs = join(outputDir, "server.js");
-    expect(await exists(serverJs)).toBe(true);
+      const serverJs = join(outputDir, "server.js");
+      expect(await exists(serverJs)).toBe(true);
 
-    const entries = await readdir(outputDir);
-    const serverEntry = entries.find((e) => e.name === "server.js");
-    expect(serverEntry).toBeDefined();
-  }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
+      const entries = await readdir(outputDir);
+      const serverEntry = entries.find((e) => e.name === "server.js");
+      expect(serverEntry).toBeDefined();
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
 
-  it("应在 write:false 时返回 outputContents", async () => {
-    const config: ServerConfig = {
-      entry: entryFile,
-      output: outputDir,
-      external: ["tailwindcss", "lightningcss"],
-    };
+    it("应在 write:false 时返回 outputContents", async () => {
+      const config: ServerConfig = {
+        entry: entryFile,
+        output: outputDir,
+        external: ["tailwindcss", "lightningcss"],
+      };
 
-    const builder = new BuilderServer(config);
-    const result = await builder.build({ mode: "prod", write: false });
+      const builder = new BuilderServer(config);
+      const result = await builder.build({ mode: "prod", write: false });
 
-    expect(result).toBeTruthy();
-    expect(result.outputContents).toBeTruthy();
-    expect(result.outputContents!.length).toBeGreaterThan(0);
-    expect(result.outputContents![0].text).toContain("Bun server build test");
-  }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
+      expect(result).toBeTruthy();
+      expect(result.outputContents).toBeTruthy();
+      expect(result.outputContents!.length).toBeGreaterThan(0);
+      expect(result.outputContents![0].text).toContain("Bun server build test");
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
   });
 }

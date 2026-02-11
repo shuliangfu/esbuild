@@ -292,6 +292,12 @@ export interface ResolverOptions {
    * 用于双构建场景：主包打包 preact，chunk 通过 import map 引用主包
    */
   forceRuntimeExternal?: boolean;
+  /**
+   * 解析覆盖：指定 specifier -> 本地文件路径的映射，在解析 bare specifier 时优先使用。
+   * 例如 { "solid-js/jsx-runtime": "/path/to/solid-jsx-runtime-shim.ts" }，
+   * 可让客户端构建使用 shim 而非 npm 包内的 jsx-runtime（避免 npm 包无 jsx/jsxs 导出问题）。
+   */
+  resolveOverrides?: Record<string, string>;
 }
 
 /**
@@ -738,6 +744,8 @@ export function denoResolverPlugin(
     debug = false,
     logger: optionsLogger,
     forceRuntimeExternal = false,
+    // 解析覆盖：如 solid-js/jsx-runtime -> shim 路径，在 package/subpath 解析时优先使用
+    resolveOverrides,
   } = options;
 
   const log = optionsLogger ?? NOOP_LOGGER;
@@ -886,7 +894,8 @@ export function denoResolverPlugin(
               const pkgName = mainSpec.replace(/^npm:/, "").split("@")[0];
               for (const [k, v] of moduleCache.entries()) {
                 if (
-                  (k.startsWith(`npm:${pkgName}@`) || k.includes(`/${pkgName}@`)) &&
+                  (k.startsWith(`npm:${pkgName}@`) ||
+                    k.includes(`/${pkgName}@`)) &&
                   existsSync(v)
                 ) {
                   mainPath = v;
@@ -1271,6 +1280,13 @@ export function denoResolverPlugin(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*\/.+$/ },
         (args): esbuild.OnResolveResult | undefined => {
           const path = args.path;
+
+          // 优先使用 resolveOverrides（如 solid-js/jsx-runtime -> shim），避免走 npm 包解析
+          if (resolveOverrides && resolveOverrides[path]) {
+            const overridePath = resolveOverrides[path];
+            debugLog(`resolveOverrides: ${path} -> ${overridePath}`);
+            return { path: overridePath, namespace: "file" };
+          }
 
           const slashIndex = path.indexOf("/");
           const packageName = path.slice(0, slashIndex);
@@ -1802,8 +1818,9 @@ export function denoResolverPlugin(
               } else if (protocolPath.startsWith("npm:")) {
                 // 对 npm: 尝试子进程在项目目录下 resolve，可拿到项目/工作区正确的缓存路径（如 Windows monorepo 下示例与根目录缓存不一致）
                 try {
-                  const projectDir =
-                    (build.initialOptions.absWorkingDir as string | undefined) ||
+                  const projectDir = (build.initialOptions.absWorkingDir as
+                    | string
+                    | undefined) ||
                     cwd();
                   const projectDenoJson = findProjectDenoJson(projectDir);
                   const proc = createCommand("deno", {
@@ -1818,11 +1835,11 @@ export function denoResolverPlugin(
                     stderr: "piped",
                   });
                   const out = await proc.output();
-                if (out.success && out.stdout && out.stdout.length > 0) {
-                  const line = new TextDecoder().decode(out.stdout).trim();
-                  if (line.startsWith("file://")) {
-                    const altPath = fileUrlToPath(line);
-                    if (existsSync(altPath)) {
+                  if (out.success && out.stdout && out.stdout.length > 0) {
+                    const line = new TextDecoder().decode(out.stdout).trim();
+                    if (line.startsWith("file://")) {
+                      const altPath = fileUrlToPath(line);
+                      if (existsSync(altPath)) {
                         const contents = await readTextFile(altPath);
                         const altResolveDir = dirname(altPath);
                         debugLog(

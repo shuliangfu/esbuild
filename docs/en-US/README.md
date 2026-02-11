@@ -976,10 +976,10 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 **Test statistics**:
 
-| Runtime | Tests | Passed | Failed | Pass Rate |
-|--------|-------|--------|--------|-----------|
-| Deno (`deno test -A`) | 518 | 518 | 0 | 100% ✅ |
-| Bun (`bun test`) | 503 | 503 | 0 | 100% ✅ |
+| Runtime               | Tests | Passed | Failed | Pass Rate |
+| --------------------- | ----- | ------ | ------ | --------- |
+| Deno (`deno test -A`) | 518   | 518    | 0      | 100% ✅   |
+| Bun (`bun test`)      | 503   | 503    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
   handling
@@ -1057,7 +1057,8 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 **v1.0.6** (2026-02-09)
 
 - **Fixed**: Normalize Windows `file://` path (remove leading slash for `C:/`)
-- **Fixed**: npm subprocess fallback when resolved file path does not exist (e.g. Windows monorepo)
+- **Fixed**: npm subprocess fallback when resolved file path does not exist
+  (e.g. Windows monorepo)
 
 Full history in [CHANGELOG.md](./CHANGELOG.md).
 
