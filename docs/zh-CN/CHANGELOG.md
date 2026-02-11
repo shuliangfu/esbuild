@@ -7,6 +7,19 @@
 
 ---
 
+## [1.0.7] - 2026-02-11
+
+### 新增
+
+- **BuilderClient**：客户端构建支持 Solid.js。`engine` 可选值增加 `"solid"`，与 `preact`、`react` 并列；配置 `engine: "solid"` 时使用 `jsxImportSource: "solid-js"`，并将 `solid-js` / `solid-js/` 作为 runtime external 处理。
+- **测试**：在 `builder-client.test.ts` 中新增「多引擎 (preact / react / solid)」用例，覆盖 preact、react、solid 三种引擎的客户端构建。
+
+### 变更
+
+- **文档**：按语言拆分文档目录为 `docs/en-US/` 与 `docs/zh-CN/`，移除根目录 `CHANGELOG.md`、`README-zh.md`、`CHANGELOG-zh.md`，统一文档链接（英文 → docs/en-US，中文 → docs/zh-CN），新增中文测试报告 `docs/zh-CN/TEST_REPORT.md`。
+
+---
+
 ## [1.0.6] - 2026-02-09
 
 ### 修复

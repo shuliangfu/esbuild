@@ -1,16 +1,16 @@
 # @dreamer/esbuild
 
 > 兼容 Deno 和 Bun
-> 的高性能构建工具库，提供全栈编译、打包、资源处理、优化等功能，支持子路径按需导入
+> 的高性能构建工具包，提供全栈编译、打包、资源处理、优化等功能，支持子路径按需导入
 
-本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb)
+本包是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb)
 框架的核心构建引擎，也可独立用于任意 Deno/Bun 项目的构建。
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 [![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./TEST_REPORT.md)
 
-[English](./README.md) | 中文 (Chinese)
+[English](../en-US/README.md) | 中文 (Chinese)
 
 ---
 
@@ -32,7 +32,7 @@
 
 ## 🎯 功能
 
-构建工具库，提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能。基于
+构建工具包，提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能。基于
 esbuild 实现高性能打包，支持 TypeScript、JSX、代码分割、Tree-shaking
 等现代构建特性。
 
@@ -176,7 +176,7 @@ import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
 ### 与 @dreamer/dweb 集成
 
-本库是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 的核心构建引擎。dweb 的
+本包是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) 的核心构建引擎。dweb 的
 `deno task build` 内部调用 `Builder.build()`，完成服务端 + 客户端 +
 资源处理。生产模式下，dweb 使用 `asset-manifest.json` 在 SSR/Hybrid/SSG 输出
 HTML 前替换资源路径。
@@ -468,7 +468,7 @@ new BuilderClient(config: ClientConfig)
 
 - `debug?: boolean`：是否启用调试日志（默认：false），开启后输出 resolver/build
   等详细调试信息。
-- `logger?: BuildLogger`：日志实例（未传时使用库内默认 logger），info/debug
+- `logger?: BuildLogger`：日志实例（未传时使用包内默认 logger），info/debug
   均通过 logger 输出，不使用 console。
 
 **ClientConfig.cssImport**（CSS 导入处理）：
@@ -552,7 +552,7 @@ interface ServerConfig {
   useNativeCompile?: boolean;
   /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息，便于排查 */
   debug?: boolean;
-  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  /** 日志实例（未传时使用包内默认 logger），info/debug 均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
   // ... 其他配置
 }
@@ -642,7 +642,7 @@ interface BundleOptions {
   bundle?: boolean;
   /** 是否启用调试日志（默认：false），开启后输出 resolver/build 等详细调试信息 */
   debug?: boolean;
-  /** 日志实例（未传时使用库内默认 logger），info/debug 均通过 logger 输出，不使用 console */
+  /** 日志实例（未传时使用包内默认 logger），info/debug 均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
 }
 ```
@@ -737,7 +737,7 @@ interface OutputFileContent {
 
 - **debug**（`boolean`，默认 `false`）：设为 `true` 时输出 resolver、build
   等详细调试信息。
-- **logger**（`BuildLogger`，可选）：日志实例；未传时使用库内默认 logger。所有
+- **logger**（`BuildLogger`，可选）：日志实例；未传时使用包内默认 logger。所有
   info/debug 输出均通过 logger，不使用 `console`。
 
 **示例**：
@@ -897,7 +897,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## ⚙️ 编译方式
 
-本库根据运行时环境自动选择最优的编译方式：
+本包根据运行时环境自动选择最优的编译方式：
 
 | 构建器                               | Deno 环境                 | Bun 环境                       |
 | ------------------------------------ | ------------------------- | ------------------------------ |
@@ -953,7 +953,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📊 测试报告
 
-本库经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看
+本包经过全面测试，所有测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看
 [TEST_REPORT.md](./TEST_REPORT.md)。
 
 **测试统计**：
@@ -1030,12 +1030,13 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.6**（2026-02-09）
+**v1.0.7**（2026-02-11）
 
-- **修复**：规范化 Windows `file://` 路径（去掉 `C:/` 前的斜杠）
-- **修复**：解析到的文件路径不存在时对 npm 包增加子进程回退（如 Windows monorepo）
+- **新增**：客户端构建支持 Solid.js（`engine: "solid"`，JSX 与 solid-js 运行时 external）。
+- **新增**：多引擎用例（preact / react / solid）于 builder-client.test.ts。
+- **变更**：文档按语言拆分（docs/en-US、docs/zh-CN）、链接更新、中文测试报告。
 
-完整历史见 [CHANGELOG-zh.md](./CHANGELOG-zh.md)。
+完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ---
 

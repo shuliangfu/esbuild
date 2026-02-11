@@ -5,7 +5,7 @@
 - **Test library version**: @dreamer/test@^1.0.0
 - **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.3
 - **Test framework**: @dreamer/test (compatible with Deno and Bun)
-- **Test date**: 2026-02-08
+- **Test date**: 2026-02-11
 - **Test environment**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
@@ -17,10 +17,10 @@
 
 | Environment | Total Tests | Passed | Failed | Pass Rate |
 |-------------|-------------|--------|--------|-----------|
-| **Deno**    | 518         | 518 ✅ | 0      | 100% ✅   |
+| **Deno**    | 566         | 566 ✅ | 0      | 100% ✅   |
 | **Bun**     | 503         | 503 ✅ | 0      | 100% ✅   |
 
-- **Test execution time**: ~40s (Deno `deno test -A`), ~20s (Bun `bun test`)
+- **Test execution time**: ~24s (Deno `deno test -A`), ~20s (Bun `bun test`)
 
 > **Note**: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
 > only in Bun; some tests use Deno-specific features (jsr:, deno.json) and run
@@ -52,7 +52,7 @@
 | `entry-exports.test.ts`             | 19         | ✅ All passed | Subpath export tests                    |
 | `builder-client-advanced.test.ts`   | 14         | ✅ All passed | Client builder advanced feature tests   |
 | `builder-client-context.test.ts`    | 8          | ✅ All passed | Client build context tests              |
-| `builder-client.test.ts`            | 28         | ✅ All passed | Client builder feature tests            |
+| `builder-client.test.ts`            | 32         | ✅ All passed | Client builder feature tests (incl. preact/react/solid engine) |
 | `client-server-separation.test.ts`  | 14         | ✅ All passed | Client-server code separation tests     |
 | `css-import-handler.test.ts`        | 16         | ✅ All passed | CSS import handler plugin tests         |
 | `css-injector.test.ts`              | 28         | ✅ All passed | CSS injector utility tests              |
@@ -394,7 +394,7 @@
 
 **Test result**: All 8 tests passed
 
-### 20. Client Builder (builder-client.test.ts) - 28 tests
+### 20. Client Builder (builder-client.test.ts) - 32 tests
 
 **Test scenarios**:
 
@@ -421,10 +421,13 @@
 - ✅ minify in config should override mode default behavior
 - ✅ Should disable minify and enable sourcemap in dev mode (createContext)
 - ✅ Should enable minify and disable sourcemap in prod mode (createContext)
+- ✅ **Multi-engine (preact / react / solid)**: engine preact should complete client build
+- ✅ **Multi-engine (preact / react / solid)**: engine react should complete client build
+- ✅ **Multi-engine (preact / react / solid)**: engine solid should complete client build
 - ✅ Should handle non-existent entry file
 - ✅ Should handle empty entry file
 
-**Test result**: All 28 tests passed
+**Test result**: All 32 tests passed
 
 **Implementation characteristics**:
 
@@ -822,7 +825,7 @@
 | `Builder`            | `watch()`            | Start Watch mode                   | ✅ 9 tests          |
 | `Builder`            | `stopWatch()`        | Stop Watch mode                    | ✅ 2 tests          |
 | `BuilderBundle`      | `build()`            | Simple bundling                    | ✅ 24 tests         |
-| `BuilderClient`      | `build()`            | Build client code                  | ✅ 28 tests         |
+| `BuilderClient`      | `build()`            | Build client code                  | ✅ 32 tests         |
 | `BuilderClient`      | `createContext()`    | Create incremental build context   | ✅ 8 tests          |
 | `BuilderClient`      | `rebuild()`          | Incremental rebuild                | ✅ 4 tests          |
 | `BuilderClient`      | `dispose()`          | Clean build context                | ✅ 3 tests          |
@@ -921,7 +924,7 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
 
 **Total tests**:
 
-- **518** tests (Deno `deno test -A`, all passed)
+- **566** tests (Deno `deno test -A`, all passed)
 - **503** tests (Bun `bun test`, all passed)
 
 > Note: Bun has fewer tests because builder-server-bun.test.ts (2 tests) runs
