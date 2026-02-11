@@ -457,6 +457,59 @@ describe("BuilderClient", () => {
     }, { sanitizeOps: false, sanitizeResources: false });
   });
 
+  describe("多引擎 (preact / react / solid)", () => {
+    const engineEntryFile = join(getTestDataDir(), "src", "index.ts");
+    const engineOutputDir = getTestOutputDir("client-builder-engine");
+
+    it("engine: preact 时应能完成客户端构建", async () => {
+      await mkdir(join(getTestDataDir(), "src"), { recursive: true });
+      await writeTextFile(engineEntryFile, "console.log('preact');");
+      const config: ClientConfig = {
+        entry: engineEntryFile,
+        output: engineOutputDir,
+        engine: "preact",
+        bundle: { minify: false, sourcemap: false },
+      };
+      const builder = new BuilderClient(config);
+      const result = await builder.build("dev");
+      expect(result).toBeTruthy();
+      expect(result.outputFiles).toBeTruthy();
+      expect(result.outputFiles!.length).toBeGreaterThan(0);
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("engine: react 时应能完成客户端构建", async () => {
+      await mkdir(join(getTestDataDir(), "src"), { recursive: true });
+      await writeTextFile(engineEntryFile, "console.log('react');");
+      const config: ClientConfig = {
+        entry: engineEntryFile,
+        output: engineOutputDir,
+        engine: "react",
+        bundle: { minify: false, sourcemap: false },
+      };
+      const builder = new BuilderClient(config);
+      const result = await builder.build("dev");
+      expect(result).toBeTruthy();
+      expect(result.outputFiles).toBeTruthy();
+      expect(result.outputFiles!.length).toBeGreaterThan(0);
+    }, { sanitizeOps: false, sanitizeResources: false });
+
+    it("engine: solid 时应能完成客户端构建", async () => {
+      await mkdir(join(getTestDataDir(), "src"), { recursive: true });
+      await writeTextFile(engineEntryFile, "console.log('solid');");
+      const config: ClientConfig = {
+        entry: engineEntryFile,
+        output: engineOutputDir,
+        engine: "solid",
+        bundle: { minify: false, sourcemap: false },
+      };
+      const builder = new BuilderClient(config);
+      const result = await builder.build("dev");
+      expect(result).toBeTruthy();
+      expect(result.outputFiles).toBeTruthy();
+      expect(result.outputFiles!.length).toBeGreaterThan(0);
+    }, { sanitizeOps: false, sanitizeResources: false });
+  });
+
   describe("边界情况", () => {
     it("应该处理不存在的入口文件", async () => {
       const config: ClientConfig = {

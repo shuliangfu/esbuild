@@ -428,8 +428,8 @@ export { logger };
               imports: {
                 "lodash": "npm:lodash@4.17.21",
                 "lodash/map": "npm:lodash@4.17.21/map",
-                "preact/jsx-runtime": "npm:preact@10.28.0/jsx-runtime",
-                "react/jsx-runtime": "npm:react@18.3.1/jsx-runtime",
+                "preact/jsx-runtime": "npm:preact@10.28.3/jsx-runtime",
+                "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
               },
             };
             writeTextFileSync(

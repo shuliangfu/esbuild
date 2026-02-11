@@ -199,7 +199,7 @@ export class BuilderClient {
     // 注意：服务端模块检测已通过插件实现，这里只处理用户手动配置的 external
     const externalModules = bundleOptions.external || [];
 
-    // 当 external 包含 preact/react 时，强制 resolver 将其标为 external（双构建：chunk 通过 import map 引用主包）
+    // 当 external 包含 preact/react/solid 时，强制 resolver 将其标为 external（双构建：chunk 通过 import map 引用主包）
     const hasRuntimeExternal = (externalModules as string[]).some(
       (ext) =>
         ext === "preact" ||
@@ -207,10 +207,12 @@ export class BuilderClient {
         ext === "react" ||
         ext.startsWith("react/") ||
         ext === "react-dom" ||
-        ext.startsWith("react-dom/"),
+        ext.startsWith("react-dom/") ||
+        ext === "solid-js" ||
+        ext.startsWith("solid-js/"),
     );
 
-    // 根据渲染引擎配置 JSX（Preact/React 使用自动模式）
+    // 根据渲染引擎配置 JSX（Preact/React/Solid 使用自动模式）
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
       jsxConfig.jsx = "automatic";
@@ -218,6 +220,9 @@ export class BuilderClient {
     } else if (this.config.engine === "react") {
       jsxConfig.jsx = "automatic";
       jsxConfig.jsxImportSource = "react";
+    } else if (this.config.engine === "solid") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "solid-js";
     }
 
     // esbuild 构建选项
@@ -385,7 +390,9 @@ export class BuilderClient {
         ext === "react" ||
         ext.startsWith("react/") ||
         ext === "react-dom" ||
-        ext.startsWith("react-dom/"),
+        ext.startsWith("react-dom/") ||
+        ext === "solid-js" ||
+        ext.startsWith("solid-js/"),
     );
 
     // 根据渲染引擎配置 JSX
@@ -396,6 +403,9 @@ export class BuilderClient {
     } else if (this.config.engine === "react") {
       jsxConfig.jsx = "automatic";
       jsxConfig.jsxImportSource = "react";
+    } else if (this.config.engine === "solid") {
+      jsxConfig.jsx = "automatic";
+      jsxConfig.jsxImportSource = "solid-js";
     }
 
     const writeToDisk = options?.write !== false;

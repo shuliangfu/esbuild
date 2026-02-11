@@ -862,7 +862,7 @@ export function denoResolverPlugin(
           return localPath;
         }
 
-        // npm: 协议：deno info 可能存精确版本，用 @版本 再试（如 npm:react-dom@18.3.1）
+        // npm: 协议：deno info 可能存精确版本，用 @版本 再试（如 npm:react-dom@19.2.4）
         if (specifier.startsWith("npm:")) {
           const exactVersion = specifier.replace(/@\^/, "@").replace(/@~/, "@");
           if (exactVersion !== specifier) {
@@ -878,11 +878,11 @@ export function denoResolverPlugin(
           if (slashIdx > 0) {
             const mainSpec = specifier.slice(0, slashIdx);
             const subpath = specifier.slice(slashIdx + 1);
-            // 主包路径：deno info 可能用 npm:preact@10.28.0 或 npm:preact@^10.28.0，或 Windows 下其他格式
+            // 主包路径：deno info 可能用 npm:preact@10.28.3 或 npm:preact@^10.28.3，或 Windows 下其他格式
             let mainPath = moduleCache.get(mainSpec) ??
               moduleCache.get(mainSpec.replace(/@\^/, "@").replace(/@~/, "@"));
             if (!mainPath) {
-              // 回退：遍历缓存找到同包任意条目（如 npm:preact@10.28.0 或 deno.land npm 格式）
+              // 回退：遍历缓存找到同包任意条目（如 npm:preact@10.28.3 或 deno.land npm 格式）
               const pkgName = mainSpec.replace(/^npm:/, "").split("@")[0];
               for (const [k, v] of moduleCache.entries()) {
                 if (

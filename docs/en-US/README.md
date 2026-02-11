@@ -8,11 +8,11 @@ This library is the core build engine of the
 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) framework, and can also be used
 independently for any Deno/Bun project builds.
 
-English | [中文 (Chinese)](./docs/zh-CN/README.md)
+English | [中文 (Chinese)](../zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -972,7 +972,7 @@ compiler to generate standalone executable:
 ## 📊 Test Report
 
 This library has been thoroughly tested, all test cases passed, with 100% test
-coverage. See [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md) for detailed test report.
+coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 **Test statistics**:
 
@@ -1016,7 +1016,7 @@ coverage. See [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md) for detailed test re
   - Native compiler (useNativeCompile) tests
   - Multi-platform compilation tests (Linux, macOS, Windows)
 
-View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
+View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ---
 
@@ -1054,13 +1054,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.7** (2026-02-11)
+**v1.0.6** (2026-02-09)
 
-- **Added**: Solid.js client build support (`engine: "solid"`, JSX + runtime externals for solid-js).
-- **Added**: Multi-engine tests (preact / react / solid) in builder-client.test.ts.
-- **Changed**: Docs restructure (`docs/en-US/`, `docs/zh-CN/`), link updates, Chinese test report.
+- **Fixed**: Normalize Windows `file://` path (remove leading slash for `C:/`)
+- **Fixed**: npm subprocess fallback when resolved file path does not exist (e.g. Windows monorepo)
 
-Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
+Full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ---
 

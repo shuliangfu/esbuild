@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.7] - 2026-02-11
+
+### Added
+
+- **BuilderClient**: Client build support for Solid.js. `engine` option now accepts `"solid"` alongside `"preact"` and `"react"`. When `engine: "solid"`, JSX uses `jsxImportSource: "solid-js"` and `solid-js` / `solid-js/` are treated as runtime externals.
+- **Tests**: Add "Multi-engine (preact / react / solid)" cases in `builder-client.test.ts` for client builds with preact, react, and solid.
+
+### Changed
+
+- **Docs**: Restructure docs into `docs/en-US/` and `docs/zh-CN/` by locale; remove root CHANGELOG and Chinese docs; update all doc links; add Chinese test report at `docs/zh-CN/TEST_REPORT.md`.
+
+---
+
 ## [1.0.6] - 2026-02-09
 
 ### Fixed
