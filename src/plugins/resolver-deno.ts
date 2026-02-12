@@ -294,7 +294,7 @@ export interface ResolverOptions {
   forceRuntimeExternal?: boolean;
   /**
    * 解析覆盖：指定 specifier -> 本地文件路径的映射，在解析 bare specifier 时优先使用。
-   * 例如 { "solid-js/jsx-runtime": "/path/to/solid-jsx-runtime-shim.ts" }，
+   * 例如 { "preact/jsx-runtime": "/path/to/preact-jsx-runtime-shim.ts" }，
    * 可让客户端构建使用 shim 而非 npm 包内的 jsx-runtime（避免 npm 包无 jsx/jsxs 导出问题）。
    */
   resolveOverrides?: Record<string, string>;
@@ -744,7 +744,7 @@ export function denoResolverPlugin(
     debug = false,
     logger: optionsLogger,
     forceRuntimeExternal = false,
-    // 解析覆盖：如 solid-js/jsx-runtime -> shim 路径，在 package/subpath 解析时优先使用
+    // 解析覆盖：如 preact/jsx-runtime -> shim 路径，在 package/subpath 解析时优先使用
     resolveOverrides,
   } = options;
 
@@ -1201,10 +1201,10 @@ export function denoResolverPlugin(
       );
 
       // 3.1 匹配不带子路径的普通包名（非 @scope/ 前缀）
-      // 例如：preact、lodash、react、scheduler
+      // 例如：preact、lodash、react、scheduler、seroval
       // 这些包需要在 deno.json 的 imports 中配置为 npm:package@version
       // importer 在 node_modules 内时（如 react-dom 内 require('react')）用 projectDir 或 cwd() 查找项目 deno.json
-      // 客户端构建时：preact/react 必须始终从 projectDir 解析，避免 JSR 缓存内的包（如 @dreamer/render）使用其自身 deno.json 导致多实例水合错误 _H
+      // 客户端构建时：一律从 projectDir 查找 deno.json，避免从依赖包所在目录找到错误配置（如 preact 依赖某包时 importer 在缓存目录，若不用 projectDir 会找不到项目的配置）
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*$/ },
         (args): esbuild.OnResolveResult | undefined => {
@@ -1215,7 +1215,7 @@ export function denoResolverPlugin(
           const isRuntimePackage = packageName === "preact" ||
             packageName === "react";
           const useProjectDir = inNodeModules ||
-            (isServerBuild === false && isRuntimePackage && projectDir);
+            (isServerBuild === false && projectDir);
           const startDir = useProjectDir
             ? (projectDir || cwd())
             : (args.resolveDir ||
@@ -1273,15 +1273,15 @@ export function denoResolverPlugin(
       );
 
       // 3.2 匹配带子路径的普通包名（非 @scope/ 前缀）
-      // 例如：preact/jsx-runtime、lodash/map、react/jsx-runtime
+      // 例如：preact/jsx-runtime、lodash/map、react/jsx-runtime、seroval/xxx
       // importer 在 node_modules 内时用 projectDir 或 cwd() 查找项目 deno.json（同 3.1）
-      // 客户端构建时：preact/*、react/* 必须始终从 projectDir 解析，避免多实例水合错误 _H
+      // 客户端构建时：一律从 projectDir 查找 deno.json（与 3.1 一致）
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*\/.+$/ },
         (args): esbuild.OnResolveResult | undefined => {
           const path = args.path;
 
-          // 优先使用 resolveOverrides（如 solid-js/jsx-runtime -> shim），避免走 npm 包解析
+          // 优先使用 resolveOverrides（如 preact/jsx-runtime -> shim），避免走 npm 包解析
           if (resolveOverrides && resolveOverrides[path]) {
             const overridePath = resolveOverrides[path];
             debugLog(`resolveOverrides: ${path} -> ${overridePath}`);
@@ -1297,7 +1297,7 @@ export function denoResolverPlugin(
           const isRuntimePackage = packageName === "preact" ||
             packageName === "react";
           const useProjectDir = inNodeModules ||
-            (isServerBuild === false && isRuntimePackage && projectDir);
+            (isServerBuild === false && projectDir);
           const startDir = useProjectDir
             ? (projectDir || cwd())
             : (args.resolveDir ||

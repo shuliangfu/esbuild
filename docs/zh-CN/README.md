@@ -1030,13 +1030,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.8**（2026-02-11）
+**v1.0.9**（2026-02-12）
 
-- **新增**：BuilderServer 新增 `compileSolidRouteForSSR()`，用于 Solid 路由 SSR
-  编译；从主入口及 `/server` 导出。
-- **新增**：`builder-server-solid-ssr.test.ts`（SSR
-  编译、服务端运行时产物、contentHash 缓存）。
-- **变更**：TEST_REPORT 与 README 测试统计更新（Deno 570、Bun 509）。
+- **新增**：BuilderClient 为引擎 `"view"` 配置
+  JSX（`jsxImportSource:
+  "@dreamer/view"`），@dreamer/view 项目运行不再出现
+  "React is not defined"。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

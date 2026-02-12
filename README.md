@@ -1055,13 +1055,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.8** (2026-02-11)
+**v1.0.9** (2026-02-12)
 
-- **Added**: `compileSolidRouteForSSR()` in BuilderServer for Solid route SSR
-  compile; exported from main and `/server`.
-- **Added**: `builder-server-solid-ssr.test.ts` (SSR compile, server runtime
-  output, contentHash cache).
-- **Changed**: TEST_REPORT and README test stats (Deno 570, Bun 509).
+- **Added**: BuilderClient JSX config for engine `"view"`
+  (`jsxImportSource:
+  "@dreamer/view"`), so @dreamer/view projects no longer
+  get "React is not defined" at runtime.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
