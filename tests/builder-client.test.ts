@@ -457,7 +457,7 @@ describe("BuilderClient", () => {
     }, { sanitizeOps: false, sanitizeResources: false });
   });
 
-  describe("多引擎 (preact / react / solid)", () => {
+  describe("多引擎 (preact / react)", () => {
     const engineEntryFile = join(getTestDataDir(), "src", "index.ts");
     const engineOutputDir = getTestOutputDir("client-builder-engine");
 
@@ -484,22 +484,6 @@ describe("BuilderClient", () => {
         entry: engineEntryFile,
         output: engineOutputDir,
         engine: "react",
-        bundle: { minify: false, sourcemap: false },
-      };
-      const builder = new BuilderClient(config);
-      const result = await builder.build("dev");
-      expect(result).toBeTruthy();
-      expect(result.outputFiles).toBeTruthy();
-      expect(result.outputFiles!.length).toBeGreaterThan(0);
-    }, { sanitizeOps: false, sanitizeResources: false });
-
-    it("engine: solid 时应能完成客户端构建", async () => {
-      await mkdir(join(getTestDataDir(), "src"), { recursive: true });
-      await writeTextFile(engineEntryFile, "console.log('solid');");
-      const config: ClientConfig = {
-        entry: engineEntryFile,
-        output: engineOutputDir,
-        engine: "solid",
         bundle: { minify: false, sourcemap: false },
       };
       const builder = new BuilderClient(config);

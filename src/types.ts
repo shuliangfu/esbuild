@@ -18,7 +18,7 @@ export interface BuildLogger {
 /**
  * 模板引擎类型（与 @dreamer/render、dweb 等一致）
  */
-export type Engine = "react" | "preact" | "solid";
+export type Engine = "react" | "preact" | "view";
 
 /**
  * 构建模式
@@ -233,7 +233,7 @@ export interface ClientConfig {
   };
   /** 输出目录 */
   output: string;
-  /** 模板引擎类型（react、preact、solid） */
+  /** 模板引擎类型（react、preact） */
   engine: Engine;
   /** 打包选项 */
   bundle?: ClientBundleOptions;

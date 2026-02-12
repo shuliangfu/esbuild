@@ -15,7 +15,7 @@ export { buildBundle, BuilderBundle, esbuild } from "./builder-bundle.ts";
 export type { BundleOptions, BundleResult } from "./builder-bundle.ts";
 export { BuilderClient } from "./builder-client.ts";
 export type { ClientBuildOptions } from "./builder-client.ts";
-export { BuilderServer, compileSolidRouteForSSR } from "./builder-server.ts";
+export { BuilderServer } from "./builder-server.ts";
 export type { ServerBuildOptions } from "./builder-server.ts";
 export { Builder } from "./builder.ts";
 export { CacheManager } from "./cache-manager.ts";

@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.0.9] - 2026-02-12
+
+### Added
+
+- **BuilderClient**: JSX config for engine `"view"`. When `engine: "view"`,
+  build now sets `jsx: "automatic"` and `jsxImportSource: "@dreamer/view"` so
+  that @dreamer/view projects bundle correctly without "React is not defined" at
+  runtime. Applied in both `build()` and `createContext()` paths.
+
+---
+
 ## [1.0.8] - 2026-02-11
 
 ### Added

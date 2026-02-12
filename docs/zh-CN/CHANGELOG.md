@@ -7,6 +7,17 @@
 
 ---
 
+## [1.0.9] - 2026-02-12
+
+### 新增
+
+- **BuilderClient**：为引擎 `"view"` 配置 JSX。当 `engine: "view"` 时，构建使用
+  `jsx: "automatic"` 与 `jsxImportSource: "@dreamer/view"`，@dreamer/view
+  项目打包后不再出现运行时报错 "React is not defined"。已在 `build()` 与
+  `createContext()` 两处生效。
+
+---
+
 ## [1.0.8] - 2026-02-11
 
 ### 新增
