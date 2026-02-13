@@ -1055,12 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.9** (2026-02-12)
+**v1.0.10** (2026-02-10)
 
-- **Added**: BuilderClient JSX config for engine `"view"`
-  (`jsxImportSource:
-  "@dreamer/view"`), so @dreamer/view projects no longer
-  get "React is not defined" at runtime.
+- **Fixed**: BuilderClient always sets `outdir` when `config.output` is set, so
+  with `splitting: false` the build still produces output for dev serve (fixes
+  `/main.js` returning HTML in @dreamer/view).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
