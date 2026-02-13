@@ -5,9 +5,8 @@
  * 时，能按包内真实路径（exports）解析为正确子路径（如 .../signal、.../effect），
  * 而非错误地解析为 store/signal.ts（包内无此导出会导致打包得到 (void 0)）。
  *
- * 覆盖范围：view 的 exports 中，当前仅 store 子路径会相对导入其它已导出模块；
- * 本用例覆盖 store 的全部 5 个相对依赖（signal、effect、scheduler、proxy、types）。
- * 其它 exports（cli、router、boundary 等）未被 store 引用，无需在本套件中做“从子路径解析相对路径”的用例。
+ * 覆盖范围：store 的 5 个相对依赖（signal、effect、scheduler、proxy、types）及
+ * signal 子路径对 ./scheduler.ts 的解析（平级，应解析为 .../scheduler 而非 signal/scheduler.ts）。
  */
 
 import { IS_DENO } from "@dreamer/runtime-adapter";
@@ -16,7 +15,7 @@ import { resolveJsrRelativeFromMeta } from "../src/plugins/resolver-deno.ts";
 
 /**
  * 模拟 @dreamer/view 的 deno.json exports，用于 mock _meta.json。
- * 与 view 包 exports 对齐；scheduler、proxy 为 store 依赖但 view 未单独导出，此处保留以便 store 相对导入能解析。
+ * 与 view 包 exports 对齐（含 ./scheduler、./proxy，供 store/signal 等子路径相对导入解析）。
  */
 const VIEW_LIKE_EXPORTS: Record<string, string> = {
   ".": "./src/mod.ts",
@@ -33,6 +32,8 @@ const VIEW_LIKE_EXPORTS: Record<string, string> = {
   "./context": "./src/context.ts",
   "./stream": "./src/stream.ts",
   "./router": "./src/router.ts",
+  "./meta": "./src/meta.ts",
+  "./route-page": "./src/route-page.tsx",
   "./store": "./src/store.ts",
   "./types": "./src/types.ts",
   "./signal": "./src/signal.ts",
@@ -167,6 +168,72 @@ describe("resolveJsrRelativeFromMeta（view 子路径）", () => {
       false,
     );
     expect(out).toBe("jsr:@dreamer/view@^1.0.0-beta.18/types");
+  });
+
+  it("router + ./meta.ts 应解析为 .../meta", async () => {
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("@dreamer/view") && url.endsWith("_meta.json")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ exports: VIEW_LIKE_EXPORTS }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return originalFetch(input);
+    };
+
+    const out = await resolveJsrRelativeFromMeta(
+      "jsr:@dreamer/view@^1.0.0-beta.18/router",
+      "./meta.ts",
+      false,
+    );
+    expect(out).toBe("jsr:@dreamer/view@^1.0.0-beta.18/meta");
+  });
+
+  it("router + ./route-page.tsx 应解析为 .../route-page", async () => {
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("@dreamer/view") && url.endsWith("_meta.json")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ exports: VIEW_LIKE_EXPORTS }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return originalFetch(input);
+    };
+
+    const out = await resolveJsrRelativeFromMeta(
+      "jsr:@dreamer/view@^1.0.0-beta.18/router",
+      "./route-page.tsx",
+      false,
+    );
+    expect(out).toBe("jsr:@dreamer/view@^1.0.0-beta.18/route-page");
+  });
+
+  it("signal + ./scheduler.ts 应解析为 .../scheduler（与 signal 平级）", async () => {
+    globalThis.fetch = (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("@dreamer/view") && url.endsWith("_meta.json")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ exports: VIEW_LIKE_EXPORTS }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return originalFetch(input);
+    };
+
+    const out = await resolveJsrRelativeFromMeta(
+      "jsr:@dreamer/view@^1.0.0-beta.18/signal",
+      "./scheduler.ts",
+      false,
+    );
+    expect(out).toBe("jsr:@dreamer/view@^1.0.0-beta.18/scheduler");
   });
 
   it("非 jsr: 协议应返回 null", async () => {

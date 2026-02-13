@@ -461,13 +461,13 @@ async function fetchSourceFromUrl(url: string): Promise<string | null> {
  * @param protocolPath - jsr: 协议路径（如 jsr:@dreamer/socket-io@^1.0.0-beta.2/encryption/encryption-manager.ts）
  * @param debug - 是否输出调试日志（默认 false）
  * @param logger - 日志实例，未传时使用空实现，所有输出均通过 logger 不使用 console
- * @returns 源码内容，失败返回 null
+ * @returns 源码内容及用于确定 loader 的解析路径（含扩展名，如 src/route-page.tsx），失败返回 { contents: null }
  */
 async function fetchJsrSourceViaMeta(
   protocolPath: string,
   debug = false,
   logger?: BuildLogger,
-): Promise<string | null> {
+): Promise<{ contents: string | null; resolvedPath?: string }> {
   const log = logger ?? NOOP_LOGGER;
   if (debug) {
     log.debug(
@@ -480,7 +480,7 @@ async function fetchJsrSourceViaMeta(
         `${PREFIX} fetchJsrSourceViaMeta 非 jsr: 协议，返回 null`,
       );
     }
-    return null;
+    return { contents: null };
   }
   // 格式 jsr:@scope/name@version/path 或 jsr:@scope/name/path（无版本号时从包级 meta 取 latest）
   const after = protocolPath.slice(4);
@@ -492,7 +492,7 @@ async function fetchJsrSourceViaMeta(
     // 无 @：解析为 @scope/name 与可选的 subpath，再从包级 meta.json 取最新非 yanked 版本
     const parts = after.split("/");
     if (parts.length < 2) {
-      return null;
+      return { contents: null };
     }
     scopeAndName = `${parts[0]}/${parts[1]}`;
     subpath = parts.length > 2 ? parts.slice(2).join("/") : "";
@@ -508,12 +508,12 @@ async function fetchJsrSourceViaMeta(
     const pkgMeta = pkgMetaRaw as {
       versions?: Record<string, { yanked?: boolean }>;
     } | null;
-    if (!pkgMeta) return null;
+    if (!pkgMeta) return { contents: null };
     const versions = pkgMeta.versions ?? {};
     const nonYanked = Object.keys(versions).filter((k) => !versions[k]?.yanked)
       .sort();
     if (nonYanked.length === 0) {
-      return null;
+      return { contents: null };
     }
     version = nonYanked[nonYanked.length - 1];
   } else {
@@ -542,7 +542,7 @@ async function fetchJsrSourceViaMeta(
     manifest?: Record<string, unknown>;
     exports?: Record<string, string>;
   } | null;
-  if (!meta) return null;
+  if (!meta) return { contents: null };
 
   const manifest = meta.manifest ?? {};
   const exports = meta.exports ?? {};
@@ -569,7 +569,9 @@ async function fetchJsrSourceViaMeta(
         }`,
       );
     }
-    if (code != null) return code;
+    if (code != null) {
+      return { contents: code, resolvedPath: pathFromExport };
+    }
   }
   // 子路径为 xxx.ts 时，若 exports["./xxx.ts"] 不存在，尝试 exports["./xxx"]（JSR 包常用 ./types 而非 ./types.ts）
   if (subpath && subpath.endsWith(".ts")) {
@@ -588,13 +590,15 @@ async function fetchJsrSourceViaMeta(
             }`,
           );
         }
-        if (code != null) return code;
+        if (code != null) {
+          return { contents: code, resolvedPath: fallbackPath };
+        }
       }
     }
   }
   // 主入口只认 meta 里的 exports["."]，可能是 mod.ts、index.ts、main.ts 等，不写死
   if (!subpath) {
-    return null;
+    return { contents: null };
   }
   // 子路径：仅按 meta 里 manifest 的 key 匹配，不假设目录结构；统一去掉 .ts 再比较，避免 import 带不带扩展名不一致
   const subpathNoExt = subpath.endsWith(".ts") ? subpath.slice(0, -3) : subpath;
@@ -617,12 +621,14 @@ async function fetchJsrSourceViaMeta(
         }`,
       );
     }
-    if (code != null) return code;
+    if (code != null) {
+      return { contents: code, resolvedPath: pathSlice };
+    }
   }
   if (debug) {
     log.debug(`${PREFIX} fetchJsrSourceViaMeta 未取到源码，返回 null`);
   }
-  return null;
+  return { contents: null };
 }
 
 /**
@@ -1917,14 +1923,20 @@ export function denoResolverPlugin(
               // 文件不存在（如 Windows 缓存路径与当前解析不一致、跨机器、缓存已清理）
               if (protocolPath.startsWith("jsr:")) {
                 // 对 jsr: 回退到 fetchJsrSourceViaMeta
-                const contents = await fetchJsrSourceViaMeta(
+                const jsrResult = await fetchJsrSourceViaMeta(
                   protocolPath,
                   debug,
                   log,
                 );
-                if (contents != null) {
-                  const loader = getLoaderFromPath(protocolPath);
-                  return { contents, loader, resolveDir };
+                if (jsrResult.contents != null) {
+                  const loader = getLoaderFromPath(
+                    jsrResult.resolvedPath ?? protocolPath,
+                  );
+                  return {
+                    contents: jsrResult.contents,
+                    loader,
+                    resolveDir,
+                  };
                 }
               } else if (protocolPath.startsWith("npm:")) {
                 // 对 npm: 尝试子进程在项目目录下 resolve，可拿到项目/工作区正确的缓存路径（如 Windows monorepo 下示例与根目录缓存不一致）
@@ -1983,20 +1995,24 @@ export function denoResolverPlugin(
               // 步骤 5: 如果 resolve 返回 HTTP URL
               // 对 jsr: 优先用 fetchJsrSourceViaMeta（内部带 Accept: JSR_ACCEPT_SOURCE），避免运行时自动加 Sec-Fetch-Dest: document 导致 JSR 仍回 HTML
               if (protocolPath.startsWith("jsr:")) {
-                const contents = await fetchJsrSourceViaMeta(
+                const jsrResult = await fetchJsrSourceViaMeta(
                   protocolPath,
                   debug,
                   log,
                 );
                 debugLog(
                   `onLoad 步骤5(https+jsr) fetchJsrSourceViaMeta 结果 contents=${
-                    contents != null ? `${contents.length} chars` : "null"
+                    jsrResult.contents != null
+                      ? `${jsrResult.contents.length} chars`
+                      : "null"
                   }`,
                 );
-                if (contents != null) {
-                  const loader = getLoaderFromPath(protocolPath);
+                if (jsrResult.contents != null) {
+                  const loader = getLoaderFromPath(
+                    jsrResult.resolvedPath ?? protocolPath,
+                  );
                   // 不设 resolveDir：否则 esbuild 会把模块内 "./socket" 等解析为 cwd()/socket，加载到项目文件导致 "No matching export"
-                  return { contents, loader };
+                  return { contents: jsrResult.contents, loader };
                 }
               }
               // 非 jsr: 或 fetchJsr 失败时：直接 fetch，带 Accept 避免 JSR 回 HTML
@@ -2026,20 +2042,27 @@ export function denoResolverPlugin(
               debugLog(`onLoad 分支 fileUrl=jsr/npm fileUrl=${fileUrl}`);
               // 步骤 6: 子进程也未得到 file:// 时，用 JSR _meta.json 的 manifest/exports 解析真实路径再 fetch 源码（非 CDN）
               if (protocolPath.startsWith("jsr:")) {
-                const contents = await fetchJsrSourceViaMeta(
+                const jsrResult = await fetchJsrSourceViaMeta(
                   protocolPath,
                   debug,
                   log,
                 );
                 debugLog(
                   `onLoad 步骤6 fetchJsrSourceViaMeta 结果 contents=${
-                    contents != null ? `${contents.length} chars` : "null"
+                    jsrResult.contents != null
+                      ? `${jsrResult.contents.length} chars`
+                      : "null"
                   }`,
                 );
-                if (contents != null) {
-                  const loader = getLoaderFromPath(protocolPath);
+                if (jsrResult.contents != null) {
+                  const loader = getLoaderFromPath(
+                    jsrResult.resolvedPath ?? protocolPath,
+                  );
                   // 不设 resolveDir，相对导入走 deno-protocol onResolve
-                  return { contents, loader };
+                  return {
+                    contents: jsrResult.contents,
+                    loader,
+                  };
                 }
               }
               debugLog(

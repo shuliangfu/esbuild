@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.12] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: JSR TSX subpaths (e.g. `@dreamer/view/route-page`) were parsed
+  as TypeScript instead of TSX because the protocol path had no file extension.
+  `fetchJsrSourceViaMeta` now returns `resolvedPath` (e.g.
+  `src/route-page.tsx`); onLoad uses it for `getLoaderFromPath` so JSX (e.g.
+  `className`) is compiled correctly and the "Expected '>' but found
+  'className'" error is resolved.
+
+---
+
 ## [1.0.11] - 2026-02-13
 
 ### Fixed
