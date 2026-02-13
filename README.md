@@ -1055,11 +1055,14 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.12** (2026-02-13)
+**v1.0.13** (2026-02-13)
 
-- **Fixed**: JSR TSX subpaths (e.g. `@dreamer/view/route-page`) are now compiled
-  as TSX using `resolvedPath` from `fetchJsrSourceViaMeta`, fixing the "Expected
-  '>' but found 'className'" JSX parse error.
+- **Fixed**: Relative imports from JSR subpaths (e.g. `@dreamer/view/router` →
+  `./meta.ts`) now use project cache: relative-path onResolve runs a subprocess
+  with the project’s `deno.json` to resolve the importer to a `file://` path,
+  then resolves the relative path on disk.
+- **Removed**: `resolveJsrRelativeFromMeta()` and its fetch-based fallback;
+  removed `resolver-view-subpath.test.ts`.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
