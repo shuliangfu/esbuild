@@ -1030,10 +1030,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.14**（2026-02-13）
+**v1.0.15**（2026-02-13）
 
-- **修复**：JSR 相对导入的协议路径现使用无扩展名子路径并统一去掉版本前的
-  `^`/`~`，使 importer 带 ^ 时 meta 等子路径能正确打包。
+- **修复**：JSR 带子路径的 importer 下，相对导入的 base 改为包根，使 `./meta`
+  等正确解析为 `.../meta`，修复 router/meta、context/signal 等返回 null 的问题。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

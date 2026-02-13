@@ -1562,12 +1562,23 @@ export function denoResolverPlugin(
                 );
               }
               // 从 importer 路径构建相对路径的协议路径，供 import.meta.resolve / onLoad 使用（importer 已优先用项目缓存子进程解析为 file://）
-              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@^1.0.0-beta.2/client（子路径即“目录”）
+              // JSR 的 exports 是包顶层扁平 key（如 "./meta"、"./route-page"），子路径如 router、context 是单文件导出，相对导入 ./meta 应解析为 .../meta 而非 .../router/meta
               const lastSegment = importerProtocolPath.replace(/.*\//, "");
               const isFile = lastSegment.includes(".");
-              let currentBasePath = isFile
-                ? importerProtocolPath.replace(/\/[^/]+$/, "")
-                : importerProtocolPath;
+              let currentBasePath: string;
+              if (importerProtocolPath.startsWith("jsr:")) {
+                const parts = importerProtocolPath.split("/");
+                // 有子路径时（如 ...@version/router）以包根为 base，否则相对导入会变成 .../router/meta，JSR 无此 export
+                currentBasePath = parts.length >= 3
+                  ? parts.slice(0, -1).join("/")
+                  : (isFile
+                    ? importerProtocolPath.replace(/\/[^/]+$/, "")
+                    : importerProtocolPath);
+              } else {
+                currentBasePath = isFile
+                  ? importerProtocolPath.replace(/\/[^/]+$/, "")
+                  : importerProtocolPath;
+              }
               const relativePath = args.path;
 
               // 规范化相对路径（处理 ../ 和 ./）
