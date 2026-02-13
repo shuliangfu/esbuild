@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.12] - 2026-02-13
+
+### 修复
+
+- **Resolver**：JSR 的 TSX 子路径（如
+  `@dreamer/view/route-page`）因协议路径无扩展名 被按 TypeScript 解析而非
+  TSX。`fetchJsrSourceViaMeta` 现返回 `resolvedPath` （如
+  `src/route-page.tsx`），onLoad 用其调用 `getLoaderFromPath`，使 JSX （如
+  `className`）被正确编译，解决 "Expected '>' but found 'className'" 报错。
+
+---
+
 ## [1.0.11] - 2026-02-13
 
 ### 修复

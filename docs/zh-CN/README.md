@@ -1030,11 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.11**（2026-02-13）
+**v1.0.12**（2026-02-13）
 
-- **修复**：Resolver 从 JSR 子路径解析相对导入时按包 exports 解析，打包 不再得到
-  `(void 0)`（如 @dreamer/view/store → ./signal.ts）。
-- **新增**：view store 子路径解析测试（`resolver-view-subpath.test.ts`）。
+- **修复**：JSR 的 TSX 子路径（如 `@dreamer/view/route-page`）现通过
+  `fetchJsrSourceViaMeta` 返回的 `resolvedPath` 按 TSX 编译，解决 "Expected '>'
+  but found 'className'" 的 JSX 解析错误。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
