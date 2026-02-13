@@ -1030,11 +1030,13 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.12**（2026-02-13）
+**v1.0.13**（2026-02-13）
 
-- **修复**：JSR 的 TSX 子路径（如 `@dreamer/view/route-page`）现通过
-  `fetchJsrSourceViaMeta` 返回的 `resolvedPath` 按 TSX 编译，解决 "Expected '>'
-  but found 'className'" 的 JSX 解析错误。
+- **修复**：JSR 子路径内的相对导入（如 `@dreamer/view/router` → `./meta.ts`）现
+  使用项目缓存：相对路径 onResolve 用项目 `deno.json` 起子进程将引用方解析为
+  `file://`，再在磁盘上解析相对路径。
+- **移除**：`resolveJsrRelativeFromMeta()` 及其基于 fetch 的 fallback；移除
+  `resolver-view-subpath.test.ts`。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

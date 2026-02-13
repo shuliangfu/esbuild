@@ -8,6 +8,27 @@ and this project adheres to
 
 ---
 
+## [1.0.13] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: When resolving relative imports from a JSR subpath (e.g.
+  `jsr:@dreamer/view/router` importing `./meta.ts`), the plugin context’s
+  `import.meta.resolve` did not yield a project cache path. The relative-path
+  onResolve now runs a subprocess with the project’s `deno.json` to resolve the
+  importer to a `file://` URL in the project cache, then resolves the relative
+  path on disk, so view projects use local cache instead of fetch.
+
+### Removed
+
+- **Resolver**: Removed `resolveJsrRelativeFromMeta()` and its fetch-based
+  fallback (JSR meta.json over HTTP); resolution now relies on subprocess +
+  project cache only.
+- **Tests**: Removed `resolver-view-subpath.test.ts` (it only tested the removed
+  API).
+
+---
+
 ## [1.0.12] - 2026-02-13
 
 ### Fixed

@@ -7,6 +7,24 @@
 
 ---
 
+## [1.0.13] - 2026-02-13
+
+### 修复
+
+- **Resolver**：从 JSR 子路径解析相对导入时（如 `jsr:@dreamer/view/router` 引用
+  `./meta.ts`），插件上下文的 `import.meta.resolve`
+  无法得到项目缓存路径。相对路径 onResolve 现通过项目 `deno.json`
+  起子进程将引用方解析为项目缓存中的 `file://`，再在磁盘上解析 相对路径，使 view
+  项目使用本地缓存而非 fetch。
+
+### 移除
+
+- **Resolver**：移除 `resolveJsrRelativeFromMeta()` 及其基于 fetch 的
+  fallback（通过 HTTP 拉取 JSR meta.json）；解析现仅依赖子进程 + 项目缓存。
+- **测试**：移除 `resolver-view-subpath.test.ts`（仅覆盖已移除的 API）。
+
+---
+
 ## [1.0.12] - 2026-02-13
 
 ### 修复
