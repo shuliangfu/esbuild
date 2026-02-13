@@ -8,6 +8,20 @@ and this project adheres to
 
 ---
 
+## [1.0.14] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: When building the protocol path for JSR relative imports (e.g.
+  `./meta.ts` from `jsr:@dreamer/view/router`), use subpath without extension
+  (e.g. `.../meta`) to match JSR exports (e.g. `"./meta"`), and normalize the
+  version in the path (strip `^`/`~`) so that `jsr:...@^1.0.0/...` and
+  `jsr:...@1.0.0/...` resolve to the same module key. This fixes meta (and other
+  subpaths) not being bundled or appearing as `(void 0)` when the importer had a
+  caret version.
+
+---
+
 ## [1.0.13] - 2026-02-13
 
 ### Fixed

@@ -1587,7 +1587,20 @@ export function denoResolverPlugin(
                 currentBasePath = currentBasePath.replace(/\/[^/]+$/, "");
               }
 
-              const fullProtocolPath = `${currentBasePath}/${normalizedPath}`;
+              // JSR exports 用无扩展名子路径（如 "./meta"）；相对路径 ./meta.ts 拼成 .../meta，否则 onLoad 查不到
+              const pathForProtocol = importerProtocolPath.startsWith("jsr:") &&
+                  /\.(tsx?|jsx?)$/i.test(normalizedPath)
+                ? normalizedPath.replace(/\.(tsx?|jsx?)$/i, "")
+                : normalizedPath;
+              // 统一去掉版本前的 ^/~，避免 jsr:...@^1.0.0/... 与 jsr:...@1.0.0/... 被当成两个模块导致 meta 等拿不到内容
+              let baseForProtocol = currentBasePath;
+              if (importerProtocolPath.startsWith("jsr:")) {
+                baseForProtocol = currentBasePath.replace(
+                  /@([\^~])([^/]+)/,
+                  "@$2",
+                );
+              }
+              const fullProtocolPath = `${baseForProtocol}/${pathForProtocol}`;
 
               // 在插件上下文中只做一次 resolve，拿不到 file:// 就返回 deno-protocol 交给 onLoad（含 fetchJsrSourceViaMeta）
               try {

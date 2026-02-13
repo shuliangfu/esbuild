@@ -1055,14 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.13** (2026-02-13)
+**v1.0.14** (2026-02-13)
 
-- **Fixed**: Relative imports from JSR subpaths (e.g. `@dreamer/view/router` →
-  `./meta.ts`) now use project cache: relative-path onResolve runs a subprocess
-  with the project’s `deno.json` to resolve the importer to a `file://` path,
-  then resolves the relative path on disk.
-- **Removed**: `resolveJsrRelativeFromMeta()` and its fetch-based fallback;
-  removed `resolver-view-subpath.test.ts`.
+- **Fixed**: JSR relative-import protocol path now uses extensionless subpath
+  (e.g. `.../meta`) and normalized version (strip `^`/`~`) so meta and other
+  subpaths bundle correctly when importer has a caret version.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
