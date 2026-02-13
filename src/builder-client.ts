@@ -247,10 +247,10 @@ export class BuilderClient {
       logLevel: "error",
     };
 
-    // 代码分割时需要 outdir（写盘或仅内存）和 chunk 名称
-    if (splittingEnabled && this.config.output) {
+    // 始终设置 outdir，否则 splitting: false 时 esbuild 无产出、result.outputFiles 为空，dev 时 /main.js 会回退到 index.html
+    if (this.config.output) {
       buildOptions.outdir = this.config.output;
-      buildOptions.chunkNames = chunkNames;
+      if (splittingEnabled) buildOptions.chunkNames = chunkNames;
     }
 
     // 添加插件：Bun 环境使用 bunResolverPlugin，Deno 环境使用 denoResolverPlugin

@@ -7,6 +7,16 @@
 
 ---
 
+## [1.0.10] - 2026-02-10
+
+### 修复
+
+- **BuilderClient**：当 `config.output` 存在时始终设置 `outdir`，使在
+  `splitting: false` 时构建仍能产出 `outputContents` / `outputFiles`，修复
+  关闭代码分割时 dev 服务访问 `/main.js` 返回 HTML 的问题（如 @dreamer/view）。
+
+---
+
 ## [1.0.9] - 2026-02-12
 
 ### 新增

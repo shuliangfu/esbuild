@@ -1030,12 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.9**（2026-02-12）
+**v1.0.10**（2026-02-10）
 
-- **新增**：BuilderClient 为引擎 `"view"` 配置
-  JSX（`jsxImportSource:
-  "@dreamer/view"`），@dreamer/view 项目运行不再出现
-  "React is not defined"。
+- **修复**：BuilderClient 在存在 `config.output` 时始终设置 `outdir`，关闭
+  代码分割时构建仍能产出产物，修复 dev 下 `/main.js` 返回 HTML 的问题（如
+  @dreamer/view）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

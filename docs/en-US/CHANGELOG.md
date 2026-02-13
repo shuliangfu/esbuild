@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.0.10] - 2026-02-10
+
+### Fixed
+
+- **BuilderClient**: Always set `outdir` when `config.output` is set, so that
+  with `splitting: false` the build still produces `outputContents` /
+  `outputFiles`. This fixes dev serve returning HTML for `/main.js` when
+  code-splitting is disabled (e.g. in @dreamer/view).
+
+---
+
 ## [1.0.9] - 2026-02-12
 
 ### Added
