@@ -1030,11 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.10**（2026-02-10）
+**v1.0.11**（2026-02-13）
 
-- **修复**：BuilderClient 在存在 `config.output` 时始终设置 `outdir`，关闭
-  代码分割时构建仍能产出产物，修复 dev 下 `/main.js` 返回 HTML 的问题（如
-  @dreamer/view）。
+- **修复**：Resolver 从 JSR 子路径解析相对导入时按包 exports 解析，打包 不再得到
+  `(void 0)`（如 @dreamer/view/store → ./signal.ts）。
+- **新增**：view store 子路径解析测试（`resolver-view-subpath.test.ts`）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

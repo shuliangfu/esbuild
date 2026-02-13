@@ -7,6 +7,24 @@
 
 ---
 
+## [1.0.11] - 2026-02-13
+
+### 修复
+
+- **Resolver**：从 JSR 子路径解析相对导入时（如 `@dreamer/view/store` 引用
+  `./signal.ts`），按包 exports 解析为正确子路径（如 `.../signal`），避免错误
+  解析为 `store/signal.ts` 导致打包得到 `(void 0)`。新增
+  `resolveJsrRelativeFromMeta()`，并在相对路径 onResolve 的 fallback 中对 `jsr:`
+  引用方调用。
+
+### 新增
+
+- **测试**：`resolver-view-subpath.test.ts` — 覆盖 store 相对导入（signal、
+  effect、scheduler、proxy、types）经 JSR exports 解析；VIEW_LIKE_EXPORTS 与
+  view 包 exports 对齐。
+
+---
+
 ## [1.0.10] - 2026-02-10
 
 ### 修复
