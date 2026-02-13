@@ -8,6 +8,25 @@ and this project adheres to
 
 ---
 
+## [1.0.11] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: When resolving relative imports from a JSR subpath (e.g.
+  `@dreamer/view/store` importing `./signal.ts`), use package exports to resolve
+  to the correct subpath (e.g. `.../signal`) instead of incorrectly resolving to
+  `store/signal.ts`, which caused bundled code to get `(void 0)`. Added
+  `resolveJsrRelativeFromMeta()` and use it in the relative-path onResolve
+  fallback for `jsr:` importers.
+
+### Added
+
+- **Tests**: `resolver-view-subpath.test.ts` — tests for resolving store’s
+  relative imports (signal, effect, scheduler, proxy, types) via JSR exports;
+  VIEW_LIKE_EXPORTS aligned with view package exports.
+
+---
+
 ## [1.0.10] - 2026-02-10
 
 ### Fixed

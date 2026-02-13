@@ -626,6 +626,104 @@ async function fetchJsrSourceViaMeta(
 }
 
 /**
+ * 根据 JSR 包 exports 将「子路径模块内的相对导入」解析为包内正确子路径。
+ * 例如：importer 为 jsr:@dreamer/view@^1.0.0-beta.18/store（对应 ./src/store.ts），
+ * relativePath 为 ./signal.ts 时，应解析为 jsr:@dreamer/view@^1.0.0-beta.18/signal（对应 ./src/signal.ts），
+ * 而不是 store/signal.ts（包内无此导出会导致打包得到 (void 0)）。
+ *
+ * @param protocolPath - 当前模块的 jsr: 协议路径（如 jsr:@dreamer/view@^1.0.0-beta.18/store）
+ * @param relativePath - 相对路径（如 ./signal.ts）
+ * @param debug - 是否输出调试日志
+ * @param logger - 日志实例
+ * @returns 解析后的完整 jsr: 协议路径，失败返回 null
+ * @internal 导出供测试 view 等子路径相对导入解析
+ */
+export async function resolveJsrRelativeFromMeta(
+  protocolPath: string,
+  relativePath: string,
+  debug: boolean,
+  logger?: BuildLogger,
+): Promise<string | null> {
+  const log = logger ?? NOOP_LOGGER;
+  if (!protocolPath.startsWith("jsr:")) return null;
+
+  const after = protocolPath.slice(4);
+  const lastAtIdx = after.lastIndexOf("@");
+  let scopeAndName: string;
+  let version: string;
+  let subpath: string;
+  if (lastAtIdx === -1) {
+    const parts = after.split("/");
+    if (parts.length < 2) return null;
+    scopeAndName = `${parts[0]}/${parts[1]}`;
+    subpath = parts.length > 2 ? parts.slice(2).join("/") : "";
+    const pkgMetaUrl = `https://jsr.io/${scopeAndName}/meta.json`;
+    const pkgMetaRaw = await fetchJsonFromUrl(pkgMetaUrl);
+    const pkgMeta = pkgMetaRaw as {
+      versions?: Record<string, { yanked?: boolean }>;
+    } | null;
+    if (!pkgMeta) return null;
+    const versions = pkgMeta.versions ?? {};
+    const nonYanked = Object.keys(versions)
+      .filter((k) => !versions[k]?.yanked)
+      .sort();
+    if (nonYanked.length === 0) return null;
+    version = nonYanked[nonYanked.length - 1];
+  } else {
+    scopeAndName = after.slice(0, lastAtIdx);
+    const versionAndPath = after.slice(lastAtIdx + 1);
+    const slashInRest = versionAndPath.indexOf("/");
+    version = slashInRest === -1
+      ? versionAndPath
+      : versionAndPath.slice(0, slashInRest);
+    subpath = slashInRest === -1 ? "" : versionAndPath.slice(slashInRest + 1);
+  }
+
+  const concreteVersion = version.replace(/^[\^~]/, "");
+  const metaUrl = `https://jsr.io/${scopeAndName}/${concreteVersion}_meta.json`;
+  const metaRaw = await fetchJsonFromUrl(metaUrl);
+  const meta = metaRaw as { exports?: Record<string, string> } | null;
+  if (!meta || typeof meta.exports !== "object") return null;
+
+  const exports = meta.exports;
+  const exportKey = subpath ? `./${subpath}` : ".";
+  let pathFromExport = exports[exportKey];
+  if (pathFromExport && typeof pathFromExport === "string") {
+    pathFromExport = pathFromExport.replace(/^\.\//, "");
+  }
+  if (!pathFromExport) return null;
+
+  const importerDir = dirname(pathFromExport.replace(/\\/g, "/"));
+  const pathSegments = importerDir
+    ? importerDir.split("/").filter(Boolean)
+    : [];
+  for (const p of relativePath.replace(/\\/g, "/").split("/")) {
+    if (p === "..") {
+      pathSegments.pop();
+    } else if (p !== "." && p !== "") {
+      pathSegments.push(p);
+    }
+  }
+  const resolvedInPackage = pathSegments.join("/");
+
+  for (const [key, value] of Object.entries(exports)) {
+    if (typeof value !== "string") continue;
+    const valueNorm = value.replace(/^\.\//, "");
+    if (valueNorm === resolvedInPackage) {
+      const newSubpath = key.replace(/^\.\//, "");
+      const out = `jsr:${scopeAndName}@${version}/${newSubpath}`;
+      if (debug) {
+        log.debug(
+          `${PREFIX} resolveJsrRelativeFromMeta ${protocolPath} + ${relativePath} -> ${out}`,
+        );
+      }
+      return out;
+    }
+  }
+  return null;
+}
+
+/**
  * 判断文件是否为 CJS 包装（如 React 的 index.js 仅做 module.exports = require('./cjs/...')）。
  * 此类文件重定向会导致循环依赖，应不重定向。
  */
@@ -1514,10 +1612,8 @@ export function denoResolverPlugin(
 
             // 如果无法通过文件路径解析，尝试构建完整的协议路径
             // 例如：jsr:@dreamer/socket-io@^1.0.0-beta.2/client + ./socket.ts -> .../client/socket.ts
-            // 例如：jsr:@dreamer/socket-io@^1.0.0-beta.2/client + ../encryption/encryption-manager.ts -> .../encryption/encryption-manager.ts
+            // 例如：jsr:@dreamer/view@^1.0.0-beta.18/store + ./signal.ts -> 先按包 exports 解析为 .../signal，避免 store/signal.ts 无导出导致 (void 0)
             try {
-              // 从 importer 路径构建相对路径的协议路径
-              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@^1.0.0-beta.2/client（子路径即“目录”）
               let importerProtocolPath = importer;
               const prefix = `${NAMESPACE_DENO_PROTOCOL}:`;
               if (importerProtocolPath.startsWith(prefix)) {
@@ -1525,7 +1621,22 @@ export function denoResolverPlugin(
                   prefix.length,
                 );
               }
-              // 基准路径：若 importer 为文件（最后一段含扩展名如 .ts），则用其所在目录；否则用完整路径（子路径如 client 对应 mod 所在目录）
+              if (importerProtocolPath.startsWith("jsr:")) {
+                const jsrResolved = await resolveJsrRelativeFromMeta(
+                  importerProtocolPath,
+                  args.path,
+                  debug,
+                  log,
+                );
+                if (jsrResolved != null) {
+                  return {
+                    path: jsrResolved,
+                    namespace: NAMESPACE_DENO_PROTOCOL,
+                  };
+                }
+              }
+              // 从 importer 路径构建相对路径的协议路径（非 jsr 或 resolveJsrRelativeFromMeta 未命中时回退）
+              // importer 可能是 deno-protocol:jsr:@dreamer/socket-io@^1.0.0-beta.2/client（子路径即“目录”）
               const lastSegment = importerProtocolPath.replace(/.*\//, "");
               const isFile = lastSegment.includes(".");
               let currentBasePath = isFile

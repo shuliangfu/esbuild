@@ -1055,11 +1055,13 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.10** (2026-02-10)
+**v1.0.11** (2026-02-13)
 
-- **Fixed**: BuilderClient always sets `outdir` when `config.output` is set, so
-  with `splitting: false` the build still produces output for dev serve (fixes
-  `/main.js` returning HTML in @dreamer/view).
+- **Fixed**: Resolver uses package exports when resolving relative imports from
+  a JSR subpath (e.g. `@dreamer/view/store` → `./signal.ts`), so bundled code no
+  longer gets `(void 0)`.
+- **Added**: Tests for view store subpath resolution
+  (`resolver-view-subpath.test.ts`).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
