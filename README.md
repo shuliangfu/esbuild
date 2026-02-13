@@ -1055,11 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.14** (2026-02-13)
+**v1.0.15** (2026-02-13)
 
-- **Fixed**: JSR relative-import protocol path now uses extensionless subpath
-  (e.g. `.../meta`) and normalized version (strip `^`/`~`) so meta and other
-  subpaths bundle correctly when importer has a caret version.
+- **Fixed**: For JSR importers with a subpath, relative-import base is now the
+  package root so `./meta` resolves to `.../meta` and fetches correctly (fixes
+  router/meta, context/signal, etc. returning null).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

@@ -7,6 +7,19 @@
 
 ---
 
+## [1.0.15] - 2026-02-13
+
+### 修复
+
+- **Resolver**：当 JSR 的 importer 带子路径（如
+  `jsr:@dreamer/view@1.0.0-beta.27/router`）时，相对导入的 base
+  改为包根而非子路径，使 `./meta` 解析为 `.../meta`（对应 JSR 的
+  `"./meta"`）而非 `.../router/meta`，修复
+  router/meta、router/route-page、context/signal 等 fetchJsrSourceViaMeta 返回
+  null 的问题。
+
+---
+
 ## [1.0.14] - 2026-02-13
 
 ### 修复

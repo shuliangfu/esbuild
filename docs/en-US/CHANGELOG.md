@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.15] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: For JSR importers with a subpath (e.g.
+  `jsr:@dreamer/view@1.0.0-beta.27/router`), the base for relative imports is
+  now the package root instead of the subpath. This makes `./meta` resolve to
+  `.../meta` (matching JSR exports like `"./meta"`) instead of
+  `.../router/meta`, fixing `fetchJsrSourceViaMeta` returning null for
+  router/meta, router/route-page, context/signal, etc.
+
+---
+
 ## [1.0.14] - 2026-02-13
 
 ### Fixed
