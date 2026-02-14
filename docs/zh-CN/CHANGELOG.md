@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.19] - 2026-02-14
+
+### 变更
+
+- **测试**：解析器高级测试改为在 `tests/data/resolver-advanced` 下生成文件（通过
+  beforeAll + getTestOutputDir），测试结束后自动清理，不再在包根目录产生文件。
+- **文档**：TEST_REPORT 与 README 测试报告章节已更新（Deno 568、Bun
+  509；解析器高级 16 个、BuilderBundle 29
+  个；补充解析器输出路径与自动清理说明）。
+
+---
+
 ## [1.0.18] - 2026-02-13
 
 ### 修复

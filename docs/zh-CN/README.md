@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20570%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 [English](../en-US/README.md) | 中文 (Chinese)
 
@@ -960,7 +960,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 | 运行时                | 测试数 | 通过 | 失败 | 通过率  |
 | --------------------- | ------ | ---- | ---- | ------- |
-| Deno (`deno test -A`) | 570    | 570  | 0    | 100% ✅ |
+| Deno (`deno test -A`) | 568    | 568  | 0    | 100% ✅ |
 | Bun (`bun test`)      | 509    | 509  | 0    | 100% ✅ |
 
 - **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理
@@ -982,12 +982,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 - ✅ 所有功能、边界情况、错误处理都有完整的测试覆盖
 - ✅ 集成测试验证了端到端的完整流程
 - ✅ 内存模式（write: false）功能完整测试
-- ✅ BuilderBundle 简单打包器完整测试（28 个）
+- ✅ BuilderBundle 简单打包器完整测试（29 个）
   - ESM 和 IIFE 格式测试
   - 全局变量设置测试（window/global/globalThis）
   - 平台特定行为测试（browser/node/neutral）
 - ✅ 路径解析功能测试（Deno 和 Bun 环境）
-  - 解析器插件测试（18 个）+ 解析器高级测试（11 个）
+  - 解析器插件测试（18 个）+ 解析器高级测试（16 个）
   - 服务端构建器路径解析测试（5 个）
   - 服务端构建器 Bun 测试（2 个，仅 Bun）
   - 客户端构建器路径解析测试（6 个）
@@ -1030,11 +1030,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.18**（2026-02-13）
+**v1.0.19**（2026-02-14）
 
-- **修复**：仅当 `@` 前为 `/` 时作版本分隔；无扩展名路径用 cache key 定 loader；
-  无版本时按 import 路径匹配缓存，不假定 mod.ts。
-- **变更**：无版本 jsr 按包前缀匹配缓存，命中则不走 fetch。
+- **变更**：解析器高级测试输出目录改为 tests/data/resolver-advanced 并自动清理；
+  TEST_REPORT 与 README 测试统计已同步（Deno 568、Bun 509）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

@@ -14,22 +14,26 @@ import {
   IS_DENO,
   join,
   mkdir,
+  remove,
   writeTextFile,
   writeTextFileSync,
 } from "@dreamer/runtime-adapter";
-import { describe, expect, it } from "@dreamer/test";
+import { beforeAll, describe, expect, it } from "@dreamer/test";
 import { buildBundle } from "../src/builder-bundle.ts";
 import { bunResolverPlugin } from "../src/plugins/resolver-bun.ts";
 import { denoResolverPlugin } from "../src/plugins/resolver-deno.ts";
-import { cleanupDir, getTestDataDir } from "./test-utils.ts";
+import { getTestOutputDir } from "./test-utils.ts";
 
 describe("解析器插件高级测试", () => {
+  /** 本套件生成的测试文件统一放在 tests/data/resolver-advanced 下，测试结束会自动删除 */
   let testDataDir: string = "";
 
-  // 测试前创建测试目录
-  it("应该创建测试目录", async () => {
-    testDataDir = getTestDataDir();
+  beforeAll(async () => {
+    testDataDir = getTestOutputDir("resolver-advanced");
     await mkdir(testDataDir, { recursive: true });
+  });
+
+  it("应该已有测试目录", () => {
     expect(testDataDir).toBeTruthy();
   });
 
@@ -376,6 +380,149 @@ export const result = helperFunction();
             throw error;
           }
         }, { sanitizeOps: false, sanitizeResources: false });
+      });
+
+      describe("view 相关编译问题", () => {
+        it(
+          "主入口相对路径应解析为 view 包内（./effect、./types 等 -> view/effect、view/types，非 jsr:@dreamer/effect）",
+          async () => {
+            try {
+              const testFile = join(
+                testDataDir,
+                "test-view-main-relative.ts",
+              );
+              await writeTextFile(
+                testFile,
+                `// 导入 view 主入口；mod.ts 内会 import ./effect、./signal、./types 等，须解析为 jsr:@dreamer/view@.../effect 而非 jsr:@dreamer/effect，否则缓存不命中、fetch 无版本包失败
+import { createSignal } from "jsr:@dreamer/view@^1.0.0-beta.34";
+
+const [get] = createSignal(0);
+export const testViewMainRelative = get();
+`,
+              );
+
+              const result = await buildBundle({
+                entryPoint: testFile,
+                globalName: "TestViewMainRelative",
+                platform: "browser",
+                format: "iife",
+                plugins: [denoResolverPlugin()],
+              });
+
+              expect(result).toBeDefined();
+              expect(result.code).toBeDefined();
+              expect(result.code.length).toBeGreaterThan(0);
+              expect(result.code).toContain("testViewMainRelative");
+            } catch (error) {
+              const errorMessage = error instanceof Error
+                ? error.message
+                : String(error);
+              if (
+                errorMessage.includes("jsr:@dreamer/types") ||
+                errorMessage.includes("jsr:@dreamer/effect") ||
+                errorMessage.includes("jsr:@dreamer/signal") ||
+                errorMessage.includes("jsr:@dreamer/runtime")
+              ) {
+                throw new Error(
+                  "view 主入口内相对导入应解析为 view 包内，不应解析为 jsr:@dreamer/xxx: " +
+                    errorMessage,
+                );
+              }
+              throw error;
+            }
+          },
+          { sanitizeOps: false, sanitizeResources: false },
+        );
+
+        it("本地 .tsx 入口应被正确编译为 JSX（loader tsx）", async () => {
+          try {
+            const srcDir = join(testDataDir, "tsx-compile-src");
+            await mkdir(srcDir, { recursive: true });
+            const tsxFile = join(srcDir, "Widget.tsx");
+            await writeTextFile(
+              tsxFile,
+              `export function Widget() {
+  return <div className="tsx-compile-marker">TSX compiled</div>;
+}
+`,
+            );
+            const entryFile = join(testDataDir, "test-tsx-compile-entry.ts");
+            await writeTextFile(
+              entryFile,
+              `import { Widget } from "./tsx-compile-src/Widget.tsx";
+export const testTsxCompile = typeof Widget;
+`,
+            );
+
+            const result = await buildBundle({
+              entryPoint: entryFile,
+              globalName: "TestTsxCompile",
+              platform: "browser",
+              format: "iife",
+              plugins: [denoResolverPlugin()],
+            });
+
+            expect(result).toBeDefined();
+            expect(result.code).toBeDefined();
+            expect(result.code.length).toBeGreaterThan(0);
+            expect(result.code).toContain("testTsxCompile");
+            expect(result.code).toContain("tsx-compile-marker");
+          } catch (error) {
+            const errorMessage = error instanceof Error
+              ? error.message
+              : String(error);
+            if (errorMessage.includes("Expected '>' but found")) {
+              throw new Error(
+                ".tsx 文件应使用 tsx loader 解析 JSX: " + errorMessage,
+              );
+            }
+            throw error;
+          }
+        }, { sanitizeOps: false, sanitizeResources: false });
+
+        it(
+          "router 子路径会拉 route-page.tsx，须用 tsx loader 且 JSX 被正确编译",
+          async () => {
+            try {
+              const testFile = join(testDataDir, "test-view-router-tsx.ts");
+              await writeTextFile(
+                testFile,
+                `// 导入 view/router 会拉 route-page.tsx；预构建缓存命中时须用 cache key 决定 loader 为 tsx，否则报 Expected '>' but found 'className'
+import "jsr:@dreamer/view@^1.0.0-beta.34/router";
+
+export const testViewRouterTsx = "ok";
+`,
+              );
+
+              const result = await buildBundle({
+                entryPoint: testFile,
+                globalName: "TestViewRouterTsx",
+                platform: "browser",
+                format: "iife",
+                plugins: [denoResolverPlugin()],
+              });
+
+              expect(result).toBeDefined();
+              expect(result.code).toBeDefined();
+              expect(result.code.length).toBeGreaterThan(0);
+              expect(result.code).toContain("testViewRouterTsx");
+              // 构建成功即说明 route-page.tsx 若被解析则必为 tsx loader（否则会抛 Expected '>' but found 'className'）
+              // 注：部分环境下 router 可能被 external，此时 bundle 不含 route-page 源码，无法用 errorSection 等断言
+            } catch (error) {
+              const errorMessage = error instanceof Error
+                ? error.message
+                : String(error);
+              if (errorMessage.includes("Expected '>' but found 'className'")) {
+                throw new Error(
+                  "route-page.tsx 应使用 tsx loader，当前被当 .ts 解析: " +
+                    errorMessage,
+                );
+              }
+              throw error;
+            }
+          },
+          { sanitizeOps: false, sanitizeResources: false },
+        );
       });
 
       describe("浏览器模式测试", () => {
@@ -851,11 +998,11 @@ export { logger };
     });
   }
 
-  // 清理测试输出目录
+  // 测试结束后无条件清理本套件生成的目录，不依赖 CLEANUP_AFTER_TEST
   it("应该清理测试输出目录", async () => {
     if (testDataDir) {
       try {
-        await cleanupDir(testDataDir);
+        await remove(testDataDir, { recursive: true });
       } catch {
         // 忽略错误
       }

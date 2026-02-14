@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.19] - 2026-02-14
+
+### Changed
+
+- **Tests**: Resolver advanced tests now write output under
+  `tests/data/resolver-advanced` (via `beforeAll` + `getTestOutputDir`) and
+  clean up automatically after run; no generated files in package root.
+- **Docs**: TEST_REPORT and README test report sections updated (Deno 568, Bun
+  509; resolver-advanced 16 tests, BuilderBundle 29 tests; resolver output path
+  and auto-cleanup noted).
+
+---
+
 ## [1.0.18] - 2026-02-13
 
 ### Fixed
