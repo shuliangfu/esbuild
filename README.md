@@ -1055,13 +1055,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.17** (2026-02-13)
+**v1.0.18** (2026-02-13)
 
-- **Changed**: Resolver prefers pre-built module cache in getLocalPathFromCache
-  so onLoad hits cache immediately and skips
-  import.meta.resolve/subprocess/fetch.
-- **Fixed**: Add .tsx to pathVariants and fuzzy match so route-page.tsx etc. are
-  found from cache.
+- **Fixed**: Only treat `@` as version when preceded by `/` so
+  `jsr:@dreamer/runtime` parses correctly; use cache key for loader when path
+  has no extension; match cache by import path only (no hardcoded mod.ts).
+- **Changed**: No-version jsr specifiers match cache by prefix, avoiding fetch.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

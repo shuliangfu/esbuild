@@ -8,6 +8,28 @@ and this project adheres to
 
 ---
 
+## [1.0.18] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: Only treat `@` as version separator when it is preceded by `/`
+  (e.g. `@scope/name@version`), so `jsr:@dreamer/runtime` is parsed as
+  scope/name `@dreamer/runtime` instead of version=dreamer, subpath=runtime.
+  Fixes fetch and cache lookup for packages like @dreamer/types,
+  @dreamer/signal.
+- **Resolver**: Use cache key (with extension) for loader when the local path is
+  extension-less (Deno cache hash), so `.tsx` files get loader `tsx` and
+  "Expected '>' but found 'className'" is resolved.
+- **Resolver**: Match cache by import path only for no-version jsr specifiers;
+  main entry is the key with no path after version, no hardcoded `mod.ts`.
+
+### Changed
+
+- **Resolver**: No-version specifiers (e.g. `jsr:@dreamer/signal`) now match
+  pre-built cache by package prefix; cache hit avoids fetch.
+
+---
+
 ## [1.0.17] - 2026-02-13
 
 ### Changed

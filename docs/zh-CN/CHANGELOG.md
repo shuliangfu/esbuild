@@ -7,6 +7,25 @@
 
 ---
 
+## [1.0.18] - 2026-02-13
+
+### 修复
+
+- **Resolver**：仅当 `@` 前为 `/` 时视为版本分隔符（如 `@scope/name@version`），
+  避免 `jsr:@dreamer/runtime` 被解析成 version=dreamer、subpath=runtime，修复
+  @dreamer/types、@dreamer/signal 等包的 fetch 与缓存查找。
+- **Resolver**：本地路径无扩展名（Deno 缓存 hash）时用 cache key 决定 loader，
+  使 .tsx 得到 loader tsx，修复 "Expected '>' but found 'className'"。
+- **Resolver**：无版本 jsr 按 import 路径匹配缓存，主入口仅匹配「版本后无路径」
+  的 key，不再假定 mod.ts。
+
+### 变更
+
+- **Resolver**：无版本 specifier（如
+  `jsr:@dreamer/signal`）按包前缀匹配预构建缓存， 命中则不再走 fetch。
+
+---
+
 ## [1.0.17] - 2026-02-13
 
 ### 变更
