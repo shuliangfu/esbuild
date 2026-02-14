@@ -870,10 +870,48 @@ export function denoResolverPlugin(
         }
         if (!moduleCache) return undefined;
 
-        // 直接查找
+        // 直接查找（与 buildModuleCache 写入的 key 完全一致时命中）
         let localPath = moduleCache.get(specifier);
         if (localPath && existsSync(localPath)) {
           return localPath;
+        }
+
+        // jsr: 预构建缓存直接命中：buildModuleCache 已把全部依赖写成 jsr:scope@version/src/path.ext，
+        // 此处用相同 key 格式查缓存，命中则直接返回，不再走 import.meta.resolve / 子进程 / fetch，提升编译效率
+        if (specifier.startsWith("jsr:")) {
+          const afterJsr = specifier.slice(4);
+          const lastAtIdx = afterJsr.lastIndexOf("@");
+          if (lastAtIdx > 0) {
+            const scopeAndName = afterJsr.slice(0, lastAtIdx);
+            const versionAndPath = afterJsr.slice(lastAtIdx + 1);
+            const slashIdx = versionAndPath.indexOf("/");
+            const version = slashIdx === -1
+              ? versionAndPath.replace(/^[\^~]/, "")
+              : versionAndPath.slice(0, slashIdx).replace(/^[\^~]/, "");
+            const subpath = slashIdx === -1
+              ? ""
+              : versionAndPath.slice(slashIdx + 1);
+            if (subpath) {
+              const base = `jsr:${scopeAndName}@${version}`;
+              const tryKeys = [
+                `${base}/${subpath}`,
+                `${base}/src/${subpath}`,
+                ...(subpath.includes(".") ? [] : [
+                  `${base}/src/${subpath}.ts`,
+                  `${base}/src/${subpath}.tsx`,
+                ]),
+              ];
+              for (const k of tryKeys) {
+                const v = moduleCache.get(k);
+                if (v && existsSync(v)) {
+                  debugLog(
+                    `getLocalPathFromCache 预构建缓存直接命中: ${specifier} -> ${k} -> ${v}`,
+                  );
+                  return v;
+                }
+              }
+            }
+          }
         }
 
         // npm: 协议：deno info 可能存精确版本，用 @版本 再试（如 npm:react-dom@19.2.4）
@@ -956,10 +994,12 @@ export function denoResolverPlugin(
               pathVariants.push(`/${subpath}`);
               // 添加 src/ 前缀
               pathVariants.push(`/src/${subpath}`);
-              // 尝试 .ts 扩展名
-              if (!subpath.endsWith(".ts")) {
+              // 尝试 .ts / .tsx 扩展名（与 buildModuleCache 中 deno info 的 key 一致，避免命中不到再走子进程/fetch）
+              if (!subpath.endsWith(".ts") && !subpath.endsWith(".tsx")) {
                 pathVariants.push(`/${subpath}.ts`);
                 pathVariants.push(`/src/${subpath}.ts`);
+                pathVariants.push(`/${subpath}.tsx`);
+                pathVariants.push(`/src/${subpath}.tsx`);
                 // 尝试 /mod.ts 后缀（JSR 包常用模式）
                 pathVariants.push(`/${subpath}/mod.ts`);
                 pathVariants.push(`/src/${subpath}/mod.ts`);
@@ -989,13 +1029,13 @@ export function denoResolverPlugin(
             const baseUrl = `https://jsr.io/${scopeAndName}/${version}/`;
             for (const [key, value] of moduleCache.entries()) {
               if (key.startsWith(baseUrl) && subpath) {
-                // 检查缓存键是否以子路径结尾（忽略 src/ 前缀和扩展名差异）
+                // 检查缓存键是否以子路径结尾（忽略 src/ 前缀和 .ts/.tsx 扩展名）
                 const keyPath = key.slice(baseUrl.length);
                 const normalizedKey = keyPath.replace(/^src\//, "").replace(
-                  /\.ts$/,
+                  /\.(ts|tsx)$/,
                   "",
                 );
-                const normalizedSubpath = subpath.replace(/\.ts$/, "");
+                const normalizedSubpath = subpath.replace(/\.(ts|tsx)$/, "");
                 if (
                   normalizedKey.endsWith(normalizedSubpath) && existsSync(value)
                 ) {

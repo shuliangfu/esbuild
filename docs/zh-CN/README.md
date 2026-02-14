@@ -1030,11 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.16**（2026-02-13）
+**v1.0.17**（2026-02-13）
 
-- **修复**：Resolver 在 resolveDir 缓存未命中时，用 importer
-  的本地缓存路径解析相对导入，使包内相对导入（如 `./dom/shared`）无需在
-  deno.json 中导出该子路径即可生效。
+- **变更**：Resolver 优先用预构建模块缓存，onLoad 直接命中缓存，不再走
+  import.meta.resolve/子进程/fetch。
+- **修复**：pathVariants 与模糊匹配支持 .tsx，使 route-page.tsx 等从缓存命中。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

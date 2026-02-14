@@ -8,6 +8,23 @@ and this project adheres to
 
 ---
 
+## [1.0.17] - 2026-02-13
+
+### Changed
+
+- **Resolver**: Prefer the pre-built module cache in `getLocalPathFromCache`:
+  for `jsr:` specifiers, try the same key format as `buildModuleCache`
+  (`jsr:scope@version/src/path.ext`) first so onLoad hits cache immediately and
+  skips `import.meta.resolve`, subprocess, and fetch, improving compile
+  performance when the cache is already populated.
+
+### Fixed
+
+- **Resolver**: Add `.tsx` to pathVariants and normalize `.tsx` in fuzzy match
+  so JSR subpaths like `route-page.tsx` are found from cache.
+
+---
+
 ## [1.0.16] - 2026-02-13
 
 ### Fixed

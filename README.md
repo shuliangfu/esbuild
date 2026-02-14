@@ -1055,12 +1055,13 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.16** (2026-02-13)
+**v1.0.17** (2026-02-13)
 
-- **Fixed**: Resolver now resolves relative imports from JSR importers using the
-  importer's local cache path when resolveDir cache misses, so internal relative
-  imports (e.g. `./dom/shared`) work without exporting those subpaths in
-  deno.json.
+- **Changed**: Resolver prefers pre-built module cache in getLocalPathFromCache
+  so onLoad hits cache immediately and skips
+  import.meta.resolve/subprocess/fetch.
+- **Fixed**: Add .tsx to pathVariants and fuzzy match so route-page.tsx etc. are
+  found from cache.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

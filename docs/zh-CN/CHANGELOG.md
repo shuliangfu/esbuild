@@ -7,6 +7,22 @@
 
 ---
 
+## [1.0.17] - 2026-02-13
+
+### 变更
+
+- **Resolver**：在 `getLocalPathFromCache` 中优先使用预构建模块缓存：对 `jsr:`
+  specifier 先按与 `buildModuleCache` 相同的 key 格式
+  （`jsr:scope@version/src/path.ext`）查找，命中则 onLoad 直接读缓存，不再走
+  import.meta.resolve、子进程和 fetch，提升已有缓存时的编译效率。
+
+### 修复
+
+- **Resolver**：pathVariants 增加 `.tsx`、模糊匹配时统一去掉 `.tsx`，使
+  route-page.tsx 等 JSR 子路径能从缓存命中。
+
+---
+
 ## [1.0.16] - 2026-02-13
 
 ### 修复
