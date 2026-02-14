@@ -482,14 +482,16 @@ async function fetchJsrSourceViaMeta(
     }
     return { contents: null };
   }
-  // 格式 jsr:@scope/name@version/path 或 jsr:@scope/name/path（无版本号时从包级 meta 取 latest）
+  // 格式 jsr:@scope/name@version/path 或 jsr:@scope/name 或 jsr:@scope/name/path（无版本号时从包级 meta 取 latest）
+  // 仅当「最后一个 @ 前是 /」时才视为版本分隔符，否则 @ 属于 scope（如 @dreamer 的 @）
   const after = protocolPath.slice(4);
   const lastAtIdx = after.lastIndexOf("@");
+  const hasVersion = lastAtIdx > 0 && after[lastAtIdx - 1] === "/";
   let scopeAndName: string;
   let version: string;
   let subpath: string;
-  if (lastAtIdx === -1) {
-    // 无 @：解析为 @scope/name 与可选的 subpath，再从包级 meta.json 取最新非 yanked 版本
+  if (!hasVersion) {
+    // 无版本号：解析为 @scope/name 与可选的 subpath，再从包级 meta.json 取最新非 yanked 版本
     const parts = after.split("/");
     if (parts.length < 2) {
       return { contents: null };
@@ -857,6 +859,9 @@ export function denoResolverPlugin(
        * @param specifier - 模块 specifier（支持 jsr:、https://jsr.io/ 等格式）
        * @returns 本地文件路径，如果未找到返回 undefined
        */
+      /** 命中预构建缓存时记录 specifier -> cache key，供 onLoad 用 key 的扩展名决定 loader（Deno 缓存路径常为无扩展名 hash） */
+      const resolverCacheKeyForLoader = new Map<string, string>();
+
       /** 路径是否指向 npm 包的 CJS 文件，统一用 / 判断避免漏掉 Windows 反斜杠 */
       function isCjsPath(localPath: string): boolean {
         return localPath.replace(/\\/g, "/").includes("/cjs/");
@@ -877,11 +882,12 @@ export function denoResolverPlugin(
         }
 
         // jsr: 预构建缓存直接命中：buildModuleCache 已把全部依赖写成 jsr:scope@version/src/path.ext，
-        // 此处用相同 key 格式查缓存，命中则直接返回，不再走 import.meta.resolve / 子进程 / fetch，提升编译效率
+        // 只有「最后一个 @ 前是 /」才当作版本，否则 @ 属于 @scope，按无版本包名查缓存
         if (specifier.startsWith("jsr:")) {
           const afterJsr = specifier.slice(4);
           const lastAtIdx = afterJsr.lastIndexOf("@");
-          if (lastAtIdx > 0) {
+          const hasVersion = lastAtIdx > 0 && afterJsr[lastAtIdx - 1] === "/";
+          if (hasVersion) {
             const scopeAndName = afterJsr.slice(0, lastAtIdx);
             const versionAndPath = afterJsr.slice(lastAtIdx + 1);
             const slashIdx = versionAndPath.indexOf("/");
@@ -904,8 +910,50 @@ export function denoResolverPlugin(
               for (const k of tryKeys) {
                 const v = moduleCache.get(k);
                 if (v && existsSync(v)) {
+                  resolverCacheKeyForLoader.set(specifier, k);
                   debugLog(
                     `getLocalPathFromCache 预构建缓存直接命中: ${specifier} -> ${k} -> ${v}`,
+                  );
+                  return v;
+                }
+              }
+            }
+          } else {
+            // 无版本：jsr:@scope/name 或 jsr:@scope/name/subpath，deno info 的 key 带具体版本，遍历缓存匹配
+            const direct = moduleCache.get(specifier);
+            if (direct && existsSync(direct)) {
+              resolverCacheKeyForLoader.set(specifier, specifier);
+              debugLog(
+                `getLocalPathFromCache 预构建缓存直接命中(无版本): ${specifier} -> ${direct}`,
+              );
+              return direct;
+            }
+            const parts = afterJsr.split("/");
+            if (parts.length >= 2) {
+              const scopeAndNameNoVer = `${parts[0]}/${parts[1]}`;
+              const subpathNoVer = parts.length > 2
+                ? parts.slice(2).join("/")
+                : "";
+              // 用 import 路径（scope/name + 可选 subpath）匹配缓存 key，不假定包内文件名（如 mod.ts）
+              const prefix = `jsr:${scopeAndNameNoVer}@`;
+              for (const [k, v] of moduleCache.entries()) {
+                if (!k.startsWith(prefix) || !existsSync(v)) continue;
+                const afterVer = k.slice(prefix.length);
+                const pathInPkg = afterVer.includes("/")
+                  ? afterVer.slice(afterVer.indexOf("/") + 1)
+                  : "";
+                // 无子路径时只匹配「版本后无路径」的 key（deno 解析出的包主入口）
+                const matchMain = pathInPkg === "";
+                const matchSub = subpathNoVer
+                  ? (pathInPkg === subpathNoVer ||
+                    pathInPkg === `src/${subpathNoVer}` ||
+                    pathInPkg.endsWith(`/${subpathNoVer}.ts`) ||
+                    pathInPkg.endsWith(`/${subpathNoVer}.tsx`))
+                  : matchMain;
+                if (matchSub) {
+                  resolverCacheKeyForLoader.set(specifier, k);
+                  debugLog(
+                    `getLocalPathFromCache 预构建缓存模糊命中(无版本): ${specifier} -> ${k} -> ${v}`,
                   );
                   return v;
                 }
@@ -1836,7 +1884,10 @@ export function denoResolverPlugin(
               const contents = await readTextFile(cachedLocalPath);
               const resolveDir = dirname(cachedLocalPath);
               protocolResolveDirCache.set(protocolPath, resolveDir);
-              const loader = getLoaderFromPath(cachedLocalPath);
+              // 用预构建缓存的 key 决定 loader（key 含 .tsx/.ts；Deno 缓存路径常为无扩展名 hash）
+              const loaderKey = resolverCacheKeyForLoader.get(protocolPath) ??
+                cachedLocalPath;
+              const loader = getLoaderFromPath(loaderKey);
               debugLog(
                 `onLoad 从预构建缓存获取 ${protocolPath} -> ${cachedLocalPath} (${contents.length} chars)`,
               );

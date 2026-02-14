@@ -1030,11 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.17**（2026-02-13）
+**v1.0.18**（2026-02-13）
 
-- **变更**：Resolver 优先用预构建模块缓存，onLoad 直接命中缓存，不再走
-  import.meta.resolve/子进程/fetch。
-- **修复**：pathVariants 与模糊匹配支持 .tsx，使 route-page.tsx 等从缓存命中。
+- **修复**：仅当 `@` 前为 `/` 时作版本分隔；无扩展名路径用 cache key 定 loader；
+  无版本时按 import 路径匹配缓存，不假定 mod.ts。
+- **变更**：无版本 jsr 按包前缀匹配缓存，命中则不走 fetch。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
