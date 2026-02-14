@@ -8,6 +8,20 @@ and this project adheres to
 
 ---
 
+## [1.0.16] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: When resolving relative imports from a deno-protocol importer
+  (e.g. `dom/element.ts` importing `./shared`), if the importer's resolveDir was
+  not yet in the cache, the plugin now looks up the importer's local path via
+  `getLocalPathFromCache(protocolPath)` and resolves the relative path against
+  that directory. This allows JSR packages (e.g. @dreamer/view) to use internal
+  relative imports (e.g. `./dom/shared`) without exporting those subpaths in
+  deno.json.
+
+---
+
 ## [1.0.15] - 2026-02-13
 
 ### Fixed

@@ -1030,10 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.15**（2026-02-13）
+**v1.0.16**（2026-02-13）
 
-- **修复**：JSR 带子路径的 importer 下，相对导入的 base 改为包根，使 `./meta`
-  等正确解析为 `.../meta`，修复 router/meta、context/signal 等返回 null 的问题。
+- **修复**：Resolver 在 resolveDir 缓存未命中时，用 importer
+  的本地缓存路径解析相对导入，使包内相对导入（如 `./dom/shared`）无需在
+  deno.json 中导出该子路径即可生效。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
