@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.16] - 2026-02-13
+
+### 修复
+
+- **Resolver**：当从 deno-protocol 的 importer 解析相对导入时（如
+  `dom/element.ts` 引用 `./shared`），若 importer 的 resolveDir
+  尚未进入缓存，插件现通过 `getLocalPathFromCache(protocolPath)` 查找 importer
+  的本地路径，并基于该目录解析相对路径，使 JSR 包（如 @dreamer/view）可在不于
+  deno.json 中导出这些子路径的情况下使用内部相对导入（如 `./dom/shared`）。
+
+---
+
 ## [1.0.15] - 2026-02-13
 
 ### 修复

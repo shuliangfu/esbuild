@@ -1055,11 +1055,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.15** (2026-02-13)
+**v1.0.16** (2026-02-13)
 
-- **Fixed**: For JSR importers with a subpath, relative-import base is now the
-  package root so `./meta` resolves to `.../meta` and fetches correctly (fixes
-  router/meta, context/signal, etc. returning null).
+- **Fixed**: Resolver now resolves relative imports from JSR importers using the
+  importer's local cache path when resolveDir cache misses, so internal relative
+  imports (e.g. `./dom/shared`) work without exporting those subpaths in
+  deno.json.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

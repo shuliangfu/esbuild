@@ -1429,6 +1429,41 @@ export function denoResolverPlugin(
               }
             }
 
+            // 未命中 resolveDir 缓存时：用 importer 在本地缓存中的路径按相对路径解析（view 等包内部相对导出不依赖 JSR exports）
+            const importerLocalPath = getLocalPathFromCache(protocolPath) ??
+              getLocalPathFromCache(protocolPath + ".ts");
+            if (importerLocalPath) {
+              const resolveDir = dirname(importerLocalPath);
+              let resolvedPath = join(resolveDir, args.path);
+              if (existsSync(resolvedPath)) {
+                if (
+                  !isServerBuild &&
+                  isCjsPath(resolvedPath)
+                ) {
+                  const esmPath = await getEsmIfCjsCached(resolvedPath);
+                  if (esmPath) {
+                    debugLog(
+                      `[CJS→ESM] 相对路径(本地缓存)重定向: ${resolvedPath} -> ${esmPath}`,
+                    );
+                    resolvedPath = esmPath;
+                  }
+                }
+                debugLog(
+                  `onResolve 相对路径从 importer 本地缓存解析: ${protocolPath} + ${args.path} -> ${resolvedPath}`,
+                );
+                return { path: resolvedPath, namespace: "file" };
+              }
+              if (!resolvedPath.includes(".")) {
+                const withTs = resolvedPath + ".ts";
+                if (existsSync(withTs)) {
+                  debugLog(
+                    `onResolve 相对路径从 importer 本地缓存解析(+.ts): ${protocolPath} + ${args.path} -> ${withTs}`,
+                  );
+                  return { path: withTs, namespace: "file" };
+                }
+              }
+            }
+
             // 在插件上下文中 import.meta.resolve 用的是 esbuild/插件的 deno.json，拿不到项目的 file://；
             // 未得到 file:// 时用项目目录 + 项目 deno.json 起子进程解析，这样 view 等 JSR 包会走项目缓存而非 fetch
             let importerUrl: string | undefined;
