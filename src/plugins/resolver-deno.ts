@@ -878,6 +878,24 @@ export function denoResolverPlugin(
         // 直接查找（与 buildModuleCache 写入的 key 完全一致时命中）
         let localPath = moduleCache.get(specifier);
         if (localPath && existsSync(localPath)) {
+          // 有扩展名则直接用 specifier 决定 loader；无扩展名时从缓存中找同文件且带扩展名的 key
+          if (
+            specifier.endsWith(".tsx") ||
+            specifier.endsWith(".ts") ||
+            specifier.endsWith(".jsx") ||
+            specifier.endsWith(".js")
+          ) {
+            resolverCacheKeyForLoader.set(specifier, specifier);
+          } else {
+            for (const [k, v] of moduleCache.entries()) {
+              if (
+                v === localPath && (k.endsWith(".tsx") || k.endsWith(".ts"))
+              ) {
+                resolverCacheKeyForLoader.set(specifier, k);
+                break;
+              }
+            }
+          }
           return localPath;
         }
 
@@ -899,12 +917,13 @@ export function denoResolverPlugin(
               : versionAndPath.slice(slashIdx + 1);
             if (subpath) {
               const base = `jsr:${scopeAndName}@${version}`;
+              // 无扩展名时先试 .tsx 再 .ts，避免 .ts 先命中导致 JSX 被当 TS 解析（Expected '>' but found 'className'）
               const tryKeys = [
                 `${base}/${subpath}`,
                 `${base}/src/${subpath}`,
                 ...(subpath.includes(".") ? [] : [
-                  `${base}/src/${subpath}.ts`,
                   `${base}/src/${subpath}.tsx`,
+                  `${base}/src/${subpath}.ts`,
                 ]),
               ];
               for (const k of tryKeys) {
@@ -1060,12 +1079,14 @@ export function denoResolverPlugin(
               pathVariants.push("/mod.ts");
             }
 
-            // 遍历所有路径变体尝试匹配
+            // 遍历所有路径变体尝试匹配（缓存可能以 https 或 jsr key 存储）
             for (const pathVariant of pathVariants) {
               const httpsUrl =
                 `https://jsr.io/${scopeAndName}/${version}${pathVariant}`;
               localPath = moduleCache.get(httpsUrl);
               if (localPath && existsSync(localPath)) {
+                // 用带扩展名的 key 供 onLoad 决定 loader，避免无扩展名路径导致 .tsx 被当 .ts
+                resolverCacheKeyForLoader.set(specifier, httpsUrl);
                 debugLog(
                   `getLocalPathFromCache 转换 ${specifier} -> ${httpsUrl} -> ${localPath}`,
                 );
@@ -1087,6 +1108,7 @@ export function denoResolverPlugin(
                 if (
                   normalizedKey.endsWith(normalizedSubpath) && existsSync(value)
                 ) {
+                  resolverCacheKeyForLoader.set(specifier, key);
                   debugLog(
                     `getLocalPathFromCache 模糊匹配 ${specifier} -> ${key} -> ${value}`,
                   );
@@ -1691,12 +1713,17 @@ export function denoResolverPlugin(
               let currentBasePath: string;
               if (importerProtocolPath.startsWith("jsr:")) {
                 const parts = importerProtocolPath.split("/");
-                // 有子路径时（如 ...@version/router）以包根为 base，否则相对导入会变成 .../router/meta，JSR 无此 export
-                currentBasePath = parts.length >= 3
-                  ? parts.slice(0, -1).join("/")
-                  : (isFile
+                // 有子路径时（如 ...@version/router、.../route-page）以包根为 base，否则相对导入会变成 .../router/meta，JSR 无此 export
+                // 仅包主入口时（parts.length === 2，即 jsr:@scope/name@version）必须以完整包为 base，否则 ./effect.ts 会错成 jsr:@dreamer/effect 而非 jsr:@dreamer/view@version/effect
+                if (parts.length >= 3) {
+                  currentBasePath = parts.slice(0, -1).join("/");
+                } else if (parts.length === 2) {
+                  currentBasePath = importerProtocolPath;
+                } else {
+                  currentBasePath = isFile
                     ? importerProtocolPath.replace(/\/[^/]+$/, "")
-                    : importerProtocolPath);
+                    : importerProtocolPath;
+                }
               } else {
                 currentBasePath = isFile
                   ? importerProtocolPath.replace(/\/[^/]+$/, "")

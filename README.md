@@ -12,7 +12,7 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20570%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 ---
 
@@ -979,7 +979,7 @@ report.
 
 | Runtime               | Tests | Passed | Failed | Pass Rate |
 | --------------------- | ----- | ------ | ------ | --------- |
-| Deno (`deno test -A`) | 570   | 570    | 0      | 100% ✅   |
+| Deno (`deno test -A`) | 568   | 568    | 0      | 100% ✅   |
 | Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
@@ -1002,12 +1002,12 @@ report.
 - ✅ Complete test coverage for all features, edge cases, error handling
 - ✅ Integration tests verify end-to-end full flow
 - ✅ Memory mode (write: false) complete feature tests
-- ✅ BuilderBundle simple bundler complete tests (28)
+- ✅ BuilderBundle simple bundler complete tests (29)
   - ESM and IIFE format tests
   - Global variable setting tests (window/global/globalThis)
   - Platform-specific behavior tests (browser/node/neutral)
 - ✅ Path resolution feature tests (Deno and Bun environments)
-  - Resolver plugin tests (18) + resolver advanced tests (11)
+  - Resolver plugin tests (18) + resolver advanced tests (16)
   - Server builder path resolution tests (5)
   - Builder server Bun tests (2, Bun only)
   - Client builder path resolution tests (6)
@@ -1055,12 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.18** (2026-02-13)
+**v1.0.19** (2026-02-14)
 
-- **Fixed**: Only treat `@` as version when preceded by `/` so
-  `jsr:@dreamer/runtime` parses correctly; use cache key for loader when path
-  has no extension; match cache by import path only (no hardcoded mod.ts).
-- **Changed**: No-version jsr specifiers match cache by prefix, avoiding fetch.
+- **Changed**: Resolver advanced tests output under
+  `tests/data/resolver-advanced` with auto-cleanup; TEST_REPORT and README test
+  stats synced (568 Deno, 509 Bun).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

@@ -12,7 +12,7 @@ English | [中文 (Chinese)](../zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-Deno%20518%20%7C%20Bun%20503%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -978,8 +978,8 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 | Runtime               | Tests | Passed | Failed | Pass Rate |
 | --------------------- | ----- | ------ | ------ | --------- |
-| Deno (`deno test -A`) | 518   | 518    | 0      | 100% ✅   |
-| Bun (`bun test`)      | 503   | 503    | 0      | 100% ✅   |
+| Deno (`deno test -A`) | 568   | 568    | 0      | 100% ✅   |
+| Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
   handling
@@ -1001,12 +1001,12 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 - ✅ Complete test coverage for all features, edge cases, error handling
 - ✅ Integration tests verify end-to-end full flow
 - ✅ Memory mode (write: false) complete feature tests
-- ✅ BuilderBundle simple bundler complete tests (28)
+- ✅ BuilderBundle simple bundler complete tests (29)
   - ESM and IIFE format tests
   - Global variable setting tests (window/global/globalThis)
   - Platform-specific behavior tests (browser/node/neutral)
 - ✅ Path resolution feature tests (Deno and Bun environments)
-  - Resolver plugin tests (18) + resolver advanced tests (11)
+  - Resolver plugin tests (18) + resolver advanced tests (16)
   - Server builder path resolution tests (5)
   - Builder server Bun tests (2, Bun only)
   - Client builder path resolution tests (6)
@@ -1054,11 +1054,11 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.6** (2026-02-09)
+**v1.0.19** (2026-02-14)
 
-- **Fixed**: Normalize Windows `file://` path (remove leading slash for `C:/`)
-- **Fixed**: npm subprocess fallback when resolved file path does not exist
-  (e.g. Windows monorepo)
+- **Changed**: Resolver advanced tests output under
+  `tests/data/resolver-advanced` with auto-cleanup; TEST_REPORT and README test
+  stats synced (568 Deno, 509 Bun).
 
 Full history in [CHANGELOG.md](./CHANGELOG.md).
 
