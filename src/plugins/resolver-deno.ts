@@ -36,6 +36,11 @@ function fileUrlToPath(fileUrl: string): string {
   return path;
 }
 
+/** 路径转为正斜杠，便于在 Windows 下传给 deno 子进程时避免反斜杠转义问题 */
+function toForwardSlash(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 const NOOP_LOGGER: BuildLogger = {
   debug: () => {},
   info: () => {},
@@ -82,12 +87,14 @@ export async function buildModuleCache(
   debugLog(`buildModuleCache 开始: entry=${entryPoint}, workDir=${workDir}`);
 
   const projectDenoJson = findProjectDenoJson(workDir);
-  const configArgs = projectDenoJson ? ["--config", projectDenoJson] : [];
+  const configArgs = projectDenoJson
+    ? ["--config", toForwardSlash(projectDenoJson)]
+    : [];
 
   try {
     const proc = createCommand("deno", {
-      args: ["info", "--json", ...configArgs, entryPoint],
-      cwd: workDir,
+      args: ["info", "--json", ...configArgs, toForwardSlash(entryPoint)],
+      cwd: toForwardSlash(workDir),
       stdout: "piped",
       stderr: "piped",
     });
@@ -136,11 +143,13 @@ export async function buildModuleCache(
         const procNpm = createCommand("deno", {
           args: [
             "eval",
-            ...(projectDenoJson ? ["--config", projectDenoJson] : []),
+            ...(projectDenoJson
+              ? ["--config", toForwardSlash(projectDenoJson)]
+              : []),
             "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
             spec,
           ],
-          cwd: workDir,
+          cwd: toForwardSlash(workDir),
           stdout: "piped",
           stderr: "piped",
         });
