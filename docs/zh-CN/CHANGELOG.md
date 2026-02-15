@@ -7,6 +7,19 @@
 
 ---
 
+## [1.0.24] - 2026-02-15
+
+### 修复
+
+- **Resolver（Deno）**：在 Windows CI 上为 `deno info` 使用相对入口路径与原生
+  `cwd`，使 `@dreamer/socket-io/client` 等 JSR
+  子路径能正确解析。`buildModuleCache` 现向 `deno info` 传入
+  `relative(workDir, entryPoint)` 作为入口（入口在 workDir
+  外时退回绝对路径），子进程的 `cwd` 直接使用 `workDir`（不做正斜杠规范化），
+  以便在 Windows 上子进程获得正确工作目录。
+
+---
+
 ## [1.0.23] - 2026-02-15
 
 ### 新增

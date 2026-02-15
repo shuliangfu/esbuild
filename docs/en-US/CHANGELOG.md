@@ -8,6 +8,20 @@ and this project adheres to
 
 ---
 
+## [1.0.24] - 2026-02-15
+
+### Fixed
+
+- **Resolver (Deno)**: Use relative entry path and native `cwd` for `deno info`
+  on Windows CI so that `@dreamer/socket-io/client` and other JSR subpaths
+  resolve correctly. `buildModuleCache` now passes
+  `relative(workDir, entryPoint)` as the entry to `deno info` (fallback to
+  absolute path when entry is outside workDir) and uses `workDir` as-is for
+  subprocess `cwd` (no forward-slash normalization) so the child process gets
+  the correct working directory on Windows.
+
+---
+
 ## [1.0.23] - 2026-02-15
 
 ### Added
