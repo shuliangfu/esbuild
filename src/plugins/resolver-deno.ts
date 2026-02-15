@@ -223,7 +223,11 @@ function findProjectDenoJson(startDir: string): string | undefined {
   return undefined;
 }
 
-/** 从项目 deno.json 的 imports 解析 bare 包名或带子路径（如 @dreamer/logger、@dreamer/logger/client） */
+/**
+ * 从项目 deno.json 的 imports 解析 bare 包名或带子路径。
+ * 子路径从右往左一层一层试：先试 @dreamer/render/client/react 整键，再试 base=@dreamer/render/client/subpath=react，
+ * 再试 base=@dreamer/render、subpath=client/react，命中 base 即拼成 jsr:.../subpath。
+ */
 function getPackageImport(
   projectDenoJsonPath: string,
   packageName: string,
@@ -232,15 +236,22 @@ function getPackageImport(
   const c = config ?? getDenoConfig(projectDenoJsonPath);
   if (!c?.imports) return undefined;
   const val = c.imports[packageName];
-  if (typeof val === "string") return val;
-  const slashIdx = packageName.indexOf("/", packageName.indexOf("/") + 1);
-  if (slashIdx > 0) {
-    const base = packageName.slice(0, slashIdx);
-    const subpath = packageName.slice(slashIdx + 1);
+  if (typeof val === "string") return normalizeProtocolSpecifier(val);
+  for (let i = packageName.length - 1; i >= 0; i--) {
+    if (packageName[i] !== "/") continue;
+    const base = packageName.slice(0, i);
+    const subpath = packageName.slice(i + 1);
     const baseVal = c.imports[base];
-    if (typeof baseVal === "string") return `${baseVal}/${subpath}`;
+    if (typeof baseVal === "string") {
+      return normalizeProtocolSpecifier(`${baseVal}/${subpath}`);
+    }
   }
   return undefined;
+}
+
+/** 规范 jsr:/npm: 后的多余前导斜杠，避免出现 npm:/react-dom@x/client 这种非法格式 */
+function normalizeProtocolSpecifier(s: string): string {
+  return s.replace(/^(npm|jsr):\/+(?!\/)/, "$1:");
 }
 
 function convertSpecifierToBrowserUrl(specifier: string): string | null {
@@ -250,7 +261,7 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
   if (specifier.startsWith("jsr:")) {
     return `https://esm.sh/jsr/${specifier.slice(4)}`;
   }
-  if (specifier.startsWith("http:") || specifier.startsWith("https:")) {
+  if (specifier.startsWith("http:")) {
     return specifier;
   }
   return null;
@@ -334,7 +345,7 @@ function escapeRegex(s: string): string {
 export type CacheLookupResult = { path: string; key: string };
 
 /**
- * 缓存查找：先精确 get；未命中则对 jsr 用正则匹配 cache key。
+ * 缓存查找：先精确 get；未命中则对 jsr 用正则匹配 cache key；对 npm 支持子路径回退（如 npm:react-dom@x/client）。
  * 子路径允许多段间有额外目录（如 client/preact 匹配 src/client/adapters/preact.ts）。
  */
 function cacheLookup(
@@ -345,6 +356,21 @@ function cacheLookup(
   const exact = moduleCache.get(specifier);
   if (exact && existsCheck(exact)) {
     return { path: exact, key: specifier };
+  }
+
+  // 无扩展名的 jsr specifier（如 .../src/types）先尝试 cache 中的 .ts/.tsx key，避免相对路径解析出的路径与 deno info 缓存 key 不一致
+  if (
+    specifier.startsWith("jsr:") &&
+    !/\.(tsx?|jsx?|mts|mjs)$/i.test(specifier)
+  ) {
+    const withTs = moduleCache.get(specifier + ".ts");
+    if (withTs && existsCheck(withTs)) {
+      return { path: withTs, key: specifier };
+    }
+    const withTsx = moduleCache.get(specifier + ".tsx");
+    if (withTsx && existsCheck(withTsx)) {
+      return { path: withTsx, key: specifier };
+    }
   }
 
   if (specifier.startsWith("jsr:")) {
@@ -371,6 +397,85 @@ function cacheLookup(
       if (!key.startsWith("jsr:")) continue;
       if (pattern.test(key) && existsCheck(localPath)) {
         return { path: localPath, key };
+      }
+    }
+
+    // JSR 子路径通用回退：用 scopeAndName 匹配 cache 中的主包，再按子路径一层一层拼候选（不写死 adapters 等目录）
+    if (subpath) {
+      const baseKeyPrefix = `jsr:${scopeAndName}@`;
+      const parts = subpath.split("/");
+      const buildCandidates = (root: string) => {
+        return [
+          join(root, subpath),
+          join(root, subpath + ".ts"),
+          join(root, subpath + ".tsx"),
+          join(root, ...parts, "mod.ts"),
+          join(root, ...parts, "index.ts"),
+          join(root, "src", subpath, "mod.ts"),
+          join(root, "src", subpath + ".ts"),
+          join(root, "src", subpath + ".tsx"),
+        ];
+      };
+      for (const [key, baseLocal] of moduleCache) {
+        if (
+          !key.startsWith("jsr:") ||
+          !key.startsWith(baseKeyPrefix) ||
+          key.slice(baseKeyPrefix.length).includes("/")
+        ) continue;
+        if (!existsCheck(baseLocal)) continue;
+        const baseDir = dirname(baseLocal);
+        for (const p of buildCandidates(baseDir)) {
+          if (existsCheck(p)) return { path: p, key: specifier };
+        }
+        const baseDirParent = dirname(baseDir);
+        if (baseDirParent !== baseDir) {
+          for (const p of buildCandidates(baseDirParent)) {
+            if (existsCheck(p)) return { path: p, key: specifier };
+          }
+        }
+      }
+    }
+  }
+
+  // npm 子路径通用回退：用 baseSpec 或包名匹配 cache 中的主包，再拼接子路径（不写死包名、不起子进程）
+  if (specifier.startsWith("npm:") && specifier.includes("/")) {
+    const after = specifier.slice(4).replace(/^\/+/, "");
+    const slashIdx = after.indexOf("/");
+    if (slashIdx > 0) {
+      const baseSpec = "npm:" + after.slice(0, slashIdx);
+      const subpath = after.slice(slashIdx + 1);
+      let baseLocal = moduleCache.get(baseSpec);
+      if (!baseLocal) {
+        const pkgName = after.slice(0, slashIdx).split("@")[0];
+        const npmPrefix = `npm:${pkgName}@`;
+        for (const [key, local] of moduleCache) {
+          if (
+            key.startsWith("npm:") &&
+            key.startsWith(npmPrefix) &&
+            !key.slice(npmPrefix.length).includes("/")
+          ) {
+            if (existsCheck(local)) {
+              baseLocal = local;
+              break;
+            }
+          }
+        }
+      }
+      if (baseLocal && existsCheck(baseLocal)) {
+        const baseDir = dirname(baseLocal);
+        const candidates = [
+          join(baseDir, subpath),
+          join(baseDir, subpath + ".js"),
+          join(baseDir, subpath + ".mjs"),
+          join(baseDir, subpath, "index.js"),
+          join(baseDir, "build", subpath + ".js"),
+          join(baseDir, "build", subpath + ".mjs"),
+        ];
+        for (const p of candidates) {
+          if (existsCheck(p)) {
+            return { path: p, key: specifier };
+          }
+        }
       }
     }
   }
@@ -511,12 +616,7 @@ export function denoResolverPlugin(
       build.onResolve(
         { filter: /^(jsr|npm):/ },
         (args): esbuild.OnResolveResult | undefined => {
-          let specifier = args.path;
-          if (
-            specifier.startsWith("jsr:/") && !specifier.startsWith("jsr://")
-          ) {
-            specifier = "jsr:" + specifier.slice(5);
-          }
+          const specifier = normalizeProtocolSpecifier(args.path);
           if (isServerBuild && !browserMode) {
             debugLog(`服务端构建 external: ${specifier}`);
             return { path: specifier, external: true };
@@ -582,19 +682,14 @@ export function denoResolverPlugin(
       );
 
       // 2.5 bare @scope/name 或 @scope/name/subpath：从 deno.json imports 取 jsr:/npm 地址
-      // 当 importer 来自 deno-protocol（如依赖包内模块）时，用 projectDir 查项目 deno.json，
-      // 使项目声明的依赖版本优先于依赖包内声明的版本（以项目版本为准）
+      // 优先用 projectDir 查 deno.json，保证 @dreamer/router/client、@dreamer/render/client/react 等子路径能命中项目 imports
       build.onResolve(
         { filter: /^@[^/]+\/[^/]+(\/.*)?$/ },
         (args): esbuild.OnResolveResult | undefined => {
-          const fromProtocol = args.importer?.startsWith(
-            NAMESPACE_DENO_PROTOCOL + ":",
-          );
-          const startDir = fromProtocol && projectDir
-            ? projectDir
-            : (args.importer
+          const startDir = projectDir ??
+            (args.importer
               ? dirname(args.importer)
-              : (args.resolveDir ?? projectDir ?? cwd()));
+              : (args.resolveDir ?? cwd()));
           const denoJsonPath = findDenoJson(startDir);
           if (!denoJsonPath) return undefined;
           const pkgImport = getPackageImport(denoJsonPath, args.path);
@@ -761,11 +856,11 @@ export function denoResolverPlugin(
         },
       );
 
-      // 4. onLoad：仅从 cache 读文件；用匹配到的 cache key 决定 loader（Deno 缓存路径常无扩展名）
+      // 4. onLoad：仅从 cache 读文件；用匹配到的 cache key 决定 loader；必须返回 resolveDir 以便包内相对路径（如 ./cjs/react.production.js）可被解析
       build.onLoad(
         { filter: /.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
-          const protocolPath = args.path;
+          const protocolPath = normalizeProtocolSpecifier(args.path);
           debugLog(`onLoad ${protocolPath}`);
           if (!moduleCache) return undefined;
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
@@ -775,10 +870,11 @@ export function denoResolverPlugin(
           const loader = /\.(tsx?|jsx?|mts|mjs)$/i.test(key)
             ? getLoaderFromPath(key)
             : getLoaderFromPath(localPath);
+          const resolveDir = dirname(localPath);
           debugLog(
             `onLoad 从缓存读取 ${protocolPath} -> ${localPath} (${contents.length} chars)`,
           );
-          return { contents, loader };
+          return { contents, loader, resolveDir };
         },
       );
     },

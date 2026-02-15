@@ -8,6 +8,32 @@ and this project adheres to
 
 ---
 
+## [1.0.22] - 2026-02-13
+
+### Fixed
+
+- **Resolver**: Normalize `npm:/` and `jsr:/` specifiers (strip leading slash
+  after protocol) so that `npm:/react-dom@19.2.4/client` is resolved as
+  `npm:react-dom@19.2.4/client`. Applied in `getPackageImport`, jsr/npm
+  onResolve, and onLoad.
+- **Resolver**: Resolve JSR relative paths without extension by trying cache
+  keys with `.ts`/`.tsx` (e.g. `jsr:.../src/types` → `jsr:.../src/types.ts`),
+  fixing "No matching export ... EnginePacketType" when bundling
+  @dreamer/socket-io client.
+
+### Changed
+
+- **Resolver**: Resolve bare subpaths from right to left in `getPackageImport`
+  (e.g. `@dreamer/render/client/react` → base `@dreamer/render`, subpath
+  `client/react`) so multi-level subpaths match project imports correctly.
+- **Resolver**: Prefer `projectDir` when resolving `@scope/name` and
+  `@scope/name/subpath` so that the project's `deno.json` is always used.
+- **Resolver**: JSR subpath fallback uses only generic path candidates (no
+  hardcoded `adapters`); npm/JSR subpaths use cache + path concatenation only
+  (no subprocess).
+
+---
+
 ## [1.0.21] - 2026-02-13
 
 ### Changed

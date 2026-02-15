@@ -1055,10 +1055,14 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.21** (2026-02-13)
+**v1.0.22** (2026-02-13)
 
-- **Changed**: Resolver now prefers project `deno.json` imports for all JSR/npm
-  dependencies (project version wins over transitive dependency versions).
+- **Fixed**: Normalize `npm:/` and `jsr:/` specifiers; resolve JSR paths without
+  extension via `.ts`/`.tsx` cache lookup (fixes socket-io client bundle export
+  errors).
+- **Changed**: Resolve bare subpaths from right to left; prefer projectDir for
+  @scope/name; JSR subpath fallback without hardcoded adapters; no subprocess
+  for subpaths.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

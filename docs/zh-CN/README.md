@@ -1030,10 +1030,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.21**（2026-02-13）
+**v1.0.22**（2026-02-13）
 
-- **变更**：解析器对所有 JSR/npm 依赖均以项目 `deno.json` 的 imports
-  为准（项目版本优先于传递依赖版本）。
+- **修复**：统一规范 `npm:/`、`jsr:/` 说明符；对无扩展名 JSR 路径按 `.ts`/`.tsx`
+  查缓存（修复 socket-io 客户端打包导出错误）。
+- **变更**：裸子路径从右往左解析；@scope/name 优先 projectDir；JSR 子路径回退
+  不写死 adapters、不起子进程。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
