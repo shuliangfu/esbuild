@@ -299,6 +299,32 @@ function parseProtocolPackageBaseAndPath(
     parseNpmPackageBaseAndPath(protocolPath);
 }
 
+/**
+ * 从 jsr: 或 npm: 的完整 specifier 解析出 deno.json imports 的 key 与子路径。
+ * 用于「以项目版本为准」：用 project 的 imports 覆盖依赖包内声明的版本。
+ * 例：jsr:@dreamer/view@^1.0.2/jsx-runtime -> { packageKey: "@dreamer/view", pathWithinPackage: "jsx-runtime" }
+ *     npm:react@18.0.0/jsx-runtime -> { packageKey: "react", pathWithinPackage: "jsx-runtime" }
+ */
+function getPackageKeyAndSubpathFromSpecifier(
+  specifier: string,
+): { packageKey: string; pathWithinPackage: string } | null {
+  const jsr = parseJsrPackageBaseAndPath(specifier);
+  if (jsr) {
+    const after = specifier.slice(4);
+    const match = after.match(/^(@[^/]+\/[^/]+)\@/);
+    if (!match) return null;
+    return { packageKey: match[1], pathWithinPackage: jsr.pathWithinPackage };
+  }
+  const npm = parseNpmPackageBaseAndPath(specifier);
+  if (npm) {
+    const after = specifier.slice(4);
+    const match = after.match(/^([^@/]+)/);
+    if (!match) return null;
+    return { packageKey: match[1], pathWithinPackage: npm.pathWithinPackage };
+  }
+  return null;
+}
+
 /** 将 specifier 中用于正则的片段转义 */
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -481,21 +507,29 @@ export function denoResolverPlugin(
       );
 
       // 2. 顶层 jsr:、npm:
+      // 以项目 deno.json 的 imports 为准：若项目声明了某包版本，则优先用该版本解析，避免依赖包（如 render）内锁定的旧版本覆盖项目版本
       build.onResolve(
         { filter: /^(jsr|npm):/ },
         (args): esbuild.OnResolveResult | undefined => {
+          let specifier = args.path;
+          if (
+            specifier.startsWith("jsr:/") && !specifier.startsWith("jsr://")
+          ) {
+            specifier = "jsr:" + specifier.slice(5);
+          }
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 external: ${args.path}`);
-            return { path: args.path, external: true };
+            debugLog(`服务端构建 external: ${specifier}`);
+            return { path: specifier, external: true };
           }
           // 客户端构建时 preact/react/@dreamer/view 等运行时必须打包进 bundle，不能 external，否则与 SSR 水合不一致
-          const forceBundle = !isServerBuild && isClientRuntimeSpec(args.path);
+          const forceBundle = !isServerBuild && isClientRuntimeSpec(specifier);
           if (browserMode && !forceBundle) {
-            const url = convertSpecifierToBrowserUrl(args.path);
+            const url = convertSpecifierToBrowserUrl(specifier);
             if (url) return { path: url, external: true };
             return undefined;
           }
-          const override = resolveOverrides[args.path];
+          const override = resolveOverrides[args.path] ??
+            resolveOverrides[specifier];
           if (override && existsSync(override)) {
             return { path: override, namespace: "file" };
           }
@@ -503,23 +537,64 @@ export function denoResolverPlugin(
             debugLog("无 moduleCache，jsr/npm 无法解析");
             return undefined;
           }
-          const localPath = cacheLookupWithCheck(args.path);
-          if (localPath) {
-            debugLog(`cacheLookup 命中: ${args.path} -> ${localPath}`);
-            return { path: args.path, namespace: NAMESPACE_DENO_PROTOCOL };
+          let tryPath = specifier;
+          if (projectDir) {
+            const denoJsonPath = findDenoJson(projectDir);
+            const parsed = getPackageKeyAndSubpathFromSpecifier(specifier);
+            if (denoJsonPath && parsed) {
+              const projectImport = getPackageImport(
+                denoJsonPath,
+                parsed.packageKey,
+              );
+              const sameProtocol = (specifier.startsWith("jsr:") &&
+                projectImport?.startsWith("jsr:")) ||
+                (specifier.startsWith("npm:") &&
+                  projectImport?.startsWith("npm:"));
+              if (projectImport && sameProtocol) {
+                if (parsed.pathWithinPackage) {
+                  tryPath = `${projectImport}/${parsed.pathWithinPackage}`;
+                } else {
+                  tryPath = projectImport;
+                }
+                if (tryPath !== specifier) {
+                  debugLog(`使用项目版本: ${specifier} -> ${tryPath}`);
+                }
+              }
+            }
           }
-          debugLog(`cacheLookup 未命中: ${args.path}`);
+          const localPath = cacheLookupWithCheck(tryPath);
+          if (localPath) {
+            debugLog(`cacheLookup 命中: ${tryPath} -> ${localPath}`);
+            return { path: tryPath, namespace: NAMESPACE_DENO_PROTOCOL };
+          }
+          if (tryPath !== specifier) {
+            const fallback = cacheLookupWithCheck(specifier);
+            if (fallback) {
+              debugLog(
+                `cacheLookup 命中(原 specifier): ${specifier} -> ${fallback}`,
+              );
+              return { path: specifier, namespace: NAMESPACE_DENO_PROTOCOL };
+            }
+          }
+          debugLog(`cacheLookup 未命中: ${tryPath}`);
           return undefined;
         },
       );
 
       // 2.5 bare @scope/name 或 @scope/name/subpath：从 deno.json imports 取 jsr:/npm 地址
+      // 当 importer 来自 deno-protocol（如依赖包内模块）时，用 projectDir 查项目 deno.json，
+      // 使项目声明的依赖版本优先于依赖包内声明的版本（以项目版本为准）
       build.onResolve(
         { filter: /^@[^/]+\/[^/]+(\/.*)?$/ },
         (args): esbuild.OnResolveResult | undefined => {
-          const startDir = args.importer
-            ? dirname(args.importer)
-            : (args.resolveDir ?? projectDir ?? cwd());
+          const fromProtocol = args.importer?.startsWith(
+            NAMESPACE_DENO_PROTOCOL + ":",
+          );
+          const startDir = fromProtocol && projectDir
+            ? projectDir
+            : (args.importer
+              ? dirname(args.importer)
+              : (args.resolveDir ?? projectDir ?? cwd()));
           const denoJsonPath = findDenoJson(startDir);
           if (!denoJsonPath) return undefined;
           const pkgImport = getPackageImport(denoJsonPath, args.path);

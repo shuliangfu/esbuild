@@ -1030,10 +1030,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.20**（2026-02-14）
+**v1.0.21**（2026-02-13）
 
-- **变更**：重写 Deno 解析器（resolver-deno.ts），客户端运行时强制打包、npm
-  子路径解析与 deno-protocol 支持；移除 BuilderClient 临时调试日志。
+- **变更**：解析器对所有 JSR/npm 依赖均以项目 `deno.json` 的 imports
+  为准（项目版本优先于传递依赖版本）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
