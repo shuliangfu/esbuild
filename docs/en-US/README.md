@@ -1054,11 +1054,10 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.19** (2026-02-14)
+**v1.0.21** (2026-02-13)
 
-- **Changed**: Resolver advanced tests output under
-  `tests/data/resolver-advanced` with auto-cleanup; TEST_REPORT and README test
-  stats synced (568 Deno, 509 Bun).
+- **Changed**: Resolver now prefers project `deno.json` imports for all JSR/npm
+  dependencies (project version wins over transitive dependency versions).
 
 Full history in [CHANGELOG.md](./CHANGELOG.md).
 

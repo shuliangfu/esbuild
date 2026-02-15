@@ -1055,11 +1055,10 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.20** (2026-02-14)
+**v1.0.21** (2026-02-13)
 
-- **Changed**: Rewrote Deno resolver (`resolver-deno.ts`): client runtime forced
-  bundle, npm subpath resolution, deno-protocol support; removed temporary debug
-  logging from BuilderClient.
+- **Changed**: Resolver now prefers project `deno.json` imports for all JSR/npm
+  dependencies (project version wins over transitive dependency versions).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

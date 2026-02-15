@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.21] - 2026-02-13
+
+### Changed
+
+- **Resolver**: Prefer project `deno.json` imports for all JSR/npm dependencies
+  (no longer limited to `@dreamer/view`). When resolving top-level `jsr:` or
+  `npm:` specifiers, if the project declares the same package, the resolver uses
+  the project's version for cache lookup so that the project's dependency
+  versions take precedence over transitive dependency versions (e.g. render pins
+  view@1.0.2 but project uses view@1.0.5 → 1.0.5 is used).
+
+---
+
 ## [1.0.20] - 2026-02-14
 
 ### Changed
