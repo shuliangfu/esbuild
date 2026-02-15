@@ -7,6 +7,29 @@
 
 ---
 
+## [1.0.22] - 2026-02-13
+
+### 修复
+
+- **Resolver**：统一规范 `npm:/`、`jsr:/` 说明符（去掉协议后的前导斜杠），使
+  `npm:/react-dom@19.2.4/client` 正确解析为 `npm:react-dom@19.2.4/client`。在
+  getPackageImport、jsr/npm onResolve 与 onLoad 中应用。
+- **Resolver**：对无扩展名的 JSR 相对路径先尝试 cache 中带 `.ts`/`.tsx` 的 key
+  （如 `jsr:.../src/types` → `jsr:.../src/types.ts`），修复打包
+  @dreamer/socket-io 客户端时的 “No matching export ... EnginePacketType” 报错。
+
+### 变更
+
+- **Resolver**：在 getPackageImport 中从右往左解析裸子路径（如
+  `@dreamer/render/client/react` → base `@dreamer/render`、subpath
+  `client/react`），使多级子路径正确命中项目 imports。
+- **Resolver**：解析 `@scope/name` 与 `@scope/name/subpath` 时优先使用
+  projectDir，确保始终使用项目的 deno.json。
+- **Resolver**：JSR 子路径回退仅使用通用路径候选（不再写死 adapters）；npm/JSR
+  子路径仅用缓存 + 路径拼接（不起子进程）。
+
+---
+
 ## [1.0.21] - 2026-02-13
 
 ### 变更
