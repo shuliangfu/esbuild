@@ -197,11 +197,10 @@ function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
   }
 }
 
-/** 根据文件路径或 cache key（含扩展名）确定 esbuild loader */
+/** 根据文件路径或 cache key（含扩展名）确定 esbuild loader。.tsx 用 tsx，.jsx 用 jsx，以便视图文件正确解析。 */
 function getLoaderFromPath(filePathOrKey: string): "ts" | "tsx" | "js" | "jsx" {
-  if (filePathOrKey.endsWith(".tsx") || filePathOrKey.endsWith(".jsx")) {
-    return "tsx";
-  }
+  if (filePathOrKey.endsWith(".tsx")) return "tsx";
+  if (filePathOrKey.endsWith(".jsx")) return "jsx";
   if (filePathOrKey.endsWith(".ts") || filePathOrKey.endsWith(".mts")) {
     return "ts";
   }
@@ -358,18 +357,27 @@ function cacheLookup(
     return { path: exact, key: specifier };
   }
 
-  // 无扩展名的 jsr specifier（如 .../src/types）先尝试 cache 中的 .ts/.tsx key，避免相对路径解析出的路径与 deno info 缓存 key 不一致
+  // 无扩展名的 jsr specifier（如 .../src/route-page）先尝试 cache 中的 .ts/.tsx/.jsx/.js key，避免相对路径解析出的路径与 deno info 缓存 key 不一致。
+  // 返回的 key 必须带扩展名，否则 onLoad 用 key 选 loader 时会误用 ts，导致 .tsx/.jsx 视图被当 TS/JS 解析（JSX 报错）。
   if (
     specifier.startsWith("jsr:") &&
     !/\.(tsx?|jsx?|mts|mjs)$/i.test(specifier)
   ) {
     const withTs = moduleCache.get(specifier + ".ts");
     if (withTs && existsCheck(withTs)) {
-      return { path: withTs, key: specifier };
+      return { path: withTs, key: specifier + ".ts" };
     }
     const withTsx = moduleCache.get(specifier + ".tsx");
     if (withTsx && existsCheck(withTsx)) {
-      return { path: withTsx, key: specifier };
+      return { path: withTsx, key: specifier + ".tsx" };
+    }
+    const withJsx = moduleCache.get(specifier + ".jsx");
+    if (withJsx && existsCheck(withJsx)) {
+      return { path: withJsx, key: specifier + ".jsx" };
+    }
+    const withJs = moduleCache.get(specifier + ".js");
+    if (withJs && existsCheck(withJs)) {
+      return { path: withJs, key: specifier + ".js" };
     }
   }
 
@@ -409,13 +417,28 @@ function cacheLookup(
           join(root, subpath),
           join(root, subpath + ".ts"),
           join(root, subpath + ".tsx"),
+          join(root, subpath + ".jsx"),
+          join(root, subpath + ".js"),
           join(root, ...parts, "mod.ts"),
           join(root, ...parts, "index.ts"),
+          join(root, ...parts, "index.js"),
           join(root, "src", subpath, "mod.ts"),
           join(root, "src", subpath + ".ts"),
           join(root, "src", subpath + ".tsx"),
+          join(root, "src", subpath + ".jsx"),
+          join(root, "src", subpath + ".js"),
         ];
       };
+      const keyWithExtForPath = (p: string) =>
+        p.endsWith(".tsx")
+          ? specifier + ".tsx"
+          : p.endsWith(".jsx")
+          ? specifier + ".jsx"
+          : p.endsWith(".ts")
+          ? specifier + ".ts"
+          : p.endsWith(".js")
+          ? specifier + ".js"
+          : specifier;
       for (const [key, baseLocal] of moduleCache) {
         if (
           !key.startsWith("jsr:") ||
@@ -425,12 +448,16 @@ function cacheLookup(
         if (!existsCheck(baseLocal)) continue;
         const baseDir = dirname(baseLocal);
         for (const p of buildCandidates(baseDir)) {
-          if (existsCheck(p)) return { path: p, key: specifier };
+          if (existsCheck(p)) {
+            return { path: p, key: keyWithExtForPath(p) };
+          }
         }
         const baseDirParent = dirname(baseDir);
         if (baseDirParent !== baseDir) {
           for (const p of buildCandidates(baseDirParent)) {
-            if (existsCheck(p)) return { path: p, key: specifier };
+            if (existsCheck(p)) {
+              return { path: p, key: keyWithExtForPath(p) };
+            }
           }
         }
       }

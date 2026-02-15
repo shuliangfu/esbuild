@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20569%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 [English](../en-US/README.md) | 中文 (Chinese)
 
@@ -960,7 +960,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 | 运行时                | 测试数 | 通过 | 失败 | 通过率  |
 | --------------------- | ------ | ---- | ---- | ------- |
-| Deno (`deno test -A`) | 568    | 568  | 0    | 100% ✅ |
+| Deno (`deno test -A`) | 569    | 569  | 0    | 100% ✅ |
 | Bun (`bun test`)      | 509    | 509  | 0    | 100% ✅ |
 
 - **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理
@@ -987,7 +987,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
   - 全局变量设置测试（window/global/globalThis）
   - 平台特定行为测试（browser/node/neutral）
 - ✅ 路径解析功能测试（Deno 和 Bun 环境）
-  - 解析器插件测试（18 个）+ 解析器高级测试（16 个）
+  - 解析器插件测试（18 个）+ 解析器高级测试（17 个）
   - 服务端构建器路径解析测试（5 个）
   - 服务端构建器 Bun 测试（2 个，仅 Bun）
   - 客户端构建器路径解析测试（6 个）
@@ -1030,12 +1030,14 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.22**（2026-02-13）
+**v1.0.23**（2026-02-15）
 
-- **修复**：统一规范 `npm:/`、`jsr:/` 说明符；对无扩展名 JSR 路径按 `.ts`/`.tsx`
-  查缓存（修复 socket-io 客户端打包导出错误）。
-- **变更**：裸子路径从右往左解析；@scope/name 优先 projectDir；JSR 子路径回退
-  不写死 adapters、不起子进程。
+- **新增**：Resolver（Deno）完整支持 `.jsx` 视图文件；无扩展名 JSR 解析尝试
+  `.jsx`/`.js`；JSR 子路径回退包含 `.jsx`/`.js` 与 index
+  变体；解析器高级测试新增 .jsx 编译用例（loader jsx）。
+- **变更**：`getLoaderFromPath()` 对 `.jsx` 返回 `"jsx"`、仅对 `.tsx` 返回
+  `"tsx"`；文档更新（Deno 569 用例、resolver-advanced 17 个、TSX/JSX
+  编译覆盖）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

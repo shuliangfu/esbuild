@@ -7,6 +7,35 @@
 
 ---
 
+## [1.0.23] - 2026-02-15
+
+### 新增
+
+- **Resolver（Deno）**：完整支持 `.jsx` 视图文件。无扩展名的 JSR
+  说明符在解析时会额外尝试 `.jsx` 与 `.js`（此前仅有
+  `.ts`/`.tsx`），并返回带正确扩展名的 cache key，使 `onLoad` 获得正确
+  loader，JSX 得以正确编译。
+- **Resolver（Deno）**：JSR 子路径回退的 `buildCandidates` 现包含 `.jsx`、`.js`
+  及 index 变体（`index.js`、`index.jsx` 及带这些扩展名的 `src/`），以便 JSR
+  包下的 JSX 视图模块能解析并使用正确 loader 编译。
+- **测试**：在 `resolver-advanced.test.ts` 中新增编译测试「本地 .jsx
+  入口应被正确编译为 JSX（loader jsx）」—— 构建一个导入 `.jsx`
+  组件的入口，断言产物包含 JSX 编译后的 marker，并验证 `.jsx` 使用 `jsx`
+  loader（若被误当 TypeScript 解析会报 “Expected '>' but found”）。TSX
+  编译测试已存在；`.tsx` 与 `.jsx` 现均有显式编译测试覆盖。
+
+### 变更
+
+- **Resolver（Deno）**：`getLoaderFromPath()` 对 `.jsx` 文件改为返回 loader
+  `"jsx"`（JavaScript + JSX），仅对 `.tsx` 返回 `"tsx"`（TypeScript +
+  JSX）。此前两者均用 `"tsx"`，可能错误处理纯 JSX；`.jsx` 视图文件现按预期使用
+  esbuild 的 `jsx` loader 编译。
+- **文档**：TEST_REPORT（中/英）与 README 测试章节已更新：Deno 用例数 568 →
+  569、测试日期 2026-02-15、执行时间约 34s、resolver-advanced 用例数 16 →
+  17，并补充 TSX/JSX 编译覆盖说明。
+
+---
+
 ## [1.0.22] - 2026-02-13
 
 ### 修复
