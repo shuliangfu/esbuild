@@ -7,6 +7,20 @@
 
 ---
 
+## [1.0.20] - 2026-02-14
+
+### 变更
+
+- **Resolver**：重写 Deno
+  解析器（`resolver-deno.ts`）：客户端运行时（preact/react/@dreamer/view）强制打包，避免
+  CDN external 导致水合时 `_H` 未定义；支持 npm 子路径相对路径解析（如
+  `preact/jsx-runtime`）；deno-protocol 支持 `npm:` 与相对路径
+  filter；裸说明符与裸子路径解析与项目配置一致。
+- **BuilderClient**：移除临时调试日志（`[builder-client]` 与
+  `[builder-client createContext]`）。
+
+---
+
 ## [1.0.19] - 2026-02-14
 
 ### 变更

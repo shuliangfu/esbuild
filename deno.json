@@ -1,7 +1,7 @@
 {
   "name": "@dreamer/esbuild",
-  "version": "1.0.19",
-  "license": "MIT",
+  "version": "1.0.20",
+  "license": "Apache-2.0",
   "exports": {
     ".": "./src/mod.ts",
     "./css-injector": "./src/utils/css-injector.ts",
@@ -13,7 +13,8 @@
   "publish": {
     "include": [
       "src/**/*.ts",
-      "LICENSE.md",
+      "LICENSE",
+      "NOTICE",
       "README.md"
     ],
     "exclude": [
