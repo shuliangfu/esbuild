@@ -105,7 +105,13 @@ export async function buildModuleCache(
 
     for (const mod of info.modules) {
       if (!mod.specifier) continue;
-      if (mod.local) cache.set(mod.specifier, mod.local);
+      // 统一转为本地文件系统路径（Windows 上 deno info 可能返回 file:// URL）
+      const localPath = mod.local
+        ? (mod.local.startsWith("file://")
+          ? fileUrlToPath(mod.local)
+          : mod.local)
+        : undefined;
+      if (localPath) cache.set(mod.specifier, localPath);
 
       const jsrMatch = mod.specifier.match(
         /^https:\/\/jsr\.io\/(@[^/]+\/[^/]+)\/([^/]+)\/(.+)$/,
@@ -113,14 +119,14 @@ export async function buildModuleCache(
       if (jsrMatch) {
         const [, scopeAndName, version, path] = jsrMatch;
         const jsrKey = `jsr:${scopeAndName}@${version}/${path}`;
-        if (mod.local) {
-          cache.set(jsrKey, mod.local);
-          debugLog(`buildModuleCache 添加: ${jsrKey} -> ${mod.local}`);
+        if (localPath) {
+          cache.set(jsrKey, localPath);
+          debugLog(`buildModuleCache 添加: ${jsrKey} -> ${localPath}`);
         }
       } else if (mod.specifier.startsWith("npm:")) {
         const spec = mod.specifier.replace(/^npm:\/+/, "npm:");
         npmToResolve.add(spec);
-        if (mod.local) cache.set(spec, mod.local);
+        if (localPath) cache.set(spec, localPath);
       }
     }
 
