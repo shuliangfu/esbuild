@@ -619,7 +619,9 @@ export { logger };
         it(
           "应该能够解析 npm 子路径（如 lodash/map）并通过子进程 resolve 打包",
           async () => {
-            if (getEnv("CI") === "true" || getEnv("GITHUB_ACTIONS") === "true") {
+            if (
+              getEnv("CI") === "true" || getEnv("GITHUB_ACTIONS") === "true"
+            ) {
               return; // skip in CI: npm resolution may fail without network/cache
             }
             try {
