@@ -7,6 +7,17 @@
 
 ---
 
+## [1.0.25] - 2026-02-16
+
+### 修复
+
+- **Builder**：在 `validateBuildResult` 中，对每个产出文件路径先执行
+  `resolve(file)` 再调用 `exists`/`stat`，使相对路径按当前工作目录解析，修复
+  Windows CI 下 `result.outputFiles`
+  为相对或规范化不一致路径时的「构建产物验证失败」。
+
+---
+
 ## [1.0.24] - 2026-02-15
 
 ### 修复

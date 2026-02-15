@@ -1055,11 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.24** (2026-02-15)
+**v1.0.25** (2026-02-16)
 
-- **Fixed**: Resolver (Deno) use relative entry path and native `cwd` for
-  `deno info` on Windows CI so that `@dreamer/socket-io/client` and other JSR
-  subpaths resolve correctly.
+- **Fixed**: Builder `validateBuildResult` now resolves each output file path
+  with `resolve(file)` before `exists`/`stat`, fixing build output validation
+  failure on Windows CI when paths are relative or differently normalized.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
