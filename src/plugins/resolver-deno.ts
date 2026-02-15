@@ -15,6 +15,7 @@ import {
   join,
   readTextFile,
   readTextFileSync,
+  relative,
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
@@ -90,11 +91,16 @@ export async function buildModuleCache(
   const configArgs = projectDenoJson
     ? ["--config", toForwardSlash(projectDenoJson)]
     : [];
+  // 使用相对于 workDir 的入口路径，避免 Windows 上绝对路径格式导致 deno info 解析失败
+  const entryRelative = relative(workDir, entryPoint);
+  const entryForDeno = entryRelative.startsWith("..")
+    ? toForwardSlash(entryPoint)
+    : toForwardSlash(entryRelative);
 
   try {
     const proc = createCommand("deno", {
-      args: ["info", "--json", ...configArgs, toForwardSlash(entryPoint)],
-      cwd: toForwardSlash(workDir),
+      args: ["info", "--json", ...configArgs, entryForDeno],
+      cwd: workDir,
       stdout: "piped",
       stderr: "piped",
     });
@@ -149,7 +155,7 @@ export async function buildModuleCache(
             "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
             spec,
           ],
-          cwd: toForwardSlash(workDir),
+          cwd: workDir,
           stdout: "piped",
           stderr: "piped",
         });
