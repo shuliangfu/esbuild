@@ -1055,15 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.23** (2026-02-15)
+**v1.0.24** (2026-02-15)
 
-- **Added**: Resolver (Deno) full support for `.jsx` view files: JSR
-  no-extension resolution tries `.jsx`/`.js`; JSR subpath fallback includes
-  `.jsx`/`.js` and index variants; new test for .jsx compilation (loader jsx) in
-  resolver-advanced.
-- **Changed**: `getLoaderFromPath()` returns loader `"jsx"` for `.jsx` and
-  `"tsx"` only for `.tsx`; TEST_REPORT and README updated (Deno 569 tests,
-  resolver-advanced 17 tests, TSX/JSX compile coverage).
+- **Fixed**: Resolver (Deno) use relative entry path and native `cwd` for
+  `deno info` on Windows CI so that `@dreamer/socket-io/client` and other JSR
+  subpaths resolve correctly.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

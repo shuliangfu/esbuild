@@ -1030,14 +1030,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.23**（2026-02-15）
+**v1.0.24**（2026-02-15）
 
-- **新增**：Resolver（Deno）完整支持 `.jsx` 视图文件；无扩展名 JSR 解析尝试
-  `.jsx`/`.js`；JSR 子路径回退包含 `.jsx`/`.js` 与 index
-  变体；解析器高级测试新增 .jsx 编译用例（loader jsx）。
-- **变更**：`getLoaderFromPath()` 对 `.jsx` 返回 `"jsx"`、仅对 `.tsx` 返回
-  `"tsx"`；文档更新（Deno 569 用例、resolver-advanced 17 个、TSX/JSX
-  编译覆盖）。
+- **修复**：Resolver（Deno）在 Windows CI 上为 `deno info` 使用相对入口路径与
+  原生 `cwd`，使 `@dreamer/socket-io/client` 等 JSR 子路径能正确解析。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
