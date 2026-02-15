@@ -1209,10 +1209,11 @@ export class Builder implements IBuilder {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    // 验证输出文件
+    // 验证输出文件（相对路径按 cwd 解析，Windows 下路径格式统一）
     for (const file of result.outputFiles) {
+      const filePath = resolve(file);
       try {
-        if (!(await exists(file))) {
+        if (!(await exists(filePath))) {
           errors.push(
             `${
               this.tr(
@@ -1224,7 +1225,7 @@ export class Builder implements IBuilder {
           continue;
         }
 
-        const fileStat = await stat(file);
+        const fileStat = await stat(filePath);
         if (fileStat.isFile) {
           // 检查文件大小（如果文件过大，发出警告）
           const sizeInMB = fileStat.size / (1024 * 1024);
@@ -1241,13 +1242,13 @@ export class Builder implements IBuilder {
           }
 
           // 验证 HTML 文件格式
-          if (file.endsWith(".html")) {
-            await this.validateHTMLFile(file, warnings, errors);
+          if (filePath.endsWith(".html")) {
+            await this.validateHTMLFile(filePath, warnings, errors);
           }
 
           // 验证资源路径（JS、CSS 文件中的资源引用）
-          if (file.endsWith(".js") || file.endsWith(".css")) {
-            await this.validateResourcePaths(file, warnings);
+          if (filePath.endsWith(".js") || filePath.endsWith(".css")) {
+            await this.validateResourcePaths(filePath, warnings);
           }
         }
       } catch (error) {

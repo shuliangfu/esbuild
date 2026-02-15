@@ -1030,10 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.24**（2026-02-15）
+**v1.0.25**（2026-02-16）
 
-- **修复**：Resolver（Deno）在 Windows CI 上为 `deno info` 使用相对入口路径与
-  原生 `cwd`，使 `@dreamer/socket-io/client` 等 JSR 子路径能正确解析。
+- **修复**：Builder 的 `validateBuildResult` 在检查产出文件前对路径执行
+  `resolve(file)`，修复 Windows CI
+  下路径为相对或规范化不一致时的构建产物验证失败。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

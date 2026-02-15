@@ -8,6 +8,18 @@ and this project adheres to
 
 ---
 
+## [1.0.25] - 2026-02-16
+
+### Fixed
+
+- **Builder**: In `validateBuildResult`, resolve each output file path with
+  `resolve(file)` before `exists`/`stat` so that relative paths are resolved
+  against the current working directory. Fixes "构建产物验证失败" (build output
+  validation failed) on Windows CI when `result.outputFiles` contain relative or
+  differently normalized paths.
+
+---
+
 ## [1.0.24] - 2026-02-15
 
 ### Fixed
