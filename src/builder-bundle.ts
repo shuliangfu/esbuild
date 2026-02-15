@@ -197,6 +197,7 @@ export class BuilderBundle {
           browserMode: false,
           isServerBuild: false,
           moduleCache,
+          projectDir: workDir,
           debug,
           logger: log,
         }));
