@@ -8,6 +8,21 @@ and this project adheres to
 
 ---
 
+## [1.0.20] - 2026-02-14
+
+### Changed
+
+- **Resolver**: Rewrote Deno resolver (`resolver-deno.ts`): client runtime
+  (preact/react/@dreamer/view) forced bundle to avoid CDN external and hydration
+  `_H` undefined; npm relative path resolution for subpaths (e.g.
+  `preact/jsx-runtime`); deno-protocol support for `npm:` and relative path
+  filter; bare specifier and bare subpath resolution aligned with project
+  config.
+- **BuilderClient**: Removed temporary debug logging (`[builder-client]` and
+  `[builder-client createContext]`).
+
+---
+
 ## [1.0.19] - 2026-02-14
 
 ### Changed

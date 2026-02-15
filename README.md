@@ -11,7 +11,7 @@ independently for any Deno/Bun project builds.
 English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 ---
@@ -1055,11 +1055,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.19** (2026-02-14)
+**v1.0.20** (2026-02-14)
 
-- **Changed**: Resolver advanced tests output under
-  `tests/data/resolver-advanced` with auto-cleanup; TEST_REPORT and README test
-  stats synced (568 Deno, 509 Bun).
+- **Changed**: Rewrote Deno resolver (`resolver-deno.ts`): client runtime forced
+  bundle, npm subpath resolution, deno-protocol support; removed temporary debug
+  logging from BuilderClient.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
@@ -1073,7 +1073,7 @@ Issues and Pull Requests are welcome!
 
 ## 📄 License
 
-MIT License - See [LICENSE.md](./LICENSE.md)
+Apache License 2.0 - See [LICENSE](./LICENSE)
 
 ---
 
