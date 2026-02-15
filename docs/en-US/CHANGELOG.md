@@ -8,6 +8,40 @@ and this project adheres to
 
 ---
 
+## [1.0.23] - 2026-02-15
+
+### Added
+
+- **Resolver (Deno)**: Full support for `.jsx` view files. JSR specifiers
+  without extension now try `.jsx` and `.js` in addition to `.ts` and `.tsx`
+  when resolving; the returned cache key includes the correct extension so that
+  `onLoad` receives the right loader and JSX is compiled correctly.
+- **Resolver (Deno)**: JSR subpath fallback `buildCandidates` now includes
+  `.jsx`, `.js`, and index variants (`index.js`, `index.jsx`, and `src/` with
+  these extensions) so that JSX view modules under JSR packages resolve and
+  compile with the correct loader.
+- **Tests**: New compilation test in `resolver-advanced.test.ts` — "local .jsx
+  entry should be compiled as JSX (loader jsx)" — which builds an entry that
+  imports a `.jsx` component, asserts the bundle output contains the
+  JSX-compiled marker, and verifies that `.jsx` files use the `jsx` loader
+  (failure would show "Expected '>' but found" if mis-parsed as TypeScript). TSX
+  compilation test was already present; both `.tsx` and `.jsx` are now covered
+  by explicit compile tests.
+
+### Changed
+
+- **Resolver (Deno)**: `getLoaderFromPath()` now returns loader `"jsx"` for
+  `.jsx` files (JavaScript + JSX) and `"tsx"` only for `.tsx` files
+  (TypeScript + JSX). Previously both used `"tsx"`, which could mis-handle plain
+  JSX; `.jsx` view files are now compiled with esbuild’s `jsx` loader as
+  intended.
+- **Docs**: TEST_REPORT (en/zh) and README test sections updated: Deno test
+  count 568 → 569, test date 2026-02-15, execution time ~34s, resolver-advanced
+  test count 16 → 17, and descriptions updated to mention TSX/JSX compile
+  coverage.
+
+---
+
 ## [1.0.22] - 2026-02-13
 
 ### Fixed

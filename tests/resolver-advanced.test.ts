@@ -480,6 +480,53 @@ export const testTsxCompile = typeof Widget;
           }
         }, { sanitizeOps: false, sanitizeResources: false });
 
+        /** 验证 .jsx 文件使用 jsx loader 编译，输出包含 JSX 编译后的内容；若被误当 .ts 解析会报 Expected '>' */
+        it("本地 .jsx 入口应被正确编译为 JSX（loader jsx）", async () => {
+          try {
+            const srcDir = join(testDataDir, "jsx-compile-src");
+            await mkdir(srcDir, { recursive: true });
+            const jsxFile = join(srcDir, "Widget.jsx");
+            await writeTextFile(
+              jsxFile,
+              `export function Widget() {
+  return <div className="jsx-compile-marker">JSX compiled</div>;
+}
+`,
+            );
+            const entryFile = join(testDataDir, "test-jsx-compile-entry.ts");
+            await writeTextFile(
+              entryFile,
+              `import { Widget } from "./jsx-compile-src/Widget.jsx";
+export const testJsxCompile = typeof Widget;
+`,
+            );
+
+            const result = await buildBundle({
+              entryPoint: entryFile,
+              globalName: "TestJsxCompile",
+              platform: "browser",
+              format: "iife",
+              plugins: [denoResolverPlugin()],
+            });
+
+            expect(result).toBeDefined();
+            expect(result.code).toBeDefined();
+            expect(result.code.length).toBeGreaterThan(0);
+            expect(result.code).toContain("testJsxCompile");
+            expect(result.code).toContain("jsx-compile-marker");
+          } catch (error) {
+            const errorMessage = error instanceof Error
+              ? error.message
+              : String(error);
+            if (errorMessage.includes("Expected '>' but found")) {
+              throw new Error(
+                ".jsx 文件应使用 jsx loader 解析 JSX: " + errorMessage,
+              );
+            }
+            throw error;
+          }
+        }, { sanitizeOps: false, sanitizeResources: false });
+
         it(
           "router 子路径会拉 route-page.tsx，须用 tsx loader 且 JSX 被正确编译",
           async () => {

@@ -12,7 +12,7 @@ English | [中文 (Chinese)](../zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20569%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -978,7 +978,7 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 | Runtime               | Tests | Passed | Failed | Pass Rate |
 | --------------------- | ----- | ------ | ------ | --------- |
-| Deno (`deno test -A`) | 568   | 568    | 0      | 100% ✅   |
+| Deno (`deno test -A`) | 569   | 569    | 0      | 100% ✅   |
 | Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
@@ -1006,7 +1006,7 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
   - Global variable setting tests (window/global/globalThis)
   - Platform-specific behavior tests (browser/node/neutral)
 - ✅ Path resolution feature tests (Deno and Bun environments)
-  - Resolver plugin tests (18) + resolver advanced tests (16)
+  - Resolver plugin tests (18) + resolver advanced tests (17)
   - Server builder path resolution tests (5)
   - Builder server Bun tests (2, Bun only)
   - Client builder path resolution tests (6)
@@ -1054,10 +1054,15 @@ View full test report: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.21** (2026-02-13)
+**v1.0.23** (2026-02-15)
 
-- **Changed**: Resolver now prefers project `deno.json` imports for all JSR/npm
-  dependencies (project version wins over transitive dependency versions).
+- **Added**: Resolver (Deno) full support for `.jsx` view files; JSR
+  no-extension tries `.jsx`/`.js`; JSR subpath fallback includes `.jsx`/`.js`
+  and index variants; new resolver-advanced test for .jsx compilation (loader
+  jsx).
+- **Changed**: `getLoaderFromPath()` returns `"jsx"` for `.jsx`, `"tsx"` for
+  `.tsx` only; docs updated (Deno 569 tests, resolver-advanced 17, TSX/JSX
+  coverage).
 
 Full history in [CHANGELOG.md](./CHANGELOG.md).
 

@@ -12,7 +12,7 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20568%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20569%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 ---
 
@@ -979,7 +979,7 @@ report.
 
 | Runtime               | Tests | Passed | Failed | Pass Rate |
 | --------------------- | ----- | ------ | ------ | --------- |
-| Deno (`deno test -A`) | 568   | 568    | 0      | 100% ✅   |
+| Deno (`deno test -A`) | 569   | 569    | 0      | 100% ✅   |
 | Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error
@@ -1055,14 +1055,15 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.22** (2026-02-13)
+**v1.0.23** (2026-02-15)
 
-- **Fixed**: Normalize `npm:/` and `jsr:/` specifiers; resolve JSR paths without
-  extension via `.ts`/`.tsx` cache lookup (fixes socket-io client bundle export
-  errors).
-- **Changed**: Resolve bare subpaths from right to left; prefer projectDir for
-  @scope/name; JSR subpath fallback without hardcoded adapters; no subprocess
-  for subpaths.
+- **Added**: Resolver (Deno) full support for `.jsx` view files: JSR
+  no-extension resolution tries `.jsx`/`.js`; JSR subpath fallback includes
+  `.jsx`/`.js` and index variants; new test for .jsx compilation (loader jsx) in
+  resolver-advanced.
+- **Changed**: `getLoaderFromPath()` returns loader `"jsx"` for `.jsx` and
+  `"tsx"` only for `.tsx`; TEST_REPORT and README updated (Deno 569 tests,
+  resolver-advanced 17 tests, TSX/JSX compile coverage).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
