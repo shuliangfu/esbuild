@@ -1055,11 +1055,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.25** (2026-02-16)
+**v1.0.26** (2026-02-16)
 
-- **Fixed**: Builder `validateBuildResult` now resolves each output file path
-  with `resolve(file)` before `exists`/`stat`, fixing build output validation
-  failure on Windows CI when paths are relative or differently normalized.
+- **Fixed**: Client resolver tests — add `react` and `react/jsx-runtime` to test
+  project `deno.json` so path-alias and code-splitting tests with JSX fixtures
+  build successfully (removes "Could not resolve react/jsx-runtime" from
+  post-test output).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

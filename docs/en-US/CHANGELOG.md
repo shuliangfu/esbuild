@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.26] - 2026-02-16
+
+### Fixed
+
+- **Tests (client resolver)**: Add `react` and `react/jsx-runtime` to test
+  project `deno.json` in "路径别名（通过 deno.json）" and
+  "应该能够处理代码分割和相对路径导入" so that JSX fixtures (`Button.tsx`)
+  resolve and the build succeeds. Removes "Could not resolve react/jsx-runtime"
+  from post-test output in `builder-client-resolver.test.ts` and
+  `build-client-resolver.test.ts`.
+
+---
+
 ## [1.0.25] - 2026-02-16
 
 ### Fixed

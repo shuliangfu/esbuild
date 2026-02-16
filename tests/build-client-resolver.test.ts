@@ -264,12 +264,16 @@ export { msg, config, Button };
         const denoJsonPath = join(testDataDir, "deno.json");
         writeTextFileSync(
           denoJsonPath,
-          JSON.stringify({
-            imports: {
-              "react": "npm:react@19.2.4",
-              "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+          JSON.stringify(
+            {
+              imports: {
+                "react": "npm:react@19.2.4",
+                "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         );
         // 创建一个使用动态导入的测试文件
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
@@ -386,12 +390,16 @@ export { msg, loadComponent };
         const denoJsonPath = join(testDataDir, "deno.json");
         writeTextFileSync(
           denoJsonPath,
-          JSON.stringify({
-            imports: {
-              "react": "npm:react@19.2.4",
-              "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+          JSON.stringify(
+            {
+              imports: {
+                "react": "npm:react@19.2.4",
+                "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         );
         // 创建一个使用动态导入的测试文件
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
