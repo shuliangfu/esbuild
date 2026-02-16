@@ -12,7 +12,7 @@ English | [中文 (Chinese)](../zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20569%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -978,7 +978,7 @@ coverage. See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test report.
 
 | Runtime               | Tests | Passed | Failed | Pass Rate |
 | --------------------- | ----- | ------ | ------ | --------- |
-| Deno (`deno test -A`) | 569   | 569    | 0      | 100% ✅   |
+| Deno (`deno test -A`) | 571   | 571    | 0      | 100% ✅   |
 | Bun (`bun test`)      | 509   | 509    | 0      | 100% ✅   |
 
 - **Test coverage**: All public APIs, subpath exports, edge cases, error

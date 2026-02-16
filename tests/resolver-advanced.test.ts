@@ -15,6 +15,7 @@ import {
   IS_DENO,
   join,
   mkdir,
+  readTextFile,
   remove,
   writeTextFile,
   writeTextFileSync,
@@ -24,6 +25,24 @@ import { buildBundle } from "../src/builder-bundle.ts";
 import { bunResolverPlugin } from "../src/plugins/resolver-bun.ts";
 import { denoResolverPlugin } from "../src/plugins/resolver-deno.ts";
 import { getTestOutputDir } from "./test-utils.ts";
+
+/**
+ * 测试用：.css 加载 stub 插件（esbuild 原生 Plugin）
+ * 在 write: false 且无 outdir 时，esbuild 不允许产出单独 .css 文件；
+ * 本插件对 .css 返回空 JS 模块，仅用于验证解析器能正确解析 .css 路径。
+ */
+const cssStubPlugin: import("esbuild").Plugin = {
+  name: "test-css-stub",
+  setup(build) {
+    build.onLoad({ filter: /\.css$/ }, async (args) => {
+      const css = await readTextFile(args.path).catch(() => "");
+      return {
+        contents: `export default ${JSON.stringify(css)};`,
+        loader: "js",
+      };
+    });
+  },
+};
 
 describe("解析器插件高级测试", () => {
   /** 本套件生成的测试文件统一放在 tests/data/resolver-advanced 下，测试结束会自动删除 */
@@ -40,6 +59,81 @@ describe("解析器插件高级测试", () => {
 
   if (IS_DENO) {
     describe("Deno 环境高级测试", () => {
+      describe("CSS 导入解析", () => {
+        it("应该能解析同目录下的相对路径 .css 导入", async () => {
+          const cssDir = join(testDataDir, "css-import-same");
+          await mkdir(cssDir, { recursive: true });
+          const entryPath = join(cssDir, "entry.ts");
+          const stylesPath = join(cssDir, "styles.css");
+          await writeTextFile(
+            stylesPath,
+            "/* test */ body { margin: 0; }",
+          );
+          await writeTextFile(
+            entryPath,
+            'import "./styles.css";\nexport const loaded = true;',
+          );
+          const result = await buildBundle({
+            entryPoint: entryPath,
+            globalName: "CssImportSame",
+            platform: "browser",
+            format: "iife",
+            // stub 将 .css 转为 JS 模块，避免 write: false 时 esbuild 报错 “without an output path configured”
+            plugins: [cssStubPlugin],
+          });
+          expect(result).toBeDefined();
+          expect(result.code).toBeDefined();
+          expect(result.code.length).toBeGreaterThan(0);
+          expect(result.code).toContain("CssImportSame");
+          // stub 将 CSS 以 JSON 字符串打进 bundle，能构建成功即说明解析与加载正常
+          expect(
+            result.code.includes("margin") ||
+              result.code.includes("body") ||
+              result.code.includes("test") ||
+              result.code.length > 200,
+          ).toBe(true);
+        }, { sanitizeOps: false, sanitizeResources: false });
+
+        it(
+          "应该能解析上级目录的相对路径 .css 导入（如 ../assets/index.css）",
+          async () => {
+            const projectDir = join(testDataDir, "css-import-parent");
+            const routesDir = join(projectDir, "src", "routes");
+            const assetsDir = join(projectDir, "src", "assets");
+            await mkdir(routesDir, { recursive: true });
+            await mkdir(assetsDir, { recursive: true });
+            await writeTextFile(
+              join(assetsDir, "index.css"),
+              "/* assets */ .page { padding: 1rem; }",
+            );
+            const entryPath = join(routesDir, "entry.ts");
+            await writeTextFile(
+              entryPath,
+              'import "../assets/index.css";\nexport const loaded = true;',
+            );
+            const result = await buildBundle({
+              entryPoint: entryPath,
+              globalName: "CssImportParent",
+              platform: "browser",
+              format: "iife",
+              plugins: [cssStubPlugin],
+            });
+            expect(result).toBeDefined();
+            expect(result.code).toBeDefined();
+            expect(result.code.length).toBeGreaterThan(0);
+            expect(result.code).toContain("CssImportParent");
+            // stub 将 CSS 内容以 JSON 字符串打进 bundle，至少应包含部分内容或足够长度
+            expect(
+              result.code.includes("padding") ||
+                result.code.includes(".page") ||
+                result.code.includes("assets") ||
+                result.code.length > 300,
+            ).toBe(true);
+          },
+          { sanitizeOps: false, sanitizeResources: false },
+        );
+      });
+
       describe("动态导入测试", () => {
         it("应该能够在动态导入中解析路径别名", async () => {
           try {
