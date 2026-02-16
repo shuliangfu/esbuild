@@ -220,13 +220,15 @@ export { msg, config, Button };
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够解析路径别名（通过 deno.json）", async () => {
-        // 创建 deno.json 配置文件
+        // 创建 deno.json 配置文件（含 react 以便 Button.tsx 的 JSX 能解析）
         const denoJsonPath = join(testDataDir, "deno.json");
         const denoJson = {
           imports: {
             "@/": "./src/",
             "~/": "./",
             "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
+            "react": "npm:react@19.2.4",
+            "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
           },
         };
         writeTextFileSync(
@@ -258,6 +260,17 @@ export { msg, config, Button };
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够处理代码分割和相对路径导入", async () => {
+        // 写入 deno.json 以解析 Button.tsx 依赖的 react/jsx-runtime
+        const denoJsonPath = join(testDataDir, "deno.json");
+        writeTextFileSync(
+          denoJsonPath,
+          JSON.stringify({
+            imports: {
+              "react": "npm:react@19.2.4",
+              "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+            },
+          }, null, 2),
+        );
         // 创建一个使用动态导入的测试文件
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
         await writeTextFile(
@@ -369,6 +382,17 @@ export { msg, loadComponent };
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够处理代码分割和相对路径导入", async () => {
+        // 写入 deno.json 以解析 Button.tsx 依赖的 react/jsx-runtime
+        const denoJsonPath = join(testDataDir, "deno.json");
+        writeTextFileSync(
+          denoJsonPath,
+          JSON.stringify({
+            imports: {
+              "react": "npm:react@19.2.4",
+              "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
+            },
+          }, null, 2),
+        );
         // 创建一个使用动态导入的测试文件
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
         await writeTextFile(
