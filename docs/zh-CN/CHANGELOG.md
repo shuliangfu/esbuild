@@ -7,6 +7,19 @@
 
 ---
 
+## [1.0.26] - 2026-02-16
+
+### 修复
+
+- **测试（客户端解析器）**：在「应该能够解析路径别名（通过
+  deno.json）」与「应该能够处理代码分割和相对路径导入」中为测试项目 `deno.json`
+  增加 `react` 与 `react/jsx-runtime`，使 JSX
+  用例（`Button.tsx`）能解析且构建成功，消除
+  `builder-client-resolver.test.ts`、`build-client-resolver.test.ts` 的
+  post-test 中 "Could not resolve react/jsx-runtime" 报错。
+
+---
+
 ## [1.0.25] - 2026-02-16
 
 ### 修复

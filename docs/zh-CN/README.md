@@ -1030,11 +1030,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.25**（2026-02-16）
+**v1.0.26**（2026-02-16）
 
-- **修复**：Builder 的 `validateBuildResult` 在检查产出文件前对路径执行
-  `resolve(file)`，修复 Windows CI
-  下路径为相对或规范化不一致时的构建产物验证失败。
+- **修复**：客户端解析器测试 — 在测试项目 `deno.json` 中增加 `react` 与
+  `react/jsx-runtime`，使路径别名与代码分割用例在含 JSX 的 fixture
+  下构建成功（消除 post-test 中的 "Could not resolve react/jsx-runtime" 报错）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
