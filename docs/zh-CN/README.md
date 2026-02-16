@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20569%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
 [English](../en-US/README.md) | 中文 (Chinese)
 
@@ -960,7 +960,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 | 运行时                | 测试数 | 通过 | 失败 | 通过率  |
 | --------------------- | ------ | ---- | ---- | ------- |
-| Deno (`deno test -A`) | 569    | 569  | 0    | 100% ✅ |
+| Deno (`deno test -A`) | 571    | 571  | 0    | 100% ✅ |
 | Bun (`bun test`)      | 509    | 509  | 0    | 100% ✅ |
 
 - **测试覆盖**: 所有公共 API、子路径导出、边界情况、错误处理

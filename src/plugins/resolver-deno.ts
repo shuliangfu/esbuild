@@ -620,13 +620,42 @@ export function denoResolverPlugin(
         return cacheLookup(specifier, moduleCache, existsSync)?.path;
       };
 
-      // 1. 路径别名 @/、~/
+      // 0. CDN 样式：仅 import "https://xxx.com/xxx.css" 这种以 .css 结尾的 URL 标为 external，由浏览器运行时加载
       build.onResolve(
-        { filter: /^(@\/|~\/|@[^/]+\/|~[^/]+\/)/ },
+        { filter: /^https?:\/\/.*\.css$/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          debugLog(`CDN CSS external: ${args.path}`);
+          return { path: args.path, external: true };
+        },
+      );
+
+      // 1. 路径别名 @/、~/ 与 file 命名空间下的相对路径（./、../，含 .css 等）写在一起
+      build.onResolve(
+        { filter: /^(@\/|~\/|@[^/]+\/|~[^/]+\/)|^\.\.?\/.*/ },
         (args): esbuild.OnResolveResult | undefined => {
           const startDir = args.importer
             ? dirname(args.importer)
             : (args.resolveDir ?? cwd());
+
+          // file 命名空间下的相对路径：显式按 importer 目录解析，支持 .css 等（deno-protocol 的 ./ ../ 由后面单独 onResolve 处理）
+          const isFileNs = !args.namespace || args.namespace === "file";
+          if (isFileNs && /^\.\.?\/.*/.test(args.path)) {
+            const resolved = resolve(join(startDir, args.path));
+            if (existsSync(resolved)) {
+              debugLog(`file 相对路径: ${args.path} -> ${resolved}`);
+              return { path: resolved, namespace: "file" };
+            }
+            if (!/\.[a-z0-9]+$/i.test(args.path)) {
+              const withCss = resolve(join(startDir, args.path + ".css"));
+              if (existsSync(withCss)) {
+                debugLog(`file 相对路径(+.css): ${args.path} -> ${withCss}`);
+                return { path: withCss, namespace: "file" };
+              }
+            }
+            return undefined;
+          }
+
+          // 路径别名 @/、~/
           const denoJsonPath = findDenoJson(startDir);
           if (!denoJsonPath) return undefined;
           const config = getConfig(denoJsonPath);
@@ -647,7 +676,7 @@ export function denoResolverPlugin(
               return { path: resolved, namespace: "file" };
             }
             if (!resolved.includes(".")) {
-              for (const ext of [".ts", ".tsx", ".js", ".jsx"]) {
+              for (const ext of [".ts", ".tsx", ".js", ".jsx", ".css"]) {
                 const withExt = resolved + ext;
                 if (existsSync(withExt)) {
                   return { path: withExt, namespace: "file" };
