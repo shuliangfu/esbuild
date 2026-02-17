@@ -9,7 +9,7 @@ import { BuildAnalyzer } from "../src/build-analyzer.ts";
 describe("BuildAnalyzer 内部方法", () => {
   describe("报告生成", () => {
     it("应该生成文本报告", () => {
-      const analyzer = new BuildAnalyzer();
+      const analyzer = new BuildAnalyzer("zh-CN");
       const metafile: esbuild.Metafile = {
         inputs: {
           "src/index.ts": {

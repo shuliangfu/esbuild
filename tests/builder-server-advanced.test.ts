@@ -305,6 +305,7 @@ console.log("External test:", something);
 
     it("应该在缺少输出路径时抛出错误", async () => {
       const config: ServerConfig = {
+        lang: "zh-CN",
         entry: entryFile,
         output: "", // 空输出路径
         target: "deno",
