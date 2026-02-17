@@ -30,6 +30,7 @@ import type {
   OutputFileContent,
   ServerConfig,
 } from "./types.ts";
+import { $t } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -66,15 +67,19 @@ export class BuilderServer {
   }
 
   /**
-   * 获取翻译文本，无 t 或翻译缺失时返回 fallback（硬编码中文）
+   * 获取翻译文本：使用包内 i18n ($t)，lang 来自 config.lang，最后回退 fallback
    */
   private tr(
     key: string,
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const r = this.config.t?.(key, params);
-    return (r != null && r !== key) ? r : fallback;
+    const t = $t(
+      key,
+      params as Record<string, string> | undefined,
+      this.config.lang,
+    );
+    return t !== key ? t : fallback;
   }
 
   /**
@@ -272,7 +277,9 @@ export class BuilderServer {
   ): Promise<BuildResult> {
     const startTime = Date.now();
 
-    this.debugLog("开始构建...");
+    this.debugLog(
+      this.tr("log.esbuild.server.debugBuildStartServer", "开始构建..."),
+    );
 
     // 解析选项
     const mode: BuildMode = typeof options === "string"
@@ -314,7 +321,13 @@ export class BuilderServer {
           err && typeof err === "object" && "code" in err &&
           (err as { code: string }).code === "EEXIST"
         ) {
-          this.debugLog(`删除旧的同名文件: ${outputDir}`);
+          this.debugLog(
+            this.tr(
+              "log.esbuild.server.debugRemoveOldFile",
+              "删除旧的同名文件: {path}",
+              { path: outputDir },
+            ),
+          );
           await remove(outputDir);
           await mkdir(outputDir, { recursive: true });
         } else {
@@ -333,9 +346,21 @@ export class BuilderServer {
       minify: this.config.compile?.minify ?? isProd,
     };
 
-    this.debugLog(`入口文件: ${entryPoint}`);
-    this.debugLog(`输出目录: ${outputDir}`);
-    this.debugLog(`工作目录: ${dirname(entryPoint)}`);
+    this.debugLog(
+      this.tr("log.esbuild.server.debugEntryFile", "入口文件: {path}", {
+        path: entryPoint,
+      }),
+    );
+    this.debugLog(
+      this.tr("log.esbuild.server.debugOutputDir", "输出目录: {path}", {
+        path: outputDir,
+      }),
+    );
+    this.debugLog(
+      this.tr("log.esbuild.server.debugWorkingDir", "工作目录: {path}", {
+        path: dirname(entryPoint),
+      }),
+    );
 
     // 构建插件列表
     const plugins: esbuild.Plugin[] = [];
@@ -344,7 +369,9 @@ export class BuilderServer {
 
     // 如果启用 externalNpm，添加插件将所有 npm 包标记为 external
     if (this.config.externalNpm) {
-      this.debugLog("启用 externalNpm");
+      this.debugLog(
+        this.tr("log.esbuild.server.debugExternalNpm", "启用 externalNpm"),
+      );
       plugins.push({
         name: "external-npm",
         setup(build) {
@@ -364,7 +391,12 @@ export class BuilderServer {
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
-      this.debugLog("使用 denoResolverPlugin (服务端构建模式)");
+      this.debugLog(
+        this.tr(
+          "log.esbuild.server.debugDenoResolver",
+          "使用 denoResolverPlugin (服务端构建模式)",
+        ),
+      );
 
       // 服务端构建模式：npm:/jsr: 依赖直接标记为 external，让 Deno 在运行时解析
       // 这样不需要扫描缓存目录，构建速度更快，也避免了缓存目录中损坏文件的问题
@@ -419,13 +451,24 @@ export class BuilderServer {
       buildOptions.outfile = outfile;
     }
 
-    this.debugLog("开始执行 esbuild.build()...");
-    this.debugLog(`external: ${JSON.stringify(this.config.external)}`);
+    this.debugLog(
+      this.tr(
+        "log.esbuild.server.debugBuildStart",
+        "开始执行 esbuild.build()...",
+      ),
+    );
+    this.debugLog(
+      this.tr("log.esbuild.server.debugExternal", "external: {value}", {
+        value: JSON.stringify(this.config.external),
+      }),
+    );
 
     // 执行构建
     const result = await esbuild.build(buildOptions);
 
-    this.debugLog("esbuild.build() 完成");
+    this.debugLog(
+      this.tr("log.esbuild.server.debugBuildComplete", "esbuild.build() 完成"),
+    );
 
     const duration = Date.now() - startTime;
 

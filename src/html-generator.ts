@@ -12,6 +12,7 @@ import {
   resolve,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
+import { $t } from "./i18n.ts";
 import type { HTMLConfig, HTMLEntry } from "./types.ts";
 import { logger } from "./utils/logger.ts";
 
@@ -44,7 +45,9 @@ export class HTMLGenerator {
         htmlTemplate = await readTextFile(templatePath);
       } catch (_error) {
         logger.warn(
-          `无法读取 HTML 模板: ${this.config.template}，使用默认模板`,
+          $t("log.esbuild.html.cannotReadTemplate", {
+            path: this.config.template,
+          }),
         );
       }
     }

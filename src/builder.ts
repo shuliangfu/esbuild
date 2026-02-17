@@ -37,6 +37,7 @@ import type {
   LogLevel,
   OptimizationSuggestion,
 } from "./types.ts";
+import { $t } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -84,33 +85,37 @@ export class Builder implements IBuilder {
 
     // BuildAnalyzer、CacheManager 延迟加载，首次 build() 时再初始化
 
-    // 初始化客户端构建器（透传 t）
+    // 初始化客户端构建器（透传 lang）
     if (config.client) {
       this.clientBuilder = new BuilderClient({
         ...config.client,
-        t: config.client.t ?? config.t,
+        lang: config.client.lang ?? config.lang,
       });
     }
 
-    // 初始化服务端构建器（透传 t）
+    // 初始化服务端构建器（透传 lang）
     if (config.server) {
       this.serverBuilder = new BuilderServer({
         ...config.server,
-        t: config.server.t ?? config.t,
+        lang: config.server.lang ?? config.lang,
       });
     }
   }
 
   /**
-   * 获取翻译文本，无 t 或翻译缺失时返回 fallback（硬编码中文）
+   * 获取翻译文本：使用包内 i18n ($t)，lang 来自 config.lang，最后回退 fallback
    */
   private tr(
     key: string,
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const r = this.config.t?.(key, params);
-    return (r != null && r !== key) ? r : fallback;
+    const t = $t(
+      key,
+      params as Record<string, string> | undefined,
+      this.config.lang,
+    );
+    return t !== key ? t : fallback;
   }
 
   /**
@@ -138,7 +143,7 @@ export class Builder implements IBuilder {
    */
   private getBuildAnalyzer(): BuildAnalyzer {
     if (!this._buildAnalyzer) {
-      this._buildAnalyzer = new BuildAnalyzer(this.config.t);
+      this._buildAnalyzer = new BuildAnalyzer(this.config.lang);
     }
     return this._buildAnalyzer;
   }
@@ -419,7 +424,7 @@ export class Builder implements IBuilder {
                 "warn",
                 `${
                   this.tr(
-                    "log.esbuild.builder.reportFailed",
+                    "log.esbuild.builder.reportGenerateFailed",
                     "生成 HTML 报告失败",
                   )
                 }: ${error}`,
@@ -1673,7 +1678,7 @@ export class Builder implements IBuilder {
               "warn",
               `${
                 this.tr(
-                  "log.esbuild.builder.reportFailed",
+                  "log.esbuild.builder.reportGenerateFailed",
                   "生成 HTML 报告失败",
                 )
               }: ${error}`,

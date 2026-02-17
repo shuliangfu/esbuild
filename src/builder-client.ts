@@ -25,6 +25,7 @@ import type {
   OutputFileContent,
   SplittingStrategy,
 } from "./types.ts";
+import { $t } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -84,15 +85,19 @@ export class BuilderClient {
   }
 
   /**
-   * 获取翻译文本，无 t 或翻译缺失时返回 fallback（硬编码中文）
+   * 获取翻译文本：使用包内 i18n ($t)，lang 来自 config.lang，最后回退 fallback
    */
   private tr(
     key: string,
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const r = this.config.t?.(key, params);
-    return (r != null && r !== key) ? r : fallback;
+    const t = $t(
+      key,
+      params as Record<string, string> | undefined,
+      this.config.lang,
+    );
+    return t !== key ? t : fallback;
   }
 
   /**
@@ -479,7 +484,7 @@ export class BuilderClient {
     if (!this.buildContext) {
       throw new Error(
         this.tr(
-          "log.esbuild.contextNotCreated",
+          "log.esbuild.builder.contextNotCreated",
           "构建上下文未创建，请先调用 createContext()",
         ),
       );

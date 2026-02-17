@@ -10,7 +10,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
 
-[English](../en-US/README.md) | 中文 (Chinese)
+[English](../../README.md) | 中文 (Chinese)
 
 ---
 
@@ -23,6 +23,7 @@
 - [快速开始](#-快速开始)
 - [使用示例](#-使用示例)
 - [API 文档](#-api-文档)
+- [国际化（i18n）](#-国际化i18n)
 - [高级配置](#-高级配置)
 - [编译方式](#️-编译方式)
 - [测试报告](#-测试报告)
@@ -470,6 +471,8 @@ new BuilderClient(config: ClientConfig)
   等详细调试信息。
 - `logger?: BuildLogger`：日志实例（未传时使用包内默认 logger），info/debug
   均通过 logger 输出，不使用 console。
+- `lang?: "en-US" | "zh-CN"`：错误信息、日志与报告的语言（默认：由环境变量
+  `LANGUAGE` / `LC_ALL` / `LANG` 自动检测）。
 
 **ClientConfig.cssImport**（CSS 导入处理）：
 
@@ -554,6 +557,8 @@ interface ServerConfig {
   debug?: boolean;
   /** 日志实例（未传时使用包内默认 logger），info/debug 均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
+  /** 错误信息与日志的语言（默认：由环境变量自动检测）。使用 createBuilder 时可传入并透传给 client/server */
+  lang?: "en-US" | "zh-CN";
   // ... 其他配置
 }
 ```
@@ -726,6 +731,30 @@ interface OutputFileContent {
   /** 文件内容（二进制格式） */
   contents: Uint8Array;
 }
+```
+
+---
+
+## 🌐 国际化（i18n）
+
+错误信息、构建日志与分析报告支持多语言。通过 **lang** 选项指定语言：
+
+- **lang**（`"en-US" | "zh-CN"`，可选）：指定后覆盖默认行为（默认由环境变量
+  `LANGUAGE` / `LC_ALL` / `LANG` 自动检测）。对 Builder、BuilderClient、
+  BuilderServer、BuildAnalyzer 均生效。可在 `createBuilder(config)` 顶层传入
+  `lang`，或在 `client` / `server` 配置中单独指定。
+
+**示例**：
+
+```typescript
+const builder = createBuilder({
+  lang: "en-US", // 或 "zh-CN"
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+});
 ```
 
 ---
@@ -1030,12 +1059,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.27**（2026-02-17）
+**v1.0.28**（2026-02-18）
 
-- **变更**：Resolver（Deno）— 无扩展名 JSR 用正则匹配；子路径/pathForProtocol
-  限定为脚本扩展名；统一 `(tsx?|jsx?|mts|mjs)` 模式。
-- **修复**：客户端解析器测试 — 路径别名与代码分割用例不再依赖
-  react/jsx-runtime，改用仅 .ts 的 fixture；去掉 try/catch，构建失败时用例失败。
+- **变更**：配置项用 `lang?: "en-US" | "zh-CN"` 替代 `t` 做国际化；文档补充 lang
+  与国际化章节；删除 `docs/en-US/README.md`。
+- **新增**：补全 i18n locale 键，替换 build-analyzer HTML 与 builder-server
+  调试日志中的硬编码文案。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

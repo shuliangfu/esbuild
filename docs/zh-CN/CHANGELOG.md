@@ -7,6 +7,25 @@
 
 ---
 
+## [1.0.28] - 2026-02-18
+
+### 变更
+
+- **配置**：从 `BuilderConfig`、`ClientConfig`、`ServerConfig`
+  中移除可选翻译函数 `t`，新增可选
+  `lang?: "en-US" | "zh-CN"`，用于控制错误信息、日志与报告的语言（默认由环境变量自动检测）。
+- **文档**：在 README 中补充 `lang` 说明与「国际化（i18n）」章节；删除
+  `docs/en-US/README.md`（根目录 README 即英文版）；中文 README
+  的英文链接改为指向根目录。
+
+### 新增
+
+- **i18n**：补全 builder、server、analyzer（报告 HTML）、html-generator 的
+  locale 键，替换 build-analyzer HTML 与 builder-server
+  调试日志中的硬编码文案；服务端错误信息支持 `{stderr}` / `{entry}` 占位符。
+
+---
+
 ## [1.0.27] - 2026-02-17
 
 ### 变更

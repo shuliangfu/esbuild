@@ -8,6 +8,7 @@
 
 import { dirname, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import type * as esbuild from "esbuild";
+import { $t, type Locale } from "./i18n.ts";
 import type { OptimizationSuggestion } from "./types.ts";
 
 /**
@@ -64,29 +65,30 @@ export interface DuplicateInfo {
   count: number;
 }
 
-/** 可选翻译函数类型（与 ClientConfig.t 一致） */
-type TranslateFn = (
-  key: string,
-  params?: Record<string, string | number | boolean>,
-) => string | undefined;
-
 /**
  * 构建产物分析器
  */
 export class BuildAnalyzer {
-  private t?: TranslateFn;
+  private lang?: Locale;
 
-  constructor(t?: TranslateFn) {
-    this.t = t;
+  constructor(lang?: Locale) {
+    this.lang = lang;
   }
 
+  /**
+   * 获取翻译文本：使用包内 i18n ($t)，lang 来自构造函数，最后回退 fallback
+   */
   private tr(
     key: string,
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const r = this.t?.(key, params);
-    return (r != null && r !== key) ? r : fallback;
+    const t = $t(
+      key,
+      params as Record<string, string> | undefined,
+      this.lang,
+    );
+    return t !== key ? t : fallback;
   }
 
   /**
@@ -555,11 +557,13 @@ export class BuildAnalyzer {
       : "N/A";
 
     return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${this.lang === "zh-CN" ? "zh-CN" : "en-US"}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>构建分析报告</title>
+  <title>${
+      this.tr("log.esbuild.analyzer.reportPageTitle", "构建分析报告")
+    }</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -709,26 +713,38 @@ export class BuildAnalyzer {
 <body>
   <div class="container">
     <header>
-      <h1>📊 构建分析报告</h1>
-      <p>生成时间: ${new Date().toLocaleString("zh-CN")}</p>
+      <h1>📊 ${
+      this.tr("log.esbuild.analyzer.reportPageTitle", "构建分析报告")
+    }</h1>
+      <p>${this.tr("log.esbuild.analyzer.reportGeneratedAt", "生成时间")}: ${
+      new Date().toLocaleString(this.lang === "zh-CN" ? "zh-CN" : "en-US")
+    }</p>
     </header>
 
     <div class="stats">
       <div class="stat-card">
         <div class="stat-value">${totalSizeMB} MB</div>
-        <div class="stat-label">总文件大小</div>
+        <div class="stat-label">${
+      this.tr("log.esbuild.analyzer.totalSize", "总文件大小")
+    }</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${result.files.length}</div>
-        <div class="stat-label">文件数量</div>
+        <div class="stat-label">${
+      this.tr("log.esbuild.analyzer.statFileCount", "文件数量")
+    }</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${buildTime}s</div>
-        <div class="stat-label">构建时间</div>
+        <div class="stat-label">${
+      this.tr("log.esbuild.analyzer.statBuildTime", "构建时间")
+    }</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${result.duplicates.length}</div>
-        <div class="stat-label">重复代码</div>
+        <div class="stat-label">${
+      this.tr("log.esbuild.analyzer.statDuplicates", "重复代码")
+    }</div>
       </div>
     </div>
 
@@ -736,7 +752,9 @@ export class BuildAnalyzer {
       performance
         ? `
     <div class="section">
-      <h2>⏱️ 构建性能</h2>
+      <h2>⏱️ ${
+          this.tr("log.esbuild.analyzer.sectionBuildPerf", "构建性能")
+        }</h2>
       <div class="performance-stages">
         ${
           Object.entries(performance.stages).map(([stage, time]) => `
@@ -753,7 +771,7 @@ export class BuildAnalyzer {
     }
 
     <div class="section">
-      <h2>📁 文件列表</h2>
+      <h2>📁 ${this.tr("log.esbuild.analyzer.sectionFileList", "文件列表")}</h2>
       <div class="file-list">
         ${
       result.files.sort((a, b) => b.size - a.size).map((file) => `
@@ -768,7 +786,9 @@ export class BuildAnalyzer {
     </div>
 
     <div class="section">
-      <h2>🔗 依赖关系图</h2>
+      <h2>🔗 ${
+      this.tr("log.esbuild.analyzer.sectionDependencyGraph", "依赖关系图")
+    }</h2>
       <div id="dependency-graph"></div>
     </div>
 
@@ -776,7 +796,9 @@ export class BuildAnalyzer {
       suggestions.length > 0
         ? `
     <div class="section">
-      <h2>💡 优化建议</h2>
+      <h2>💡 ${
+          this.tr("log.esbuild.analyzer.sectionSuggestions", "优化建议")
+        }</h2>
       ${
           suggestions.map((suggestion) => `
         <div class="suggestion ${suggestion.type}">
@@ -786,9 +808,9 @@ export class BuildAnalyzer {
           <div>${this.escapeHtml(suggestion.description)}</div>
           ${
             suggestion.fix
-              ? `<div class="suggestion-fix">修复建议: ${
-                this.escapeHtml(suggestion.fix)
-              }</div>`
+              ? `<div class="suggestion-fix">${
+                this.tr("log.esbuild.analyzer.suggestionFixLabel", "修复建议:")
+              } ${this.escapeHtml(suggestion.fix)}</div>`
               : ""
           }
         </div>
@@ -803,13 +825,21 @@ export class BuildAnalyzer {
       result.duplicates.length > 0
         ? `
     <div class="section">
-      <h2>🔄 重复代码检测</h2>
+      <h2>🔄 ${
+          this.tr("log.esbuild.analyzer.sectionDuplicates", "重复代码检测")
+        }</h2>
       <div class="file-list">
         ${
           result.duplicates.map((dup) => `
           <div class="file-item">
             <span class="file-name">${this.escapeHtml(dup.code)}</span>
-            <span class="file-size">出现在 ${dup.count} 个文件中</span>
+            <span class="file-size">${
+            this.tr(
+              "log.esbuild.analyzer.dupInFiles",
+              "出现在 {count} 个文件中",
+              { count: dup.count },
+            )
+          }</span>
           </div>
         `).join("")
         }
@@ -823,7 +853,9 @@ export class BuildAnalyzer {
       result.unused.length > 0
         ? `
     <div class="section">
-      <h2>🗑️ 未使用的代码</h2>
+      <h2>🗑️ ${
+          this.tr("log.esbuild.analyzer.sectionUnused", "未使用的代码")
+        }</h2>
       <div class="file-list">
         ${
           result.unused.map((file) => `

@@ -6,7 +6,11 @@
  * 提供统一的构建接口，支持服务端和客户端代码的编译、打包、优化等功能
  */
 
+import { initEsbuildI18n } from "./i18n.ts";
 import { Builder } from "./builder.ts";
+
+// 入口处初始化 i18n，供 Builder/analyzer 等日志与错误文案使用
+initEsbuildI18n();
 import type { BuilderConfig } from "./types.ts";
 
 export { AssetsProcessor } from "./assets-processor.ts";
@@ -89,3 +93,6 @@ export type {
 export function createBuilder(config: BuilderConfig): Builder {
   return new Builder(config);
 }
+
+/** i18n：日志与错误文案翻译，可按需 init 或使用默认入口初始化 */
+export { $t, initEsbuildI18n, type Locale } from "./i18n.ts";
