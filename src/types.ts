@@ -110,13 +110,8 @@ export interface ServerConfig {
   debug?: boolean;
   /** 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
-  /**
-   * 可选翻译函数，用于国际化错误信息、日志等（与 ClientConfig.t 相同）
-   */
-  t?: (
-    key: string,
-    params?: Record<string, string | number | boolean>,
-  ) => string | undefined;
+  /** 语言（未传时由环境变量检测），用于错误信息、日志等 */
+  lang?: "en-US" | "zh-CN";
 }
 
 /**
@@ -256,17 +251,8 @@ export interface ClientConfig {
   debug?: boolean;
   /** 日志实例（未传时使用库内默认 logger），info/debug 等均通过 logger 输出，不使用 console */
   logger?: BuildLogger;
-  /**
-   * 可选翻译函数，用于国际化错误信息、日志等
-   * 调用方（如 dweb）可传入 $t 或包装函数，未传则使用硬编码中文
-   * @param key 翻译 key，如 "log.esbuild.clientMissingEntry"
-   * @param params 插值参数
-   * @returns 翻译后的字符串，无对应翻译时返回 undefined 以使用 fallback
-   */
-  t?: (
-    key: string,
-    params?: Record<string, string | number | boolean>,
-  ) => string | undefined;
+  /** 语言（未传时由环境变量检测），用于错误信息、日志等 */
+  lang?: "en-US" | "zh-CN";
 }
 
 /**
@@ -439,14 +425,8 @@ export interface BuilderConfig {
   build?: BuildOptions;
   /** 是否验证构建配置（默认 false） */
   validateConfig?: boolean;
-  /**
-   * 可选翻译函数，用于国际化错误信息、进度、报告等
-   * 会透传给 BuilderClient/BuilderServer 的 config.t，未传则使用硬编码中文
-   */
-  t?: (
-    key: string,
-    params?: Record<string, string | number | boolean>,
-  ) => string | undefined;
+  /** 语言（未传时由环境变量检测），用于错误信息、进度、报告等，会透传给 client/server */
+  lang?: "en-US" | "zh-CN";
 }
 
 /**

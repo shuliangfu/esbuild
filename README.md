@@ -25,6 +25,7 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 - [Quick Start](#-quick-start)
 - [Usage Examples](#-usage-examples)
 - [API Documentation](#-api-documentation)
+- [Internationalization (i18n)](#-internationalization-i18n)
 - [Advanced Configuration](#-advanced-configuration)
 - [Compilation Methods](#️-compilation-methods)
 - [Test Report](#-test-report)
@@ -478,6 +479,8 @@ new BuilderClient(config: ClientConfig)
   detailed resolver/build debug info when enabled.
 - `logger?: BuildLogger`: Logger instance (uses library default logger when not
   provided), info/debug output through logger, not console.
+- `lang?: "en-US" | "zh-CN"`: Language for error messages, logs, and reports
+  (default: auto-detected from `LANGUAGE` / `LC_ALL` / `LANG`).
 
 **ClientConfig.cssImport** (CSS import handling):
 
@@ -562,6 +565,8 @@ interface ServerConfig {
   debug?: boolean;
   /** Logger instance (uses library default logger when not provided), info/debug output through logger, not console */
   logger?: BuildLogger;
+  /** Language for error messages and logs (default: auto-detected from env). Pass to client/server when using createBuilder. */
+  lang?: "en-US" | "zh-CN";
   // ... other config
 }
 ```
@@ -736,6 +741,32 @@ interface OutputFileContent {
   /** File content (binary format) */
   contents: Uint8Array;
 }
+```
+
+---
+
+## 🌐 Internationalization (i18n)
+
+Error messages, build logs, and analysis reports are localized. Use the **lang**
+option to set the language:
+
+- **lang** (`"en-US" | "zh-CN"`, optional): When set, overrides the default
+  (auto-detected from `LANGUAGE` / `LC_ALL` / `LANG`). Applies to Builder,
+  BuilderClient, BuilderServer, and BuildAnalyzer. Pass `lang` in
+  `createBuilder(config)`, or in `client` / `server` config to override per
+  builder.
+
+**Example**:
+
+```typescript
+const builder = createBuilder({
+  lang: "en-US", // or "zh-CN"
+  client: {
+    entry: "./src/client/index.tsx",
+    output: "./dist/client",
+    engine: "react",
+  },
+});
 ```
 
 ---
@@ -1055,14 +1086,13 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.27** (2026-02-17)
+**v1.0.28** (2026-02-18)
 
-- **Changed**: Resolver (Deno) — regex-based extension matching for
-  extensionless JSR; restrict subpath/pathForProtocol to script extensions;
-  unify `(tsx?|jsx?|mts|mjs)` pattern.
-- **Fixed**: Client resolver tests — path-alias and code-splitting tests no
-  longer depend on react/jsx-runtime; use .ts-only fixtures; remove try/catch so
-  build failures fail the test.
+- **Changed**: Replaced config `t` with `lang?: "en-US" | "zh-CN"` for i18n;
+  documented lang and Internationalization section; removed
+  `docs/en-US/README.md`.
+- **Added**: Completed i18n locale keys and replaced hardcoded strings in
+  build-analyzer HTML and builder-server debug logs.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

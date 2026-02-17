@@ -8,6 +8,27 @@ and this project adheres to
 
 ---
 
+## [1.0.28] - 2026-02-18
+
+### Changed
+
+- **Config**: Removed optional translation function `t` from `BuilderConfig`,
+  `ClientConfig`, and `ServerConfig`. Added optional `lang?: "en-US" | "zh-CN"`
+  to control language for error messages, logs, and reports (default:
+  auto-detected from env).
+- **Docs**: Documented `lang` and added "Internationalization (i18n)" section in
+  README. Removed `docs/en-US/README.md` (root README is the English version).
+  Updated `docs/zh-CN/README.md` to link to root for English.
+
+### Added
+
+- **i18n**: Completed locale keys for builder, server, analyzer (report HTML),
+  and html-generator; replaced hardcoded strings in build-analyzer HTML and
+  builder-server debug logs. Server error messages support `{stderr}` /
+  `{entry}` placeholders.
+
+---
+
 ## [1.0.27] - 2026-02-17
 
 ### Changed
