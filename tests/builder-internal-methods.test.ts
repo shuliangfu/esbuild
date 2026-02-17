@@ -35,6 +35,7 @@ describe("Builder 内部方法", () => {
   describe("性能报告生成", () => {
     it("应该生成性能报告", () => {
       const config: BuilderConfig = {
+        lang: "zh-CN",
         client: {
           entry: entryFile,
           output: outputDir,
@@ -65,6 +66,7 @@ describe("Builder 内部方法", () => {
 
     it("应该显示慢构建警告", () => {
       const config: BuilderConfig = {
+        lang: "zh-CN",
         client: {
           entry: entryFile,
           output: outputDir,
@@ -92,6 +94,7 @@ describe("Builder 内部方法", () => {
 
     it("应该识别构建瓶颈", () => {
       const config: BuilderConfig = {
+        lang: "zh-CN",
         client: {
           entry: entryFile,
           output: outputDir,

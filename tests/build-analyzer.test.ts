@@ -225,7 +225,7 @@ describe("BuildAnalyzer", () => {
 
   describe("生成分析报告", () => {
     it("应该生成文本格式的报告", () => {
-      const analyzer = new BuildAnalyzer();
+      const analyzer = new BuildAnalyzer("zh-CN");
       const metafile: esbuild.Metafile = {
         inputs: {},
         outputs: {
@@ -297,7 +297,7 @@ describe("BuildAnalyzer", () => {
     });
 
     it("应该包含重复代码信息", () => {
-      const analyzer = new BuildAnalyzer();
+      const analyzer = new BuildAnalyzer("zh-CN");
       const metafile: esbuild.Metafile = {
         inputs: {},
         outputs: {

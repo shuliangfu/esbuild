@@ -53,6 +53,7 @@ describe("Builder 错误处理", () => {
 
     it("应该生成错误报告", () => {
       const config: BuilderConfig = {
+        lang: "zh-CN",
         client: {
           entry: entryFile,
           output: outputDir,
