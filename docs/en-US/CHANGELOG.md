@@ -8,6 +8,25 @@ and this project adheres to
 
 ---
 
+## [1.0.27] - 2026-02-17
+
+### Changed
+
+- **Resolver (Deno)**: Use a single regex to match extensionless JSR specifiers
+  against cache keys (`.ts`/`.tsx`/`.jsx`/`.js`/`.mts`/`.mjs`) instead of four
+  separate `get` branches. Restrict subpath and `pathForProtocol` patterns to
+  script extensions only so `.json` and `.d.ts` are not matched. Unify script
+  extension pattern `(tsx?|jsx?|mts|mjs)` across cache lookup and path handling.
+
+### Fixed
+
+- **Tests (client resolver)**: Path-alias and code-splitting tests no longer
+  depend on `Button.tsx` (react/jsx-runtime). Use `.ts`-only fixtures so tests
+  pass in Deno test env without `npm:react` in the module cache. Remove
+  try/catch so build failures fail the test instead of passing silently.
+
+---
+
 ## [1.0.26] - 2026-02-16
 
 ### Fixed

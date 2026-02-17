@@ -7,6 +7,24 @@
 
 ---
 
+## [1.0.27] - 2026-02-17
+
+### 变更
+
+- **Resolver（Deno）**：无扩展名 JSR 说明符改为用单一正则在 cache key 上匹配
+  `.ts`/`.tsx`/`.jsx`/`.js`/`.mts`/`.mjs`，不再使用四个独立 `get` 分支。子路径与
+  `pathForProtocol` 的正则限定为仅脚本扩展名，避免匹配 `.json`、`.d.ts`。统一
+  脚本扩展名模式 `(tsx?|jsx?|mts|mjs)` 于 cache 查找与路径处理。
+
+### 修复
+
+- **测试（客户端解析器）**：路径别名与代码分割用例不再依赖 `Button.tsx`
+  （react/jsx-runtime），改用仅 `.ts` 的 fixture，使 Deno 测试环境下无需 module
+  cache 中的 `npm:react` 即可通过。去掉 try/catch，构建失败时用例失败而非
+  静默通过。
+
+---
+
 ## [1.0.26] - 2026-02-16
 
 ### 修复
