@@ -378,27 +378,19 @@ function cacheLookup(
     return { path: exact, key: specifier };
   }
 
-  // 无扩展名的 jsr specifier（如 .../src/route-page）先尝试 cache 中的 .ts/.tsx/.jsx/.js key，避免相对路径解析出的路径与 deno info 缓存 key 不一致。
-  // 返回的 key 必须带扩展名，否则 onLoad 用 key 选 loader 时会误用 ts，导致 .tsx/.jsx 视图被当 TS/JS 解析（JSX 报错）。
+  // 无扩展名的 jsr specifier：用正则匹配 cache 中 specifier + .ts/.tsx/.jsx/.js 的 key，保证 onLoad 拿到带扩展名的 key 以选对 loader。
   if (
     specifier.startsWith("jsr:") &&
     !/\.(tsx?|jsx?|mts|mjs)$/i.test(specifier)
   ) {
-    const withTs = moduleCache.get(specifier + ".ts");
-    if (withTs && existsCheck(withTs)) {
-      return { path: withTs, key: specifier + ".ts" };
-    }
-    const withTsx = moduleCache.get(specifier + ".tsx");
-    if (withTsx && existsCheck(withTsx)) {
-      return { path: withTsx, key: specifier + ".tsx" };
-    }
-    const withJsx = moduleCache.get(specifier + ".jsx");
-    if (withJsx && existsCheck(withJsx)) {
-      return { path: withJsx, key: specifier + ".jsx" };
-    }
-    const withJs = moduleCache.get(specifier + ".js");
-    if (withJs && existsCheck(withJs)) {
-      return { path: withJs, key: specifier + ".js" };
+    const extRe = new RegExp(
+      `^${escapeRegex(specifier)}\\.(tsx?|jsx?|mts|mjs)$`,
+      "i",
+    );
+    for (const [key, localPath] of moduleCache) {
+      if (extRe.test(key) && existsCheck(localPath)) {
+        return { path: localPath, key };
+      }
     }
   }
 
@@ -413,74 +405,24 @@ function cacheLookup(
     const scopeEscaped = escapeRegex(scopeAndName);
     const segments = subpath
       ? subpath.split("/").map((s) => escapeRegex(s))
-      : [];
-    const pathPart = segments.length === 0
-      ? "(src/)?(mod)?(\\.tsx?|\\.jsx?)?"
-      : segments.length === 1
-      ? `(src/)?${segments[0]}(/mod)?(\\.tsx?|\\.jsx?)?`
-      : `(src/)?${segments.join("(\\/[^/]+)*\\/")}(\\.tsx?|\\.jsx?)?`;
+      : ["mod"];
+    // 无子路径（包根）：匹配主入口 mod、index 及 src 下对应文件（mod.ts、index.ts），不匹配 mod-hybrid
+    const pathPart = subpath === "" ? "(src/)?(mod|index)(/mod)?" : (() => {
+      const first = `(src/)?([a-z]*-)?${segments[0]}(-[a-z]*)?`;
+      const rest = segments.length > 1
+        ? `(\\/[^/]+)*\\/${segments.slice(1).join("(\\/[^/]+)*\\/")}`
+        : "";
+      return first + rest + "(/mod)?";
+    })();
+    // 后缀限定为脚本扩展名，避免匹配到 .json、.d.ts 等
     const pattern = new RegExp(
-      `^jsr:${scopeEscaped}@[^/]+/${pathPart}$`,
+      `^jsr:${scopeEscaped}@[^/]+/${pathPart}(\\.(tsx?|jsx?|mts|mjs))?$`,
+      "i",
     );
     for (const [key, localPath] of moduleCache) {
       if (!key.startsWith("jsr:")) continue;
       if (pattern.test(key) && existsCheck(localPath)) {
         return { path: localPath, key };
-      }
-    }
-
-    // JSR 子路径通用回退：用 scopeAndName 匹配 cache 中的主包，再按子路径一层一层拼候选（不写死 adapters 等目录）
-    if (subpath) {
-      const baseKeyPrefix = `jsr:${scopeAndName}@`;
-      const parts = subpath.split("/");
-      const buildCandidates = (root: string) => {
-        return [
-          join(root, subpath),
-          join(root, subpath + ".ts"),
-          join(root, subpath + ".tsx"),
-          join(root, subpath + ".jsx"),
-          join(root, subpath + ".js"),
-          join(root, ...parts, "mod.ts"),
-          join(root, ...parts, "index.ts"),
-          join(root, ...parts, "index.js"),
-          join(root, "src", subpath, "mod.ts"),
-          join(root, "src", subpath + ".ts"),
-          join(root, "src", subpath + ".tsx"),
-          join(root, "src", subpath + ".jsx"),
-          join(root, "src", subpath + ".js"),
-        ];
-      };
-      const keyWithExtForPath = (p: string) =>
-        p.endsWith(".tsx")
-          ? specifier + ".tsx"
-          : p.endsWith(".jsx")
-          ? specifier + ".jsx"
-          : p.endsWith(".ts")
-          ? specifier + ".ts"
-          : p.endsWith(".js")
-          ? specifier + ".js"
-          : specifier;
-      for (const [key, baseLocal] of moduleCache) {
-        if (
-          !key.startsWith("jsr:") ||
-          !key.startsWith(baseKeyPrefix) ||
-          key.slice(baseKeyPrefix.length).includes("/")
-        ) continue;
-        if (!existsCheck(baseLocal)) continue;
-        const baseDir = dirname(baseLocal);
-        for (const p of buildCandidates(baseDir)) {
-          if (existsCheck(p)) {
-            return { path: p, key: keyWithExtForPath(p) };
-          }
-        }
-        const baseDirParent = dirname(baseDir);
-        if (baseDirParent !== baseDir) {
-          for (const p of buildCandidates(baseDirParent)) {
-            if (existsCheck(p)) {
-              return { path: p, key: keyWithExtForPath(p) };
-            }
-          }
-        }
       }
     }
   }
@@ -574,8 +516,8 @@ function resolveRelative(
   } catch {
     resolvedWithin = relativePath.replace(/^\.\//, "").replace(/\.\.\//g, "");
   }
-  const pathForProtocol = /\.(tsx?|jsx?)$/i.test(resolvedWithin)
-    ? resolvedWithin.replace(/\.(tsx?|jsx?)$/i, "")
+  const pathForProtocol = /\.(tsx?|jsx?|mts|mjs)$/i.test(resolvedWithin)
+    ? resolvedWithin.replace(/\.(tsx?|jsx?|mts|mjs)$/i, "")
     : resolvedWithin;
   const baseForProtocol = parsed.packageBase.replace(/@([\^~])([^/]+)/, "@$2");
   const targetSpecifier = pathForProtocol

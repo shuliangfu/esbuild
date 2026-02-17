@@ -131,7 +131,7 @@ export { msg, sum, appConfig };
 `,
     );
 
-    // 创建入口文件 5: 路径别名导入
+    // 创建入口文件 5: 路径别名导入（仅用 .ts 避免依赖 react/jsx-runtime，便于 Deno 测试环境通过）
     entryFileAlias = join(testDataDir, "client-alias.ts");
     await writeTextFile(
       entryFileAlias,
@@ -139,7 +139,6 @@ export { msg, sum, appConfig };
 // Deno: 通过 deno.json imports 配置
 // Bun: 通过 tsconfig.json paths 配置
 import { formatMessage } from "@/utils/helper.ts";
-import { Button } from "@/components/Button.tsx";
 import { appConfig } from "~/config/app.ts";
 
 const msg = formatMessage("Hello from alias");
@@ -148,7 +147,7 @@ const config = appConfig;
 console.log("Message:", msg);
 console.log("Config:", config);
 
-export { msg, config, Button };
+export { msg, config };
 `,
     );
 
@@ -220,15 +219,12 @@ export { msg, config, Button };
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够解析路径别名（通过 deno.json）", async () => {
-        // 创建 deno.json 配置文件（含 react 以便 Button.tsx 的 JSX 能解析）
         const denoJsonPath = join(testDataDir, "deno.json");
         const denoJson = {
           imports: {
             "@/": "./src/",
             "~/": "./",
             "@dreamer/logger": "jsr:@dreamer/logger@^1.0.0-beta.7",
-            "react": "npm:react@19.2.4",
-            "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
           },
         };
         writeTextFileSync(
@@ -243,54 +239,32 @@ export { msg, config, Button };
         };
         const builder = new BuilderClient(config);
 
-        try {
-          const result = await builder.build({ mode: "dev", write: false });
-          expect(result).toBeTruthy();
-          expect(result.outputContents).toBeDefined();
-          expect(result.outputContents!.length).toBeGreaterThan(0);
+        const result = await builder.build({ mode: "dev", write: false });
+        expect(result).toBeTruthy();
+        expect(result.outputContents).toBeDefined();
+        expect(result.outputContents!.length).toBeGreaterThan(0);
 
-          const code = result.outputContents![0]?.text || "";
-          // 验证代码包含导入的内容
-          expect(code).toContain("Formatted");
-          expect(code).toContain("Test App");
-        } catch (error) {
-          // 如果构建失败，至少验证构建器创建成功
-          expect(builder).toBeTruthy();
-        }
+        const code = result.outputContents![0]?.text || "";
+        expect(code).toContain("Formatted");
+        expect(code).toContain("Test App");
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够处理代码分割和相对路径导入", async () => {
-        // 写入 deno.json 以解析 Button.tsx 依赖的 react/jsx-runtime
-        const denoJsonPath = join(testDataDir, "deno.json");
-        writeTextFileSync(
-          denoJsonPath,
-          JSON.stringify(
-            {
-              imports: {
-                "react": "npm:react@19.2.4",
-                "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
-              },
-            },
-            null,
-            2,
-          ),
-        );
-        // 创建一个使用动态导入的测试文件
+        // 动态导入 .ts 模块以触发代码分割，避免依赖 react/jsx-runtime（Deno 测试环境可能未拉取 npm:react）
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
         await writeTextFile(
           dynamicEntry,
           `import { formatMessage } from "./src/utils/helper.ts";
 
-// 动态导入（会触发代码分割）
-const loadComponent = async () => {
-  const { Button } = await import("./src/components/Button.tsx");
-  return Button;
+const loadHelper = async () => {
+  const m = await import("./src/utils/helper.ts");
+  return m.formatMessage;
 };
 
 const msg = formatMessage("Dynamic import test");
 console.log("Message:", msg);
 
-export { msg, loadComponent };
+export { msg, loadHelper };
 `,
         );
 
@@ -304,17 +278,11 @@ export { msg, loadComponent };
         };
         const builder = new BuilderClient(config);
 
-        try {
-          const result = await builder.build({ mode: "dev", write: false });
-          expect(result).toBeTruthy();
-          expect(result.outputFiles).toBeDefined();
-          expect(result.outputFiles.length).toBeGreaterThan(0);
-          // 代码分割应该生成多个文件
-          expect(result.outputFiles.length).toBeGreaterThan(1);
-        } catch (error) {
-          // 如果构建失败，至少验证构建器创建成功
-          expect(builder).toBeTruthy();
-        }
+        const result = await builder.build({ mode: "dev", write: false });
+        expect(result).toBeTruthy();
+        expect(result.outputFiles).toBeDefined();
+        expect(result.outputFiles.length).toBeGreaterThan(0);
+        expect(result.outputFiles.length).toBeGreaterThan(1);
       }, { sanitizeOps: false, sanitizeResources: false });
     });
   }
@@ -386,37 +354,20 @@ export { msg, loadComponent };
       }, { sanitizeOps: false, sanitizeResources: false });
 
       it("应该能够处理代码分割和相对路径导入", async () => {
-        // 写入 deno.json 以解析 Button.tsx 依赖的 react/jsx-runtime
-        const denoJsonPath = join(testDataDir, "deno.json");
-        writeTextFileSync(
-          denoJsonPath,
-          JSON.stringify(
-            {
-              imports: {
-                "react": "npm:react@19.2.4",
-                "react/jsx-runtime": "npm:react@19.2.4/jsx-runtime",
-              },
-            },
-            null,
-            2,
-          ),
-        );
-        // 创建一个使用动态导入的测试文件
         const dynamicEntry = join(testDataDir, "client-dynamic.ts");
         await writeTextFile(
           dynamicEntry,
           `import { formatMessage } from "./src/utils/helper.ts";
 
-// 动态导入（会触发代码分割）
-const loadComponent = async () => {
-  const { Button } = await import("./src/components/Button.tsx");
-  return Button;
+const loadHelper = async () => {
+  const m = await import("./src/utils/helper.ts");
+  return m.formatMessage;
 };
 
 const msg = formatMessage("Dynamic import test");
 console.log("Message:", msg);
 
-export { msg, loadComponent };
+export { msg, loadHelper };
 `,
         );
 
@@ -430,15 +381,11 @@ export { msg, loadComponent };
         };
         const builder = new BuilderClient(config);
 
-        try {
-          const result = await builder.build({ mode: "dev", write: false });
-          expect(result).toBeTruthy();
-          expect(result.outputFiles).toBeDefined();
-          expect(result.outputFiles.length).toBeGreaterThan(0);
-        } catch (error) {
-          // 如果构建失败，至少验证构建器创建成功
-          expect(builder).toBeTruthy();
-        }
+        const result = await builder.build({ mode: "dev", write: false });
+        expect(result).toBeTruthy();
+        expect(result.outputFiles).toBeDefined();
+        expect(result.outputFiles.length).toBeGreaterThan(0);
+        expect(result.outputFiles.length).toBeGreaterThan(1);
       }, { sanitizeOps: false, sanitizeResources: false });
     });
   }

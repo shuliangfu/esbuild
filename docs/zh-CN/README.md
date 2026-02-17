@@ -1030,11 +1030,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.26**（2026-02-16）
+**v1.0.27**（2026-02-17）
 
-- **修复**：客户端解析器测试 — 在测试项目 `deno.json` 中增加 `react` 与
-  `react/jsx-runtime`，使路径别名与代码分割用例在含 JSX 的 fixture
-  下构建成功（消除 post-test 中的 "Could not resolve react/jsx-runtime" 报错）。
+- **变更**：Resolver（Deno）— 无扩展名 JSR 用正则匹配；子路径/pathForProtocol
+  限定为脚本扩展名；统一 `(tsx?|jsx?|mts|mjs)` 模式。
+- **修复**：客户端解析器测试 — 路径别名与代码分割用例不再依赖
+  react/jsx-runtime，改用仅 .ts 的 fixture；去掉 try/catch，构建失败时用例失败。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

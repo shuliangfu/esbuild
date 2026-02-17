@@ -1055,12 +1055,14 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.26** (2026-02-16)
+**v1.0.27** (2026-02-17)
 
-- **Fixed**: Client resolver tests — add `react` and `react/jsx-runtime` to test
-  project `deno.json` so path-alias and code-splitting tests with JSX fixtures
-  build successfully (removes "Could not resolve react/jsx-runtime" from
-  post-test output).
+- **Changed**: Resolver (Deno) — regex-based extension matching for
+  extensionless JSR; restrict subpath/pathForProtocol to script extensions;
+  unify `(tsx?|jsx?|mts|mjs)` pattern.
+- **Fixed**: Client resolver tests — path-alias and code-splitting tests no
+  longer depend on react/jsx-runtime; use .ts-only fixtures; remove try/catch so
+  build failures fail the test.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
