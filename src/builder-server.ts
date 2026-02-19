@@ -30,7 +30,7 @@ import type {
   OutputFileContent,
   ServerConfig,
 } from "./types.ts";
-import { $t } from "./i18n.ts";
+import { $tr } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -74,7 +74,7 @@ export class BuilderServer {
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const t = $t(
+    const t = $tr(
       key,
       params as Record<string, string> | undefined,
       this.config.lang,

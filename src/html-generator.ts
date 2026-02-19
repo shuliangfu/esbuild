@@ -12,7 +12,7 @@ import {
   resolve,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
-import { $t } from "./i18n.ts";
+import { $tr } from "./i18n.ts";
 import type { HTMLConfig, HTMLEntry } from "./types.ts";
 import { logger } from "./utils/logger.ts";
 
@@ -45,7 +45,7 @@ export class HTMLGenerator {
         htmlTemplate = await readTextFile(templatePath);
       } catch (_error) {
         logger.warn(
-          $t("log.esbuild.html.cannotReadTemplate", {
+          $tr("log.esbuild.html.cannotReadTemplate", {
             path: this.config.template,
           }),
         );
