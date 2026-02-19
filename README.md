@@ -14,6 +14,13 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
+**Changelog**: [English](./docs/en-US/CHANGELOG.md) |
+[中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
+
+### [1.0.29] - 2026-02-19
+
+- **Changed**: i18n translation method `$t` → `$tr`.
+
 ---
 
 ## 📑 Table of Contents

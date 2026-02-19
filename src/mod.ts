@@ -94,5 +94,4 @@ export function createBuilder(config: BuilderConfig): Builder {
   return new Builder(config);
 }
 
-/** i18n：日志与错误文案翻译，可按需 init 或使用默认入口初始化 */
-export { $t, initEsbuildI18n, type Locale } from "./i18n.ts";
+// i18n 仅包内使用，不对外导出；测试需 init/setLocale 时从 ./i18n.ts 导入

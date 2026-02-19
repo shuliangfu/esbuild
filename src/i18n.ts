@@ -2,14 +2,13 @@
  * @module @dreamer/esbuild/i18n
  *
  * i18n for @dreamer/esbuild: builder/analyzer log and error messages.
- * When lang is not passed, locale is auto-detected from env
- * (LANGUAGE/LC_ALL/LANG).
+ * Uses $tr + module instance, no install(); locale auto-detected from env
+ * (LANGUAGE/LC_ALL/LANG) when not set.
  */
 
 import {
-  $i18n,
-  getGlobalI18n,
-  getI18n,
+  createI18n,
+  type I18n,
   type TranslationData,
   type TranslationParams,
 } from "@dreamer/i18n";
@@ -25,7 +24,13 @@ export const DEFAULT_LOCALE: Locale = "en-US";
 
 const ESBUILD_LOCALES: Locale[] = ["en-US", "zh-CN"];
 
-let esbuildTranslationsLoaded = false;
+const LOCALE_DATA: Record<string, TranslationData> = {
+  "en-US": enUS as TranslationData,
+  "zh-CN": zhCN as TranslationData,
+};
+
+/** Module-scoped i18n instance for esbuild; not installed globally. */
+let esbuildI18n: I18n | null = null;
 
 /**
  * Detect locale: LANGUAGE > LC_ALL > LANG.
@@ -50,41 +55,39 @@ export function detectLocale(): Locale {
 }
 
 /**
- * Load esbuild translations into the current I18n instance (once).
- */
-export function ensureEsbuildI18n(): void {
-  if (esbuildTranslationsLoaded) return;
-  const i18n = getGlobalI18n() ?? getI18n();
-  i18n.loadTranslations("en-US", enUS as TranslationData);
-  i18n.loadTranslations("zh-CN", zhCN as TranslationData);
-  esbuildTranslationsLoaded = true;
-}
-
-/**
- * Load translations and set current locale. Call once at entry (e.g. mod).
+ * Create esbuild i18n instance and set locale. Call once at entry (e.g. mod).
+ * Does not call install(); uses module instance only.
  */
 export function initEsbuildI18n(): void {
-  ensureEsbuildI18n();
-  $i18n.setLocale(detectLocale());
+  if (esbuildI18n) return;
+  const i18n = createI18n({
+    defaultLocale: DEFAULT_LOCALE,
+    fallbackBehavior: "default",
+    locales: [...ESBUILD_LOCALES],
+    translations: LOCALE_DATA as Record<string, TranslationData>,
+  });
+  i18n.setLocale(detectLocale());
+  esbuildI18n = i18n;
 }
 
 /**
- * Translate by key. When lang is not passed, uses current locale (set at entry).
- * Do not call ensure/init inside $t; call initEsbuildI18n() at entry.
+ * Translate by key. Uses module instance; when lang is not passed, uses current locale.
+ * When init not called, returns key.
  */
-export function $t(
+export function $tr(
   key: string,
-  params?: TranslationParams,
+  params?: Record<string, string | number>,
   lang?: Locale,
 ): string {
+  if (!esbuildI18n) return key;
   if (lang !== undefined) {
-    const prev = $i18n.getLocale();
-    $i18n.setLocale(lang);
+    const prev = esbuildI18n.getLocale();
+    esbuildI18n.setLocale(lang);
     try {
-      return $i18n.t(key, params);
+      return esbuildI18n.t(key, params as TranslationParams);
     } finally {
-      $i18n.setLocale(prev);
+      esbuildI18n.setLocale(prev);
     }
   }
-  return $i18n.t(key, params);
+  return esbuildI18n.t(key, params as TranslationParams);
 }

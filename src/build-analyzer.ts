@@ -8,7 +8,7 @@
 
 import { dirname, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import type * as esbuild from "esbuild";
-import { $t, type Locale } from "./i18n.ts";
+import { $tr, type Locale } from "./i18n.ts";
 import type { OptimizationSuggestion } from "./types.ts";
 
 /**
@@ -83,7 +83,7 @@ export class BuildAnalyzer {
     fallback: string,
     params?: Record<string, string | number | boolean>,
   ): string {
-    const t = $t(
+    const t = $tr(
       key,
       params as Record<string, string> | undefined,
       this.lang,
