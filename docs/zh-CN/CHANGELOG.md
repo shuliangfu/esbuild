@@ -7,6 +7,20 @@
 
 ---
 
+## [1.0.30] - 2026-02-19
+
+### 变更
+
+- **i18n**：i18n 在模块加载时自动初始化。`initEsbuildI18n`
+  不再对外导出；调用方及
+  各入口（mod、builder、bundle、client、server、css-injector）无需再调用。翻译函数
+  `$tr` 在首次使用时若尚未初始化会自动初始化。需设置构建消息语言时请使用
+  `setEsbuildLocale`。
+- **依赖**：`@dreamer/console` 升级至 ^1.0.12，`@dreamer/runtime-adapter` 升级至
+  ^1.0.15，`@dreamer/image` 升级至 ^1.0.2，`@dreamer/test` 升级至 ^1.0.10。
+
+---
+
 ## [1.0.29] - 2026-02-19
 
 ### 变更

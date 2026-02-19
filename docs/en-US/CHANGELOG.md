@@ -8,6 +8,22 @@ and this project adheres to
 
 ---
 
+## [1.0.30] - 2026-02-19
+
+### Changed
+
+- **i18n**: i18n now auto-initializes when the module is loaded.
+  `initEsbuildI18n` is no longer exported; callers and entry points (mod,
+  builder, bundle, client, server, css-injector) no longer need to call it. The
+  translation function `$tr` initializes i18n on first use if not yet
+  initialized. Use `setEsbuildLocale` when you need to set the locale for build
+  messages.
+- **Dependencies**: Bumped `@dreamer/console` to ^1.0.12,
+  `@dreamer/runtime-adapter` to ^1.0.15, `@dreamer/image` to ^1.0.2,
+  `@dreamer/test` to ^1.0.10.
+
+---
+
 ## [1.0.29] - 2026-02-19
 
 ### Changed

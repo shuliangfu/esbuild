@@ -1059,12 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.28**（2026-02-18）
+**v1.0.30**（2026-02-19）
 
-- **变更**：配置项用 `lang?: "en-US" | "zh-CN"` 替代 `t` 做国际化；文档补充 lang
-  与国际化章节；删除 `docs/en-US/README.md`。
-- **新增**：补全 i18n locale 键，替换 build-analyzer HTML 与 builder-server
-  调试日志中的硬编码文案。
+- **变更**：i18n 在模块加载时自动初始化，`initEsbuildI18n` 不再导出，各入口不再
+  调用；依赖升级：@dreamer/console ^1.0.12、@dreamer/runtime-adapter ^1.0.15、
+  @dreamer/image ^1.0.2、@dreamer/test ^1.0.10。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
