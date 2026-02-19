@@ -8,9 +8,6 @@
  */
 
 import { resolve } from "@dreamer/runtime-adapter";
-import { initEsbuildI18n } from "../i18n.ts";
-
-initEsbuildI18n();
 
 /**
  * 注入 HTML 内容到指定位置（简化版实现）

@@ -17,9 +17,13 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.29] - 2026-02-19
+### [1.0.30] - 2026-02-19
 
-- **Changed**: i18n translation method `$t` → `$tr`.
+- **Changed**: i18n auto-initializes on module load; `initEsbuildI18n` no longer
+  exported; entry points no longer call it. Dependencies bumped:
+  @dreamer/console ^1.0.12, @dreamer/runtime-adapter ^1.0.15, @dreamer/image
+  ^1.0.2, @dreamer/test ^1.0.10. Full history:
+  [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
 

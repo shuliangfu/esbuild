@@ -54,11 +54,8 @@ export function detectLocale(): Locale {
   return DEFAULT_LOCALE;
 }
 
-/**
- * Create esbuild i18n instance and set locale. Call once at entry (e.g. mod).
- * Does not call install(); uses module instance only.
- */
-export function initEsbuildI18n(): void {
+/** 内部初始化，导入 i18n 时自动执行，不导出 */
+function initEsbuildI18n(): void {
   if (esbuildI18n) return;
   const i18n = createI18n({
     defaultLocale: DEFAULT_LOCALE,
@@ -70,6 +67,8 @@ export function initEsbuildI18n(): void {
   esbuildI18n = i18n;
 }
 
+initEsbuildI18n();
+
 /**
  * Translate by key. Uses module instance; when lang is not passed, uses current locale.
  * When init not called, returns key.
@@ -79,6 +78,7 @@ export function $tr(
   params?: Record<string, string | number>,
   lang?: Locale,
 ): string {
+  if (!esbuildI18n) initEsbuildI18n();
   if (!esbuildI18n) return key;
   if (lang !== undefined) {
     const prev = esbuildI18n.getLocale();

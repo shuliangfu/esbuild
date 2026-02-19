@@ -5,9 +5,5 @@
  * 按需导入：import { BuilderServer } from "jsr:@dreamer/esbuild/server"
  */
 
-import { initEsbuildI18n } from "./i18n.ts";
-
-initEsbuildI18n();
-
 export { BuilderServer } from "./builder-server.ts";
 export type { ServerBuildOptions } from "./builder-server.ts";
