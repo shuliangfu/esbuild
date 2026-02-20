@@ -213,6 +213,8 @@ export class BuilderBundle {
       plugins.push(bunResolverPlugin({
         enabled: true,
         browserMode: useBrowserMode,
+        debug,
+        logger: log,
       }));
     }
 

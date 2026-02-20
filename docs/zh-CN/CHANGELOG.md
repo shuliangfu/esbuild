@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.31] - 2026-02-20
+
+### 修复
+
+- **服务端（Bun）**：使用 Bun 构建服务端时，输出的 `server.js`
+  现已自动在文件头部注入 `globalThis.__DWEB_PROD__ = true;`，使 @dreamer/dweb
+  在运行编译产物时以生产模式运行（不启用 HMR、不请求 `hmr-browser.ts`）。与
+  esbuild 构建路径行为一致，修复 Bun 构建后执行 `bun run start` 时出现「ENOENT:
+  hmr-browser.ts」的问题。
+
+---
+
 ## [1.0.30] - 2026-02-19
 
 ### 变更

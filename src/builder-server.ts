@@ -17,9 +17,11 @@ import {
   makeTempDir,
   mkdir,
   readFile,
+  readTextFile,
   relative,
   remove,
   resolve,
+  writeTextFile,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
@@ -30,7 +32,7 @@ import type {
   OutputFileContent,
   ServerConfig,
 } from "./types.ts";
-import { $tr } from "./i18n.ts";
+import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -67,22 +69,6 @@ export class BuilderServer {
   }
 
   /**
-   * 获取翻译文本：使用包内 i18n ($t)，lang 来自 config.lang，最后回退 fallback
-   */
-  private tr(
-    key: string,
-    fallback: string,
-    params?: Record<string, string | number | boolean>,
-  ): string {
-    const t = $tr(
-      key,
-      params as Record<string, string> | undefined,
-      this.config.lang,
-    );
-    return t !== key ? t : fallback;
-  }
-
-  /**
    * 调试日志：仅当 config.debug 为 true 时通过 logger.debug 输出，便于排查构建问题
    */
   private debugLog(message: string): void {
@@ -112,6 +98,10 @@ export class BuilderServer {
   build(
     options: BuildMode | ServerBuildOptions = "prod",
   ): Promise<BuildResult> {
+    // 设置包内 i18n 语言，后续 $tr 不再传 lang
+    if (this.config.lang !== undefined) {
+      setEsbuildLocale(this.config.lang);
+    }
     // 如果启用原生编译，使用 deno compile / bun build --compile
     if (this.config.useNativeCompile) {
       return this.buildWithNativeCompile(options);
@@ -147,10 +137,7 @@ export class BuilderServer {
     // 验证输出路径
     if (!this.config.output || this.config.output.trim() === "") {
       throw new Error(
-        this.tr(
-          "log.esbuild.server.missingOutput",
-          "服务端配置缺少输出路径 (output)",
-        ),
+        $tr("log.esbuild.server.missingOutput"),
       );
     }
 
@@ -201,13 +188,9 @@ export class BuilderServer {
       if (!output.success) {
         const stderr = output.stderr
           ? new TextDecoder().decode(output.stderr)
-          : this.tr("log.esbuild.builder.unknownError", "未知错误");
+          : $tr("log.esbuild.builder.unknownError");
         throw new Error(
-          this.tr(
-            "log.esbuild.server.bunCompileFailed",
-            `Bun 编译失败: ${stderr}`,
-            { stderr },
-          ),
+          $tr("log.esbuild.server.bunCompileFailed", { stderr }),
         );
       }
     } else {
@@ -216,12 +199,9 @@ export class BuilderServer {
       // 如果配置了 external，需要提示用户
       if (externalModules.length > 0) {
         console.warn(
-          this.tr(
+          $tr(
             "log.esbuild.server.denoCompileExternalWarning",
-            "警告: deno compile 不支持 external 配置，以下模块将被打包: {modules}",
-            {
-              modules: externalModules.join(", "),
-            },
+            { modules: externalModules.join(", ") },
           ),
         );
       }
@@ -247,13 +227,9 @@ export class BuilderServer {
       if (!output.success) {
         const stderr = output.stderr
           ? new TextDecoder().decode(output.stderr)
-          : this.tr("log.esbuild.builder.unknownError", "未知错误");
+          : $tr("log.esbuild.builder.unknownError");
         throw new Error(
-          this.tr(
-            "log.esbuild.server.denoCompileFailed",
-            `Deno 编译失败: ${stderr}`,
-            { stderr },
-          ),
+          $tr("log.esbuild.server.denoCompileFailed", { stderr }),
         );
       }
     }
@@ -278,7 +254,7 @@ export class BuilderServer {
     const startTime = Date.now();
 
     this.debugLog(
-      this.tr("log.esbuild.server.debugBuildStartServer", "开始构建..."),
+      $tr("log.esbuild.server.debugBuildStartServer"),
     );
 
     // 解析选项
@@ -295,10 +271,7 @@ export class BuilderServer {
     if (write) {
       if (!this.config.output || this.config.output.trim() === "") {
         throw new Error(
-          this.tr(
-            "log.esbuild.builder.validateServerMissingOutput",
-            "服务端配置缺少输出目录 (output)",
-          ),
+          $tr("log.esbuild.builder.validateServerMissingOutput"),
         );
       }
       outputDir = await resolve(this.config.output);
@@ -322,11 +295,7 @@ export class BuilderServer {
           (err as { code: string }).code === "EEXIST"
         ) {
           this.debugLog(
-            this.tr(
-              "log.esbuild.server.debugRemoveOldFile",
-              "删除旧的同名文件: {path}",
-              { path: outputDir },
-            ),
+            $tr("log.esbuild.server.debugRemoveOldFile", { path: outputDir }),
           );
           await remove(outputDir);
           await mkdir(outputDir, { recursive: true });
@@ -347,17 +316,13 @@ export class BuilderServer {
     };
 
     this.debugLog(
-      this.tr("log.esbuild.server.debugEntryFile", "入口文件: {path}", {
-        path: entryPoint,
-      }),
+      $tr("log.esbuild.server.debugEntryFile", { path: entryPoint }),
     );
     this.debugLog(
-      this.tr("log.esbuild.server.debugOutputDir", "输出目录: {path}", {
-        path: outputDir,
-      }),
+      $tr("log.esbuild.server.debugOutputDir", { path: outputDir }),
     );
     this.debugLog(
-      this.tr("log.esbuild.server.debugWorkingDir", "工作目录: {path}", {
+      $tr("log.esbuild.server.debugWorkingDir", {
         path: dirname(entryPoint),
       }),
     );
@@ -370,7 +335,7 @@ export class BuilderServer {
     // 如果启用 externalNpm，添加插件将所有 npm 包标记为 external
     if (this.config.externalNpm) {
       this.debugLog(
-        this.tr("log.esbuild.server.debugExternalNpm", "启用 externalNpm"),
+        $tr("log.esbuild.server.debugExternalNpm"),
       );
       plugins.push({
         name: "external-npm",
@@ -387,15 +352,12 @@ export class BuilderServer {
     if (IS_BUN) {
       // 在 Bun 环境下自动启用解析器插件
       // 用于解析 package.json 的 imports 配置（如 @dreamer/logger/client）
-      plugins.push(bunResolverPlugin());
+      plugins.push(bunResolverPlugin({ debug, logger: log }));
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
       this.debugLog(
-        this.tr(
-          "log.esbuild.server.debugDenoResolver",
-          "使用 denoResolverPlugin (服务端构建模式)",
-        ),
+        $tr("log.esbuild.server.debugDenoResolver"),
       );
 
       // 服务端构建模式：npm:/jsr: 依赖直接标记为 external，让 Deno 在运行时解析
@@ -452,13 +414,10 @@ export class BuilderServer {
     }
 
     this.debugLog(
-      this.tr(
-        "log.esbuild.server.debugBuildStart",
-        "开始执行 esbuild.build()...",
-      ),
+      $tr("log.esbuild.server.debugBuildStart"),
     );
     this.debugLog(
-      this.tr("log.esbuild.server.debugExternal", "external: {value}", {
+      $tr("log.esbuild.server.debugExternal", {
         value: JSON.stringify(this.config.external),
       }),
     );
@@ -467,7 +426,7 @@ export class BuilderServer {
     const result = await esbuild.build(buildOptions);
 
     this.debugLog(
-      this.tr("log.esbuild.server.debugBuildComplete", "esbuild.build() 完成"),
+      $tr("log.esbuild.server.debugBuildComplete"),
     );
 
     const duration = Date.now() - startTime;
@@ -533,10 +492,7 @@ export class BuilderServer {
     if (write) {
       if (!this.config.output || this.config.output.trim() === "") {
         throw new Error(
-          this.tr(
-            "log.esbuild.builder.validateServerMissingOutput",
-            "服务端配置缺少输出目录 (output)",
-          ),
+          $tr("log.esbuild.builder.validateServerMissingOutput"),
         );
       }
       outputDir = await resolve(this.config.output);
@@ -638,30 +594,30 @@ export class BuilderServer {
       if (!output.success) {
         const stderrStr = output.stderr
           ? new TextDecoder().decode(output.stderr)
-          : this.tr("log.esbuild.builder.unknownError", "未知错误");
+          : $tr("log.esbuild.builder.unknownError");
         throw new Error(
-          this.tr(
-            "log.esbuild.server.bunBuildFailed",
-            `Bun 服务端编译失败: ${stderrStr}。入口文件: ${this.config.entry}`,
-            {
-              stderr: stderrStr,
-              entry: this.config.entry,
-            },
-          ),
+          $tr("log.esbuild.server.bunBuildFailed", {
+            stderr: stderrStr,
+            entry: this.config.entry,
+          }),
         );
       }
 
       const duration = Date.now() - startTime;
 
+      // 与 esbuild 路径一致：注入生产环境标志，使 @dreamer/dweb 在运行编译产物时识别为 prod（不启用 HMR / 不请求 hmr-browser.ts）
+      const DWEB_PROD_BANNER = "globalThis.__DWEB_PROD__ = true;\n";
+
       // 如果是内存模式，读取输出文件内容并返回
       if (!write && tempDir) {
         const codeBuffer = await readFile(actualOutfile);
-        const code = new TextDecoder().decode(codeBuffer);
+        let code = new TextDecoder().decode(codeBuffer);
+        code = DWEB_PROD_BANNER + code;
 
         const outputContents: OutputFileContent[] = [{
           path: outfile, // 使用原始输出路径
           text: code,
-          contents: codeBuffer,
+          contents: new TextEncoder().encode(code),
         }];
 
         return {
@@ -669,6 +625,12 @@ export class BuilderServer {
           outputContents,
           duration,
         };
+      }
+
+      // 写入模式：在输出文件头部注入 __DWEB_PROD__，保证 bun run dist/server.js 时以 prod 模式运行
+      if (write && existsSync(actualOutfile)) {
+        const code = await readTextFile(actualOutfile);
+        await writeTextFile(actualOutfile, DWEB_PROD_BANNER + code);
       }
 
       return {

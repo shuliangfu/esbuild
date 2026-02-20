@@ -8,7 +8,7 @@
 
 import { dirname, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import type * as esbuild from "esbuild";
-import { $tr, type Locale } from "./i18n.ts";
+import { $tr, type Locale, setEsbuildLocale } from "./i18n.ts";
 import type { OptimizationSuggestion } from "./types.ts";
 
 /**
@@ -76,25 +76,12 @@ export class BuildAnalyzer {
   }
 
   /**
-   * 获取翻译文本：使用包内 i18n ($t)，lang 来自构造函数，最后回退 fallback
-   */
-  private tr(
-    key: string,
-    fallback: string,
-    params?: Record<string, string | number | boolean>,
-  ): string {
-    const t = $tr(
-      key,
-      params as Record<string, string> | undefined,
-      this.lang,
-    );
-    return t !== key ? t : fallback;
-  }
-
-  /**
    * 分析构建产物
    */
   analyze(metafile: esbuild.Metafile): AnalysisResult {
+    if (this.lang !== undefined) {
+      setEsbuildLocale(this.lang);
+    }
     const files: FileInfo[] = [];
     const dependencies: DependencyGraph = {};
     let totalSize = 0;
@@ -228,20 +215,18 @@ export class BuildAnalyzer {
     const lines: string[] = [];
 
     lines.push(
-      `=== ${
-        this.tr("log.esbuild.analyzer.reportTitle", "构建产物分析报告")
-      } ===\n`,
+      `=== ${$tr("log.esbuild.analyzer.reportTitle")} ===\n`,
     );
 
     // 总文件大小
     lines.push(
-      `${this.tr("log.esbuild.analyzer.totalSize", "总文件大小")}: ${
+      `${$tr("log.esbuild.analyzer.totalSize")}: ${
         this.formatSize(result.totalSize)
       }\n`,
     );
 
     // 文件列表
-    lines.push(this.tr("log.esbuild.analyzer.fileList", "文件列表") + ":");
+    lines.push($tr("log.esbuild.analyzer.fileList") + ":");
     for (const file of result.files.sort((a, b) => b.size - a.size)) {
       lines.push(
         `  ${file.path}: ${this.formatSize(file.size)} (${file.type})`,
@@ -251,16 +236,12 @@ export class BuildAnalyzer {
     // 重复代码
     if (result.duplicates.length > 0) {
       lines.push(
-        `\n${this.tr("log.esbuild.analyzer.duplicates", "重复代码检测")}:`,
+        `\n${$tr("log.esbuild.analyzer.duplicates")}:`,
       );
       for (const dup of result.duplicates) {
         lines.push(
           `  ${dup.code} ${
-            this.tr(
-              "log.esbuild.analyzer.dupInFiles",
-              `出现在 ${dup.count} 个文件中`,
-              { count: String(dup.count) },
-            )
+            $tr("log.esbuild.analyzer.dupInFiles", { count: String(dup.count) })
           }: ${dup.files.join(", ")}`,
         );
       }
@@ -269,7 +250,7 @@ export class BuildAnalyzer {
     // 未使用的代码
     if (result.unused.length > 0) {
       lines.push(
-        `\n${this.tr("log.esbuild.analyzer.unused", "未使用的代码")}:`,
+        `\n${$tr("log.esbuild.analyzer.unused")}:`,
       );
       for (const unused of result.unused) {
         lines.push(`  ${unused}`);
@@ -311,19 +292,11 @@ export class BuildAnalyzer {
     if (largeFiles.length > 0) {
       suggestions.push({
         type: "warning",
-        title: this.tr(
-          "log.esbuild.analyzer.largeFilesTitle",
-          "检测到过大的文件",
-        ),
-        description: this.tr(
-          "log.esbuild.analyzer.largeFilesDesc",
-          "有 {count} 个文件超过 5MB，可能影响加载性能",
-          { count: String(largeFiles.length) },
-        ),
-        fix: this.tr(
-          "log.esbuild.analyzer.largeFilesFix",
-          "考虑进行代码分割，将大文件拆分为多个较小的 chunk",
-        ),
+        title: $tr("log.esbuild.analyzer.largeFilesTitle"),
+        description: $tr("log.esbuild.analyzer.largeFilesDesc", {
+          count: String(largeFiles.length),
+        }),
+        fix: $tr("log.esbuild.analyzer.largeFilesFix"),
         files: largeFiles.map((f) => f.path),
       });
     }
@@ -336,19 +309,12 @@ export class BuildAnalyzer {
       );
       suggestions.push({
         type: "info",
-        title: this.tr("log.esbuild.analyzer.dupCodeTitle", "检测到重复代码"),
-        description: this.tr(
-          "log.esbuild.analyzer.dupCodeDesc",
-          "发现 {places} 处重复代码，共重复 {count} 次",
-          {
-            places: String(analysis.duplicates.length),
-            count: String(duplicateCount),
-          },
-        ),
-        fix: this.tr(
-          "log.esbuild.analyzer.dupCodeFix",
-          "考虑提取公共代码到共享模块，减少重复打包",
-        ),
+        title: $tr("log.esbuild.analyzer.dupCodeTitle"),
+        description: $tr("log.esbuild.analyzer.dupCodeDesc", {
+          places: String(analysis.duplicates.length),
+          count: String(duplicateCount),
+        }),
+        fix: $tr("log.esbuild.analyzer.dupCodeFix"),
         files: analysis.duplicates.flatMap((dup) => dup.files),
       });
     }
@@ -357,19 +323,11 @@ export class BuildAnalyzer {
     if (analysis.unused.length > 0) {
       suggestions.push({
         type: "info",
-        title: this.tr(
-          "log.esbuild.analyzer.unusedTitle",
-          "检测到未使用的代码",
-        ),
-        description: this.tr(
-          "log.esbuild.analyzer.unusedDesc",
-          "发现 {count} 个文件未被使用",
-          { count: String(analysis.unused.length) },
-        ),
-        fix: this.tr(
-          "log.esbuild.analyzer.unusedFix",
-          "考虑移除未使用的文件，减少构建产物大小",
-        ),
+        title: $tr("log.esbuild.analyzer.unusedTitle"),
+        description: $tr("log.esbuild.analyzer.unusedDesc", {
+          count: String(analysis.unused.length),
+        }),
+        fix: $tr("log.esbuild.analyzer.unusedFix"),
         files: analysis.unused,
       });
     }
@@ -381,22 +339,12 @@ export class BuildAnalyzer {
       if (buildTime > totalTime * 0.7) {
         suggestions.push({
           type: "warning",
-          title: this.tr(
-            "log.esbuild.analyzer.buildSlowTitle",
-            "构建阶段耗时过长",
-          ),
-          description: this.tr(
-            "log.esbuild.analyzer.buildSlowDesc",
-            "构建阶段耗时 {time}s，占总时间的 {pct}%",
-            {
-              time: (buildTime / 1000).toFixed(2),
-              pct: ((buildTime / totalTime) * 100).toFixed(1),
-            },
-          ),
-          fix: this.tr(
-            "log.esbuild.analyzer.buildSlowFix",
-            "考虑启用缓存、优化依赖或使用增量构建",
-          ),
+          title: $tr("log.esbuild.analyzer.buildSlowTitle"),
+          description: $tr("log.esbuild.analyzer.buildSlowDesc", {
+            time: (buildTime / 1000).toFixed(2),
+            pct: ((buildTime / totalTime) * 100).toFixed(1),
+          }),
+          fix: $tr("log.esbuild.analyzer.buildSlowFix"),
         });
       }
 
@@ -404,16 +352,11 @@ export class BuildAnalyzer {
       if (totalTime > 10000) {
         suggestions.push({
           type: "warning",
-          title: this.tr("log.esbuild.analyzer.totalSlowTitle", "构建耗时较长"),
-          description: this.tr(
-            "log.esbuild.analyzer.totalSlowDesc",
-            "总构建时间 {time}s，超过 10 秒",
-            { time: (totalTime / 1000).toFixed(2) },
-          ),
-          fix: this.tr(
-            "log.esbuild.analyzer.totalSlowFix",
-            "检查是否启用了缓存，考虑并行构建或优化构建配置",
-          ),
+          title: $tr("log.esbuild.analyzer.totalSlowTitle"),
+          description: $tr("log.esbuild.analyzer.totalSlowDesc", {
+            time: (totalTime / 1000).toFixed(2),
+          }),
+          fix: $tr("log.esbuild.analyzer.totalSlowFix"),
         });
       }
     }
@@ -422,19 +365,11 @@ export class BuildAnalyzer {
     if (analysis.files.length > 50) {
       suggestions.push({
         type: "info",
-        title: this.tr(
-          "log.esbuild.analyzer.manyFilesTitle",
-          "输出文件数量较多",
-        ),
-        description: this.tr(
-          "log.esbuild.analyzer.manyFilesDesc",
-          "构建产物包含 {count} 个文件，可能影响加载性能",
-          { count: String(analysis.files.length) },
-        ),
-        fix: this.tr(
-          "log.esbuild.analyzer.manyFilesFix",
-          "考虑合并小文件或调整代码分割策略",
-        ),
+        title: $tr("log.esbuild.analyzer.manyFilesTitle"),
+        description: $tr("log.esbuild.analyzer.manyFilesDesc", {
+          count: String(analysis.files.length),
+        }),
+        fix: $tr("log.esbuild.analyzer.manyFilesFix"),
       });
     }
 
@@ -443,19 +378,11 @@ export class BuildAnalyzer {
     if (totalSizeMB > 10) {
       suggestions.push({
         type: "warning",
-        title: this.tr(
-          "log.esbuild.analyzer.totalSizeTitle",
-          "构建产物总大小较大",
-        ),
-        description: this.tr(
-          "log.esbuild.analyzer.totalSizeDesc",
-          "总大小 {size}MB，可能影响加载性能",
-          { size: totalSizeMB.toFixed(2) },
-        ),
-        fix: this.tr(
-          "log.esbuild.analyzer.totalSizeFix",
-          "考虑启用压缩、代码分割或移除未使用的代码",
-        ),
+        title: $tr("log.esbuild.analyzer.totalSizeTitle"),
+        description: $tr("log.esbuild.analyzer.totalSizeDesc", {
+          size: totalSizeMB.toFixed(2),
+        }),
+        fix: $tr("log.esbuild.analyzer.totalSizeFix"),
       });
     }
 
@@ -561,9 +488,7 @@ export class BuildAnalyzer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${
-      this.tr("log.esbuild.analyzer.reportPageTitle", "构建分析报告")
-    }</title>
+  <title>${$tr("log.esbuild.analyzer.reportPageTitle")}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -713,10 +638,8 @@ export class BuildAnalyzer {
 <body>
   <div class="container">
     <header>
-      <h1>📊 ${
-      this.tr("log.esbuild.analyzer.reportPageTitle", "构建分析报告")
-    }</h1>
-      <p>${this.tr("log.esbuild.analyzer.reportGeneratedAt", "生成时间")}: ${
+      <h1>📊 ${$tr("log.esbuild.analyzer.reportPageTitle")}</h1>
+      <p>${$tr("log.esbuild.analyzer.reportGeneratedAt")}: ${
       new Date().toLocaleString(this.lang === "zh-CN" ? "zh-CN" : "en-US")
     }</p>
     </header>
@@ -724,26 +647,24 @@ export class BuildAnalyzer {
     <div class="stats">
       <div class="stat-card">
         <div class="stat-value">${totalSizeMB} MB</div>
-        <div class="stat-label">${
-      this.tr("log.esbuild.analyzer.totalSize", "总文件大小")
-    }</div>
+        <div class="stat-label">${$tr("log.esbuild.analyzer.totalSize")}</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${result.files.length}</div>
         <div class="stat-label">${
-      this.tr("log.esbuild.analyzer.statFileCount", "文件数量")
+      $tr("log.esbuild.analyzer.statFileCount")
     }</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${buildTime}s</div>
         <div class="stat-label">${
-      this.tr("log.esbuild.analyzer.statBuildTime", "构建时间")
+      $tr("log.esbuild.analyzer.statBuildTime")
     }</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${result.duplicates.length}</div>
         <div class="stat-label">${
-      this.tr("log.esbuild.analyzer.statDuplicates", "重复代码")
+      $tr("log.esbuild.analyzer.statDuplicates")
     }</div>
       </div>
     </div>
@@ -752,9 +673,7 @@ export class BuildAnalyzer {
       performance
         ? `
     <div class="section">
-      <h2>⏱️ ${
-          this.tr("log.esbuild.analyzer.sectionBuildPerf", "构建性能")
-        }</h2>
+      <h2>⏱️ ${$tr("log.esbuild.analyzer.sectionBuildPerf")}</h2>
       <div class="performance-stages">
         ${
           Object.entries(performance.stages).map(([stage, time]) => `
@@ -771,7 +690,7 @@ export class BuildAnalyzer {
     }
 
     <div class="section">
-      <h2>📁 ${this.tr("log.esbuild.analyzer.sectionFileList", "文件列表")}</h2>
+      <h2>📁 ${$tr("log.esbuild.analyzer.sectionFileList")}</h2>
       <div class="file-list">
         ${
       result.files.sort((a, b) => b.size - a.size).map((file) => `
@@ -786,9 +705,7 @@ export class BuildAnalyzer {
     </div>
 
     <div class="section">
-      <h2>🔗 ${
-      this.tr("log.esbuild.analyzer.sectionDependencyGraph", "依赖关系图")
-    }</h2>
+      <h2>🔗 ${$tr("log.esbuild.analyzer.sectionDependencyGraph")}</h2>
       <div id="dependency-graph"></div>
     </div>
 
@@ -796,9 +713,7 @@ export class BuildAnalyzer {
       suggestions.length > 0
         ? `
     <div class="section">
-      <h2>💡 ${
-          this.tr("log.esbuild.analyzer.sectionSuggestions", "优化建议")
-        }</h2>
+      <h2>💡 ${$tr("log.esbuild.analyzer.sectionSuggestions")}</h2>
       ${
           suggestions.map((suggestion) => `
         <div class="suggestion ${suggestion.type}">
@@ -809,7 +724,7 @@ export class BuildAnalyzer {
           ${
             suggestion.fix
               ? `<div class="suggestion-fix">${
-                this.tr("log.esbuild.analyzer.suggestionFixLabel", "修复建议:")
+                $tr("log.esbuild.analyzer.suggestionFixLabel")
               } ${this.escapeHtml(suggestion.fix)}</div>`
               : ""
           }
@@ -825,20 +740,16 @@ export class BuildAnalyzer {
       result.duplicates.length > 0
         ? `
     <div class="section">
-      <h2>🔄 ${
-          this.tr("log.esbuild.analyzer.sectionDuplicates", "重复代码检测")
-        }</h2>
+      <h2>🔄 ${$tr("log.esbuild.analyzer.sectionDuplicates")}</h2>
       <div class="file-list">
         ${
           result.duplicates.map((dup) => `
           <div class="file-item">
             <span class="file-name">${this.escapeHtml(dup.code)}</span>
             <span class="file-size">${
-            this.tr(
-              "log.esbuild.analyzer.dupInFiles",
-              "出现在 {count} 个文件中",
-              { count: dup.count },
-            )
+            $tr("log.esbuild.analyzer.dupInFiles", {
+              count: String(dup.count),
+            })
           }</span>
           </div>
         `).join("")
@@ -853,9 +764,7 @@ export class BuildAnalyzer {
       result.unused.length > 0
         ? `
     <div class="section">
-      <h2>🗑️ ${
-          this.tr("log.esbuild.analyzer.sectionUnused", "未使用的代码")
-        }</h2>
+      <h2>🗑️ ${$tr("log.esbuild.analyzer.sectionUnused")}</h2>
       <div class="file-list">
         ${
           result.unused.map((file) => `
@@ -926,15 +835,12 @@ export class BuildAnalyzer {
    */
   private getStageName(stage: string): string {
     const stageMap: Record<string, string> = {
-      clean: this.tr("log.esbuild.builder.stageNameClean", "清理"),
-      cacheCheck: this.tr(
-        "log.esbuild.builder.stageNameCacheCheck",
-        "缓存检查",
-      ),
-      build: this.tr("log.esbuild.builder.stageNameBuild", "构建"),
-      assets: this.tr("log.esbuild.builder.stageNameAssets", "资源处理"),
-      html: this.tr("log.esbuild.builder.stageNameHtml", "HTML 生成"),
-      css: this.tr("log.esbuild.builder.stageNameCss", "CSS 优化"),
+      clean: $tr("log.esbuild.builder.stageNameClean"),
+      cacheCheck: $tr("log.esbuild.builder.stageNameCacheCheck"),
+      build: $tr("log.esbuild.builder.stageNameBuild"),
+      assets: $tr("log.esbuild.builder.stageNameAssets"),
+      html: $tr("log.esbuild.builder.stageNameHtml"),
+      css: $tr("log.esbuild.builder.stageNameCss"),
     };
     return stageMap[stage] || stage;
   }
