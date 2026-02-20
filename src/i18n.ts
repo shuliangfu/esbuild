@@ -70,6 +70,19 @@ function initEsbuildI18n(): void {
 initEsbuildI18n();
 
 /**
+ * 设置 esbuild 包内 i18n 的当前语言。
+ * 在 Builder 入口（如 build 开始前）调用一次，后续所有 $tr 将使用该语言，无需每次传 lang。
+ *
+ * @param lang - 语言，不传则使用环境变量检测结果（detectLocale）
+ */
+export function setEsbuildLocale(lang?: Locale): void {
+  if (!esbuildI18n) initEsbuildI18n();
+  if (esbuildI18n) {
+    esbuildI18n.setLocale(lang ?? detectLocale());
+  }
+}
+
+/**
  * Translate by key. Uses module instance; when lang is not passed, uses current locale.
  * When init not called, returns key.
  */

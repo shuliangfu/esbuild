@@ -25,7 +25,7 @@ import type {
   OutputFileContent,
   SplittingStrategy,
 } from "./types.ts";
-import { $tr } from "./i18n.ts";
+import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -85,22 +85,6 @@ export class BuilderClient {
   }
 
   /**
-   * 获取翻译文本：使用包内 i18n ($t)，lang 来自 config.lang，最后回退 fallback
-   */
-  private tr(
-    key: string,
-    fallback: string,
-    params?: Record<string, string | number | boolean>,
-  ): string {
-    const t = $tr(
-      key,
-      params as Record<string, string> | undefined,
-      this.config.lang,
-    );
-    return t !== key ? t : fallback;
-  }
-
-  /**
    * 构建客户端代码
    *
    * @param options - 构建选项，可以是 BuildMode 字符串或 ClientBuildOptions 对象
@@ -121,6 +105,11 @@ export class BuilderClient {
   ): Promise<BuildResult> {
     const startTime = Date.now();
 
+    // 设置包内 i18n 语言，后续 $tr 不再传 lang
+    if (this.config.lang !== undefined) {
+      setEsbuildLocale(this.config.lang);
+    }
+
     // 解析选项
     const mode: BuildMode = typeof options === "string"
       ? options
@@ -132,12 +121,7 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error(
-        this.tr(
-          "log.esbuild.clientMissingEntry",
-          "客户端配置缺少入口文件 (entry)",
-        ),
-      );
+      throw new Error($tr("log.esbuild.builder.clientMissingEntry"));
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -158,12 +142,7 @@ export class BuilderClient {
     // 写入文件或代码分割时都需要 output（代码分割时 outdir 用于路径解析，write: false 时不写盘）
     if (write || splittingEnabled) {
       if (!this.config.output || this.config.output.trim() === "") {
-        throw new Error(
-          this.tr(
-            "log.esbuild.clientMissingOutput",
-            "客户端配置缺少输出目录 (output)",
-          ),
-        );
+        throw new Error($tr("log.esbuild.builder.clientMissingOutput"));
       }
       if (write) {
         await mkdir(this.config.output, { recursive: true });
@@ -267,7 +246,12 @@ export class BuilderClient {
 
     if (IS_BUN) {
       // Bun 环境：使用 bunResolverPlugin 解析 tsconfig 和 package.json
-      plugins.unshift(bunResolverPlugin());
+      plugins.unshift(
+        bunResolverPlugin({
+          debug: this.config.debug,
+          logger: log,
+        }),
+      );
     } else {
       // Deno 环境：构建模块缓存 + denoResolverPlugin
       const moduleCache = await buildModuleCache(
@@ -339,14 +323,10 @@ export class BuilderClient {
     mode: BuildMode = "dev",
     options?: { write?: boolean },
   ): Promise<esbuild.BuildContext> {
+    if (this.config.lang !== undefined) setEsbuildLocale(this.config.lang);
     // 验证输出目录配置
     if (!this.config.output || this.config.output.trim() === "") {
-      throw new Error(
-        this.tr(
-          "log.esbuild.clientMissingOutput",
-          "客户端配置缺少输出目录 (output)",
-        ),
-      );
+      throw new Error($tr("log.esbuild.builder.clientMissingOutput"));
     }
 
     // 确保输出目录存在
@@ -354,12 +334,7 @@ export class BuilderClient {
 
     // 解析入口文件路径（支持单入口）
     if (!this.config.entry) {
-      throw new Error(
-        this.tr(
-          "log.esbuild.clientMissingEntry",
-          "客户端配置缺少入口文件 (entry)",
-        ),
-      );
+      throw new Error($tr("log.esbuild.builder.clientMissingEntry"));
     }
     const entryPoint = await resolve(this.config.entry);
 
@@ -447,7 +422,12 @@ export class BuilderClient {
     );
 
     if (IS_BUN) {
-      plugins.unshift(bunResolverPlugin());
+      plugins.unshift(
+        bunResolverPlugin({
+          debug: this.config.debug,
+          logger: log,
+        }),
+      );
     } else {
       const moduleCache = await buildModuleCache(
         entryPoint,
@@ -482,12 +462,7 @@ export class BuilderClient {
    */
   async rebuild(): Promise<BuildResult> {
     if (!this.buildContext) {
-      throw new Error(
-        this.tr(
-          "log.esbuild.builder.contextNotCreated",
-          "构建上下文未创建，请先调用 createContext()",
-        ),
-      );
+      throw new Error($tr("log.esbuild.builder.contextNotCreated"));
     }
 
     const startTime = Date.now();

@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.0.31] - 2026-02-20
+
+### Fixed
+
+- **Server (Bun)**: When building the server with Bun (`buildWithBun`), the
+  output `server.js` now has `globalThis.__DWEB_PROD__ = true;` injected at the
+  top so that @dreamer/dweb runs in production mode when executing the built
+  file (no HMR, no request for `hmr-browser.ts`). Aligns with the esbuild
+  builder path and fixes "ENOENT: hmr-browser.ts" when running `bun run start`
+  after a Bun server build.
+
+---
+
 ## [1.0.30] - 2026-02-19
 
 ### Changed

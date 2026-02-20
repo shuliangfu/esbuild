@@ -24,6 +24,14 @@ import {
   readTextFileSync,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
+import type { BuildLogger } from "../types.ts";
+
+const PREFIX = "[resolver-bun]";
+
+const NOOP_LOGGER: BuildLogger = {
+  debug: () => {},
+  info: () => {},
+};
 
 /**
  * 解析器选项
@@ -33,6 +41,10 @@ export interface ResolverOptions {
   enabled?: boolean;
   /** 浏览器模式：将 jsr: 和 npm: 依赖转换为 CDN URL（如 esm.sh） */
   browserMode?: boolean;
+  /** 是否输出 debug 日志（默认：false） */
+  debug?: boolean;
+  /** 构建日志器，debug 时通过 logger.debug 输出 */
+  logger?: BuildLogger;
 }
 
 /**
@@ -385,7 +397,17 @@ async function resolveBunProtocolPath(
 export function bunResolverPlugin(
   options: ResolverOptions = {},
 ): esbuild.Plugin {
-  const { enabled = true, browserMode = false } = options;
+  const {
+    enabled = true,
+    browserMode = false,
+    debug = false,
+    logger: optionsLogger,
+  } = options;
+
+  const log = optionsLogger ?? NOOP_LOGGER;
+  const debugLog = (msg: string) => {
+    if (debug) log.debug(`${PREFIX} ${msg}`);
+  };
 
   return {
     name: "bun-resolver",
@@ -393,6 +415,8 @@ export function bunResolverPlugin(
       if (!enabled) {
         return;
       }
+      // 插件加载时打一条 debug，便于确认 debug 与 logger 已正确传入（Bun 下很多解析走默认，可能不会命中后续 onResolve）
+      debugLog("plugin loaded (debug enabled)");
 
       // 1. 处理路径别名（通过 package.json imports 或 tsconfig.json paths 配置）
       // 例如：import { x } from "@/utils.ts"
@@ -409,6 +433,7 @@ export function bunResolverPlugin(
 
           const resolvedPath = resolvePathAlias(path, startDir);
           if (resolvedPath) {
+            debugLog(`路径别名: ${path} -> ${resolvedPath}`);
             return {
               path: resolvedPath,
               namespace: "file",
@@ -432,8 +457,7 @@ export function bunResolverPlugin(
           if (browserMode) {
             const browserUrl = convertSpecifierToBrowserUrl(path);
             if (browserUrl) {
-              // 返回 external，让 esbuild 不打包这个依赖
-              // 浏览器会在运行时从 CDN 加载
+              debugLog(`npm 浏览器 external: ${path} -> ${browserUrl}`);
               return {
                 path: browserUrl,
                 external: true,
@@ -441,7 +465,11 @@ export function bunResolverPlugin(
             }
           }
 
-          return await resolveBunProtocolPath(path);
+          const result = await resolveBunProtocolPath(path);
+          if (result?.path) {
+            debugLog(`npm 协议解析: ${path} -> ${result.path}`);
+          }
+          return result;
         },
       );
 
@@ -451,6 +479,7 @@ export function bunResolverPlugin(
       build.onResolve(
         { filter: /^jsr:/ },
         (args): esbuild.OnResolveResult | undefined => {
+          debugLog(`jsr 协议跳过（Bun 不支持）: ${args.path}`);
           // Bun 不支持直接使用 jsr: 协议
           // 建议用户通过 package.json imports 映射来使用 JSR 包
           // 然后代码中使用：import { x } from "@dreamer/logger/client"
@@ -511,6 +540,7 @@ export function bunResolverPlugin(
                 }
 
                 if (filePath && existsSync(filePath)) {
+                  debugLog(`bare 子路径(缓存): ${path} -> ${filePath}`);
                   return {
                     path: filePath,
                     namespace: "file",
@@ -536,8 +566,7 @@ export function bunResolverPlugin(
           if (browserMode) {
             const browserUrl = convertSpecifierToBrowserUrl(fullProtocolPath);
             if (browserUrl) {
-              // 返回 external，让 esbuild 不打包这个依赖
-              // 浏览器会在运行时从 CDN 加载
+              debugLog(`子路径浏览器 external: ${path} -> ${browserUrl}`);
               return {
                 path: browserUrl,
                 external: true,
@@ -557,7 +586,13 @@ export function bunResolverPlugin(
           }
 
           // 使用统一的协议路径解析函数（仅支持 npm: 协议）
-          return await resolveBunProtocolPath(fullProtocolPath);
+          const result = await resolveBunProtocolPath(fullProtocolPath);
+          if (result?.path) {
+            debugLog(
+              `bare 子路径: ${path} -> ${fullProtocolPath} -> ${result.path}`,
+            );
+          }
+          return result;
         },
       );
 
@@ -606,6 +641,9 @@ export function bunResolverPlugin(
                 const resolvedPath = join(importerDir, args.path);
 
                 if (existsSync(resolvedPath)) {
+                  debugLog(
+                    `bun-protocol 相对路径: ${importer} + ${args.path} -> ${resolvedPath}`,
+                  );
                   return {
                     path: resolvedPath,
                     namespace: "file",
@@ -653,6 +691,9 @@ export function bunResolverPlugin(
                   }
 
                   if (existsSync(resolvedProtocolPath)) {
+                    debugLog(
+                      `bun-protocol 协议相对: ${importer} + ${args.path} -> ${resolvedProtocolPath}`,
+                    );
                     return {
                       path: resolvedProtocolPath,
                       namespace: "file",
@@ -683,6 +724,7 @@ export function bunResolverPlugin(
         { filter: /.*/, namespace: "bun-protocol" },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = args.path;
+          debugLog(`onLoad bun-protocol: ${protocolPath}`);
 
           // 如果协议路径是 jsr:，Bun 不支持，返回 undefined
           if (protocolPath.startsWith("jsr:")) {
@@ -744,7 +786,9 @@ export function bunResolverPlugin(
               if (existsSync(filePath)) {
                 const contents = await readTextFile(filePath);
                 const loader = getLoaderFromPath(filePath);
-
+                debugLog(
+                  `onLoad 从文件读取: ${protocolPath} -> ${filePath} (${contents.length} chars)`,
+                );
                 return {
                   contents,
                   loader,
@@ -775,6 +819,17 @@ export function bunResolverPlugin(
           }
         },
       );
+
+      // 6. debug 时对每次解析请求打日志（透传、不处理），便于与 Deno 的编译日志对齐
+      if (debug) {
+        build.onResolve(
+          { filter: /.*/ },
+          (args): undefined => {
+            debugLog(`resolving: ${args.path}`);
+            return undefined;
+          },
+        );
+      }
     },
   };
 }

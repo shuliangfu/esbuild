@@ -17,13 +17,11 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.30] - 2026-02-19
+### [1.0.31] - 2026-02-20
 
-- **Changed**: i18n auto-initializes on module load; `initEsbuildI18n` no longer
-  exported; entry points no longer call it. Dependencies bumped:
-  @dreamer/console ^1.0.12, @dreamer/runtime-adapter ^1.0.15, @dreamer/image
-  ^1.0.2, @dreamer/test ^1.0.10. Full history:
-  [Changelog](./docs/en-US/CHANGELOG.md)
+- **Fixed**: Bun server build now injects `globalThis.__DWEB_PROD__ = true;`
+  into output `server.js` so that @dreamer/dweb runs in production mode (no HMR
+  / no hmr-browser.ts). Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
 
@@ -1097,13 +1095,10 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.28** (2026-02-18)
+**v1.0.31** (2026-02-20)
 
-- **Changed**: Replaced config `t` with `lang?: "en-US" | "zh-CN"` for i18n;
-  documented lang and Internationalization section; removed
-  `docs/en-US/README.md`.
-- **Added**: Completed i18n locale keys and replaced hardcoded strings in
-  build-analyzer HTML and builder-server debug logs.
+- **Fixed**: Bun server build injects `__DWEB_PROD__` banner so that running
+  `dist/server.js` uses production mode (no HMR, no hmr-browser.ts).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
