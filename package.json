@@ -32,7 +32,7 @@
     "postcss": "npm:postcss@8.4.39"
   },
   "devDependencies": {
-    "@dreamer/test": "npm:@jsr/dreamer__test@^1.0.13"
+    "@dreamer/test": "npm:@jsr/dreamer__test@^1.0.14"
   },
   "engines": {
     "bun": ">=1.3"

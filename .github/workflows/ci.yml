@@ -150,9 +150,6 @@ jobs:
       - name: Install dependencies (Bun)
         run: bun install
 
-      - name: Install ImageMagick (for asset processor tests)
-        run: choco install imagemagick -y
-
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.5
