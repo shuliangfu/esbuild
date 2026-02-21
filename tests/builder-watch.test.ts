@@ -3,7 +3,7 @@
  */
 
 import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
-import { assertRejects, describe, expect, it } from "@dreamer/test";
+import { assertRejects, beforeAll, describe, expect, it } from "@dreamer/test";
 import { Builder } from "../src/builder.ts";
 import type { BuilderConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
@@ -13,22 +13,20 @@ describe("Builder Watch 模式", () => {
   let outputDir: string;
   let testDataDir: string;
 
-  // 测试前创建测试目录和测试文件
-  it("应该创建测试目录和测试文件", async () => {
+  // 在任意 Watch 测试前初始化目录和文件，避免 Bun 并行时 testDataDir 未赋值导致 join(undefined) 报错
+  beforeAll(async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("builder-watch");
     entryFile = join(testDataDir, "src", "watch-test.ts");
 
-    // 确保目录存在
     await mkdir(join(testDataDir, "src"), { recursive: true });
+    await writeTextFile(entryFile, `console.log('Watch Test');`);
+  });
 
-    // 创建入口文件
-    await writeTextFile(
-      entryFile,
-      `console.log('Watch Test');`,
-    );
-
+  it("应该创建测试目录和测试文件", () => {
     expect(testDataDir).toBeTruthy();
+    expect(outputDir).toBeTruthy();
+    expect(entryFile).toBeTruthy();
   });
 
   describe("Watch 模式", () => {
