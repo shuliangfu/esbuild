@@ -84,6 +84,9 @@ jobs:
       - name: Install dependencies (Bun)
         run: bun install
 
+      - name: Install ImageMagick (for asset processor tests)
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.5
@@ -112,6 +115,10 @@ jobs:
 
       - name: Install dependencies (Bun)
         run: bun install
+
+      # 测试中资源处理（图片压缩/hash）会用到 ImageMagick；若未安装会触发 brew 自动安装并易在 CI 中 SIGTERM，故在此预先安装
+      - name: Install ImageMagick (for asset processor tests)
+        run: brew install imagemagick
 
       - uses: denoland/setup-deno@v2
         with:
@@ -142,6 +149,9 @@ jobs:
 
       - name: Install dependencies (Bun)
         run: bun install
+
+      - name: Install ImageMagick (for asset processor tests)
+        run: choco install imagemagick -y
 
       - uses: denoland/setup-deno@v2
         with:

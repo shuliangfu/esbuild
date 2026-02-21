@@ -2,7 +2,7 @@
  * @fileoverview AssetsProcessor 高级功能测试
  */
 
-import { describe, expect, it } from "@dreamer/test";
+import { beforeAll, describe, expect, it } from "@dreamer/test";
 import {
   join,
   mkdir,
@@ -23,15 +23,20 @@ describe("AssetsProcessor 高级功能", () => {
   let publicDir: string;
   let testDataDir: string;
 
-  // 测试前创建测试目录（Windows CI 上 tests/data 可能不存在，需显式创建）
-  it("应该创建测试目录", async () => {
+  // 在任意用例前初始化目录，避免 Bun 并行时 publicDir/outputDir 未赋值导致 join(undefined)（Windows CI）
+  beforeAll(async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("assets-processor-advanced");
     publicDir = join(testDataDir, "public");
     await mkdir(testDataDir, { recursive: true });
     await mkdir(outputDir, { recursive: true });
     await mkdir(publicDir, { recursive: true });
+  });
+
+  it("应该创建测试目录", () => {
     expect(testDataDir).toBeTruthy();
+    expect(outputDir).toBeTruthy();
+    expect(publicDir).toBeTruthy();
   });
 
   describe("图片处理", () => {
