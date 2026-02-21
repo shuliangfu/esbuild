@@ -3,7 +3,7 @@
  */
 
 import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
-import { describe, expect, it } from "@dreamer/test";
+import { beforeAll, describe, expect, it } from "@dreamer/test";
 import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
@@ -13,22 +13,20 @@ describe("BuilderClient 高级功能", () => {
   let outputDir: string;
   let testDataDir: string;
 
-  // 测试前创建测试目录和测试文件
-  it("应该创建测试目录和测试文件", async () => {
+  // 在任意用例前初始化目录和文件，避免 Bun 并行时 entryFile/outputDir 未赋值
+  beforeAll(async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("client-builder-advanced");
     entryFile = join(testDataDir, "src", "index.ts");
 
-    // 确保目录存在
     await mkdir(join(testDataDir, "src"), { recursive: true });
+    await writeTextFile(entryFile, `console.log('Advanced Test');`);
+  });
 
-    // 创建入口文件
-    await writeTextFile(
-      entryFile,
-      `console.log('Advanced Test');`,
-    );
-
+  it("应该创建测试目录和测试文件", () => {
     expect(testDataDir).toBeTruthy();
+    expect(outputDir).toBeTruthy();
+    expect(entryFile).toBeTruthy();
   });
 
   describe("代码分割策略", () => {
