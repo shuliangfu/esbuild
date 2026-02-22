@@ -7,6 +7,17 @@
 
 ---
 
+## [1.0.33] - 2026-02-22
+
+### 新增
+
+- **服务端（Bun）**：当 `config.debug` 为 true 时，`buildWithBun` 输出 debug
+  日志：服务端构建开始、入口文件、输出目录、工作目录、external
+  列表、构建开始/完成（与 `buildWithEsbuild` 使用相同 i18n key），使
+  `bun run build` 在开启 debug 时与 Deno 下日志风格一致。
+
+---
+
 ## [1.0.32] - 2026-02-22
 
 ### 变更

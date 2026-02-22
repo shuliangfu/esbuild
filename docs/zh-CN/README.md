@@ -1059,9 +1059,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.32**（2026-02-22）
+**v1.0.33**（2026-02-22）
 
-- **变更**：Chore: JSR 发布 1.0.32。
+- **新增**：服务端（Bun）在 `config.debug` 为 true 时，`buildWithBun` 输出 debug
+  日志。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
