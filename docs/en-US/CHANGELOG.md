@@ -8,6 +8,33 @@ and this project adheres to
 
 ---
 
+## [1.0.35] - 2026-02-23
+
+### Fixed
+
+- **Resolver (Bun)**: Subpath protocol paths (e.g. `npm:@jsr/pkg@v/client`) no
+  longer use `import.meta.resolve`; they are forced to `bun-protocol` so onLoad
+  resolves via `package.json` exports. Avoids wrong main entry and larger
+  bundles.
+- **Resolver (Bun)**: Module key now uses only `protocolPath` (no importer
+  prefix), so the same logical module is not duplicated across chunks; reduces
+  bundle size.
+- **Resolver (Bun)**: Relative imports inside bun-protocol modules (e.g.
+  `./client.js`, `../types.js`) now resolve via
+  `getProtocolPathResolveDir(importer)`, fixing "No matching export for Client"
+  and "has no exports" when using `@dreamer/websocket/client` and similar
+  packages.
+
+### Added
+
+- **Resolver (Bun)**: `getProtocolPathResolveDir()` helper to resolve a protocol
+  path to its package directory (node_modules + exports). Used for bun-protocol
+  relative path resolution.
+- **Resolver (Bun)**: `hasProtocolSubpath()` to detect subpath protocol paths;
+  `resolve` from `@dreamer/runtime-adapter` for path normalization.
+
+---
+
 ## [1.0.34] - 2026-02-23
 
 ### Fixed

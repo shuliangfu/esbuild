@@ -17,15 +17,14 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.34] - 2026-02-23
+### [1.0.35] - 2026-02-23
 
-- **Fixed**: Bun resolver subpath resolution in workspaces (e.g.
-  `@dreamer/router/client`); normalize bare version to `npm:@jsr/...` for any
-  scope; stop at filesystem root when walking up.
-- **Changed**: Removed `preferBunCacheOverDeno`; script path resolution via
-  `resolveScriptPath()` and `SCRIPT_EXTENSIONS`.
-- **Added**: Bun-only test `resolver-bun-subpath.test.ts` for subpath
-  resolution.
+- **Fixed**: Subpath protocol paths forced to bun-protocol (no wrong main
+  entry); module key only protocolPath (no duplicate bundling); relative imports
+  in bun-protocol resolved via `getProtocolPathResolveDir` (fixes "No matching
+  export for Client").
+- **Added**: `getProtocolPathResolveDir()`, `hasProtocolSubpath()`, `resolve`
+  from runtime-adapter.
 
 Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 

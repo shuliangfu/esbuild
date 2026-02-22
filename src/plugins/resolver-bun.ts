@@ -23,6 +23,7 @@ import {
   readdirSync,
   readTextFile,
   readTextFileSync,
+  resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import type { BuildLogger } from "../types.ts";
@@ -372,6 +373,92 @@ function resolveScriptPath(basePath: string): string | null {
 }
 
 /**
+ * 根据协议路径（如 npm:@jsr/pkg@v/client）解析出该模块所在目录
+ * 用于 bun-protocol 内相对导入（./client.js、../types.js）时得到 resolveDir
+ * 与 onLoad 子路径解析共用同一套 node_modules + exports 逻辑
+ *
+ * @param protocolPath - 协议路径
+ * @returns 解析到的目录，未找到则 null
+ */
+function getProtocolPathResolveDir(protocolPath: string): string | null {
+  if (!protocolPath.startsWith("npm:") || !protocolPath.includes("/")) {
+    return null;
+  }
+  const parts = protocolPath.split("/");
+  if (parts.length < 3 || parts[2]!.startsWith(".")) {
+    return null;
+  }
+  const base = parts[0] + "/" + parts[1];
+  const subpath = parts.slice(2).join("/");
+  if (!subpath || subpath.includes("..")) {
+    return null;
+  }
+  const baseParts = base.split("/");
+  const scope = baseParts[0]!.startsWith("npm:")
+    ? baseParts[0].slice(4)
+    : baseParts[0]!;
+  const nameWithVer = baseParts[1] ?? "";
+  const namePrefix = nameWithVer.includes("@")
+    ? nameWithVer.split("@")[0]!
+    : nameWithVer;
+  if (!scope || !namePrefix) {
+    return null;
+  }
+  let dir = cwd();
+  for (let up = 0; up < 20 && dir; up++) {
+    const scopeDir = join(dir, "node_modules", scope);
+    if (existsSync(scopeDir)) {
+      try {
+        const entries = readdirSync(scopeDir);
+        const pkgDir = entries.find(
+          (e: { isFile: boolean; name: string }) =>
+            !e.isFile && e.name.startsWith(namePrefix),
+        );
+        if (pkgDir) {
+          const pkgRoot = join(scopeDir, pkgDir.name);
+          const pkgJsonPath = join(pkgRoot, "package.json");
+          if (existsSync(pkgJsonPath)) {
+            const raw = readTextFileSync(pkgJsonPath);
+            const pkg = JSON.parse(raw) as {
+              exports?: Record<
+                string,
+                string | { import?: string; default?: string }
+              >;
+            };
+            const exportEntry = pkg.exports?.["./" + subpath];
+            let target: string | undefined;
+            if (typeof exportEntry === "string") {
+              target = exportEntry;
+            } else if (
+              exportEntry &&
+              typeof exportEntry === "object"
+            ) {
+              target =
+                (exportEntry as { import?: string; default?: string }).import ??
+                  (exportEntry as { import?: string; default?: string })
+                    .default;
+            }
+            if (target != null && typeof target === "string") {
+              const res = join(pkgRoot, target);
+              const pathToUse = resolveScriptPath(res);
+              if (pathToUse) {
+                return dirname(pathToUse);
+              }
+            }
+          }
+        }
+      } catch {
+        /* 当前层读取失败，继续向上 */
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+/**
  * 根据文件路径确定 esbuild loader
  *
  * @param filePath - 文件路径
@@ -390,9 +477,31 @@ function getLoaderFromPath(filePath: string): "ts" | "tsx" | "js" | "jsx" {
 }
 
 /**
+ * 判断协议路径是否包含子路径（如 npm:pkg@v/client）。
+ * 子路径必须通过 package.json exports 解析，不能信任 import.meta.resolve，
+ * 否则 Bun 可能返回包主入口导致整包被打进 bundle、体积暴增。
+ *
+ * @param protocolPath - 协议路径
+ * @returns 是否包含子路径
+ */
+function hasProtocolSubpath(protocolPath: string): boolean {
+  if (!protocolPath.startsWith("npm:") || !protocolPath.includes("/")) {
+    return false;
+  }
+  const afterNpm = protocolPath.slice(5);
+  const slashIdx = afterNpm.indexOf("/");
+  if (slashIdx <= 0) return false;
+  const afterSlash = afterNpm.slice(slashIdx + 1).trim();
+  // 子路径如 client、map、client/preact，不含版本号形态
+  return afterSlash.length > 0 && !/^\d/.test(afterSlash);
+}
+
+/**
  * 解析 Bun 协议路径（仅支持 npm:）
  * Bun 原生支持 npm: 协议，可以直接使用 import.meta.resolve
  * 注意：Bun 不支持 jsr: 协议，此函数不应被用于 jsr: 协议
+ * 带子路径的路径（如 npm:@jsr/pkg@v/client）不信任 resolve 结果，统一走
+ * bun-protocol 由 onLoad 按 node_modules + exports 解析，避免打进整包。
  *
  * @param protocolPath - 协议路径（如 npm:esbuild@^0.27.2）
  * @returns 解析结果
@@ -401,6 +510,14 @@ async function resolveBunProtocolPath(
   protocolPath: string,
 ): Promise<esbuild.OnResolveResult | undefined> {
   try {
+    // 子路径必须按 exports 解析，否则 Bun 可能返回主入口导致 bundle 体积过大
+    if (hasProtocolSubpath(protocolPath)) {
+      return {
+        path: protocolPath,
+        namespace: "bun-protocol",
+      };
+    }
+
     // Bun 原生支持 npm: 协议，可以直接解析
     // 注意：Bun 不支持 jsr: 协议，如果传入 jsr: 协议，resolve 会失败
     const resolvedUrl = await import.meta.resolve(protocolPath);
@@ -539,10 +656,10 @@ export function bunResolverPlugin(
             if (result.namespace === "file") {
               debugLog(`缓存路径: ${path} -> ${result.path}`);
             }
-            // 让 onLoad 在「请求方项目」下解析：传入 importer，便于子路径按 exports 解析时用 Bun.resolveSync(base, importer)
-            if (result.namespace === "bun-protocol" && args.importer) {
+            // 必须只返回 protocolPath 作为 path，否则同一逻辑模块会因 importer 不同被 esbuild 视为不同模块，导致重复打包、chunk/路由体积暴增
+            if (result.namespace === "bun-protocol") {
               return {
-                path: args.importer + "\0" + result.path,
+                path: result.path,
                 namespace: "bun-protocol",
               };
             }
@@ -684,10 +801,10 @@ export function bunResolverPlugin(
             if (result.namespace === "file") {
               debugLog(`缓存路径: ${path} -> ${result.path}`);
             }
-            // 让 onLoad 在「请求方项目」下解析：传入 importer，子路径按 exports 时用 Bun.resolveSync(base, importer)
-            if (result.namespace === "bun-protocol" && args.importer) {
+            // 必须只返回 protocolPath，否则同一子路径会因 importer 不同被 esbuild 重复打包
+            if (result.namespace === "bun-protocol") {
               return {
-                path: args.importer + "\0" + result.path,
+                path: result.path,
                 namespace: "bun-protocol",
               };
             }
@@ -703,13 +820,33 @@ export function bunResolverPlugin(
         { filter: /^\.\.?\/.*/, namespace: "bun-protocol" },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           // 相对路径导入，需要从 importer 的目录解析
-          // importer 是协议路径（如 npm:lodash@^4.17.21/map）
+          // importer 是协议路径（如 npm:@jsr/pkg@v/client）
           const importer = args.importer;
           if (!importer) {
             return undefined;
           }
 
           try {
+            // 优先：根据 importer 协议路径解析出包内目录，再解析相对路径（./client.js、../types.js 等）
+            // 这样包内未在 exports 中声明的文件也能正确解析，避免 "No matching export" / "has no exports"
+            if (importer.startsWith("npm:") && importer.includes("/")) {
+              const importerDir = getProtocolPathResolveDir(importer);
+              if (importerDir) {
+                const absolutePath = resolve(importerDir, args.path);
+                const pathToUse = resolveScriptPath(absolutePath) ??
+                  (existsSync(absolutePath) ? absolutePath : null);
+                if (pathToUse) {
+                  debugLog(
+                    `bun-protocol 相对路径(按 importer 目录): ${importer} + ${args.path} -> ${pathToUse}`,
+                  );
+                  return {
+                    path: pathToUse,
+                    namespace: "file",
+                  };
+                }
+              }
+            }
+
             // 先尝试直接解析 importer 为实际文件路径
             let importerUrl: string | undefined;
             try {
@@ -823,10 +960,8 @@ export function bunResolverPlugin(
       build.onLoad(
         { filter: /.*/, namespace: "bun-protocol" },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
-          // 可能带有 importer 前缀（onResolve 传入）：importer\0protocolPath，便于在「请求方项目」下解析
-          const nul = args.path.indexOf("\0");
-          const importer = nul >= 0 ? args.path.slice(0, nul) : "";
-          const protocolPath = nul >= 0 ? args.path.slice(nul + 1) : args.path;
+          // path 仅为 protocolPath（不包含 importer），保证同一逻辑模块只对应一个 key，避免重复打包
+          const protocolPath = args.path;
           debugLog(`onLoad bun-protocol: ${protocolPath}`);
 
           // 如果协议路径是 jsr:，Bun 不支持，返回 undefined
@@ -863,7 +998,8 @@ export function bunResolverPlugin(
                     if (!scope || !namePrefix) {
                       debugLog(`onLoad 子路径: 无法解析 base=${base}`);
                     } else {
-                      let dir = importer ? dirname(importer) : cwd();
+                      // 从 cwd() 向上找 node_modules（不再用 importer，避免 path 含 importer 导致 esbuild 重复打包）
+                      let dir = cwd();
                       for (let up = 0; up < 20 && dir; up++) {
                         const scopeDir = join(dir, "node_modules", scope);
                         if (existsSync(scopeDir)) {
