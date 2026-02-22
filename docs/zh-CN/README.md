@@ -1059,13 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.35**（2026-02-23）
+**v1.0.36**（2026-02-23）
 
-- **修复**：子路径协议强制走 bun-protocol（避免误用主入口）；模块 key 仅
-  protocolPath（避免重复打包）；bun-protocol 内相对导入经
-  `getProtocolPathResolveDir` 解析（修复 "No matching export for Client"）。
-- **新增**：`getProtocolPathResolveDir()`、`hasProtocolSubpath()`，以及从
-  runtime-adapter 引入 `resolve`。
+- **新增**：Bun 解析器支持 `isServerBuild` 选项，为 true 时将 `npm:` 导入标为
+  external；BuilderServer 在 Bun 下使用 esbuild 构建时向 `bunResolverPlugin`
+  传入 `isServerBuild: true`。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

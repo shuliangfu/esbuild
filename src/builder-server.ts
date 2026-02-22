@@ -350,9 +350,11 @@ export class BuilderServer {
     }
 
     if (IS_BUN) {
-      // 在 Bun 环境下自动启用解析器插件
+      // 在 Bun 环境下自动启用解析器插件，服务端构建时 npm 包标为 external
       // 用于解析 package.json 的 imports 配置（如 @dreamer/logger/client）
-      plugins.push(bunResolverPlugin({ debug, logger: log }));
+      plugins.push(
+        bunResolverPlugin({ isServerBuild: true, debug, logger: log }),
+      );
     } else {
       // 在 Deno 环境下自动启用解析器插件
       // 用于解析 deno.json 的 exports 配置（如 @dreamer/logger/client）
