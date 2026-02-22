@@ -8,6 +8,39 @@ and this project adheres to
 
 ---
 
+## [1.0.34] - 2026-02-23
+
+### Fixed
+
+- **Resolver (Bun)**: Subpath imports (e.g. `@dreamer/router/client`,
+  `npm:@jsr/pkg@v/client`) now resolve correctly in workspaces. Resolver no
+  longer relies on `Bun.resolveSync` from plugin context; it walks up from the
+  importer directory and looks up packages in each `node_modules/@jsr/...`, then
+  reads `package.json` exports to resolve `./client` and other subpaths.
+- **Resolver (Bun)**: When a bare version (e.g. `^1.0.2`) is found for
+  `@scope/name` or `@jsr/scope__name`, it is normalized to
+  `npm:@jsr/scope__name@version` so onLoad can resolve correctly. Generic for
+  any JSR scope (no hardcoded `dreamer`).
+- **Resolver (Bun)**: Stop walking up at filesystem root (`parent === dir`) to
+  avoid crossing outside the project.
+
+### Changed
+
+- **Resolver (Bun)**: Removed `preferBunCacheOverDeno`; no longer prefer `.bun`
+  over `.deno` cache paths.
+- **Resolver (Bun)**: Script path resolution (for export targets without
+  extension) now uses a shared `SCRIPT_EXTENSIONS` list and
+  `resolveScriptPath()` helper, matching `.ts`/`.tsx`/`.js`/`.jsx`/`.mts`/`.mjs`
+  in one place.
+
+### Added
+
+- **Tests**: `resolver-bun-subpath.test.ts` — integration test for Bun subpath
+  resolution (runs only when `IS_BUN`); verifies that `@dreamer/router/client`
+  builds and the bundle contains `createRouter`.
+
+---
+
 ## [1.0.33] - 2026-02-22
 
 ### Added

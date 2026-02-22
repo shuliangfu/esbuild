@@ -1059,10 +1059,14 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.33**（2026-02-22）
+**v1.0.34**（2026-02-23）
 
-- **新增**：服务端（Bun）在 `config.debug` 为 true 时，`buildWithBun` 输出 debug
-  日志。
+- **修复**：Bun 解析器在 workspace 下正确解析子路径（如
+  `@dreamer/router/client`）；裸版本规范为
+  `npm:@jsr/...`；向上查找在根目录停止。
+- **变更**：移除 `preferBunCacheOverDeno`；脚本路径用 `resolveScriptPath()` 与
+  `SCRIPT_EXTENSIONS` 统一解析。
+- **新增**：Bun 子路径解析集成测试 `resolver-bun-subpath.test.ts`。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
