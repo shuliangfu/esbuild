@@ -478,6 +478,10 @@ export class BuilderServer {
   ): Promise<BuildResult> {
     const startTime = Date.now();
 
+    this.debugLog(
+      $tr("log.esbuild.server.debugBuildStartServer"),
+    );
+
     // 解析选项
     const mode: BuildMode = typeof options === "string"
       ? options
@@ -509,6 +513,16 @@ export class BuilderServer {
     // 解析入口文件路径
     const entryPoint = await resolve(this.config.entry);
     const entryDir = dirname(entryPoint);
+
+    this.debugLog(
+      $tr("log.esbuild.server.debugEntryFile", { path: entryPoint }),
+    );
+    this.debugLog(
+      $tr("log.esbuild.server.debugOutputDir", { path: outputDir }),
+    );
+    this.debugLog(
+      $tr("log.esbuild.server.debugWorkingDir", { path: entryDir }),
+    );
 
     // 合并配置选项和模式选项
     const compileOptions = {
@@ -544,6 +558,15 @@ export class BuilderServer {
     // 确定工作目录：如果有配置文件，在入口文件目录执行；否则使用输出目录
     // 注意：即使没有配置文件，Bun 也能从缓存读取 npm 包，所以也可以工作
     const workDir = hasConfig ? entryDir : actualOutputDir;
+
+    this.debugLog(
+      $tr("log.esbuild.server.debugExternal", {
+        value: JSON.stringify(this.config.external || []),
+      }),
+    );
+    this.debugLog(
+      $tr("log.esbuild.server.debugBuildStart"),
+    );
 
     try {
       // 构建 bun build 命令参数
@@ -590,6 +613,10 @@ export class BuilderServer {
       });
 
       const output = await command.output();
+
+      this.debugLog(
+        $tr("log.esbuild.server.debugBuildComplete"),
+      );
 
       if (!output.success) {
         const stderrStr = output.stderr

@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.0.33] - 2026-02-22
+
+### Added
+
+- **Server (Bun)**: Debug logging in `buildWithBun` when `config.debug` is true:
+  server build start, entry file, output dir, working dir, external list, build
+  start/complete (same i18n keys as `buildWithEsbuild`), so `bun run build` with
+  debug enabled shows the same style of logs as Deno.
+
+---
+
 ## [1.0.32] - 2026-02-22
 
 ### Changed

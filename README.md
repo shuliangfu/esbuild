@@ -17,10 +17,10 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.32] - 2026-02-22
+### [1.0.33] - 2026-02-22
 
-- **Changed**: Chore: JSR release 1.0.32. Full history:
-  [Changelog](./docs/en-US/CHANGELOG.md)
+- **Added**: Server (Bun) debug logging in `buildWithBun` when `config.debug` is
+  true. Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
 
