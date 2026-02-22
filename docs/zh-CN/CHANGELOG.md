@@ -7,6 +7,29 @@
 
 ---
 
+## [1.0.35] - 2026-02-23
+
+### 修复
+
+- **解析器（Bun）**：带子路径的协议路径（如 `npm:@jsr/pkg@v/client`）不再使用
+  `import.meta.resolve`，强制走 `bun-protocol` 由 onLoad 按 `package.json`
+  exports 解析，避免误用主入口导致体积过大。
+- **解析器（Bun）**：模块 key 仅使用 `protocolPath`（不再带 importer 前缀），
+  同一逻辑模块不再在多个 chunk 中重复，减小 bundle 体积。
+- **解析器（Bun）**：bun-protocol 模块内的相对导入（如 `./client.js`、
+  `../types.js`）现通过 `getProtocolPathResolveDir(importer)` 解析，修复使用
+  `@dreamer/websocket/client` 等时的 "No matching export for Client" 与 "has no
+  exports"。
+
+### 新增
+
+- **解析器（Bun）**：`getProtocolPathResolveDir()` 辅助函数，根据协议路径解析
+  到包目录（node_modules + exports），用于 bun-protocol 内相对路径解析。
+- **解析器（Bun）**：`hasProtocolSubpath()` 判断子路径协议；从
+  `@dreamer/runtime-adapter` 引入 `resolve` 做路径规范化。
+
+---
+
 ## [1.0.34] - 2026-02-23
 
 ### 修复
