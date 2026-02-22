@@ -1,7 +1,7 @@
 /**
  * @fileoverview BuilderServer Bun 环境专用测试
  *
- * 测试 buildWithBun 使用 --outdir 输出多文件（server.js + 原生 .node 等）的场景。
+ * 测试 Bun 下服务端构建（现统一走 esbuild + bunResolverPlugin isServerBuild）能成功输出 server.js。
  * 仅当 IS_BUN 为 true 时执行。
  */
 
@@ -19,7 +19,7 @@ import type { ServerConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 if (IS_BUN) {
-  describe("BuilderServer Bun 环境 (buildWithBun)", () => {
+  describe("BuilderServer Bun 环境", () => {
     let entryDir: string;
     let entryFile: string;
     let outputDir: string;
@@ -57,7 +57,7 @@ if (IS_BUN) {
       }
     });
 
-    it("应使用 buildWithBun 成功构建并输出 server.js", async () => {
+    it("Bun 下服务端构建应成功并输出 server.js", async () => {
       const config: ServerConfig = {
         entry: entryFile,
         output: outputDir,
