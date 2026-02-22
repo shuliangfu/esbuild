@@ -17,14 +17,11 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.35] - 2026-02-23
+### [1.0.36] - 2026-02-23
 
-- **Fixed**: Subpath protocol paths forced to bun-protocol (no wrong main
-  entry); module key only protocolPath (no duplicate bundling); relative imports
-  in bun-protocol resolved via `getProtocolPathResolveDir` (fixes "No matching
-  export for Client").
-- **Added**: `getProtocolPathResolveDir()`, `hasProtocolSubpath()`, `resolve`
-  from runtime-adapter.
+- **Added**: `isServerBuild` option for Bun resolver; when true, `npm:` imports
+  are marked external. BuilderServer passes `isServerBuild: true` to
+  `bunResolverPlugin` when building with esbuild under Bun.
 
 Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 

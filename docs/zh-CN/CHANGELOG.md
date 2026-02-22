@@ -7,6 +7,18 @@
 
 ---
 
+## [1.0.36] - 2026-02-23
+
+### 新增
+
+- **解析器（Bun）**：新增 `isServerBuild` 选项。为 `true` 且非 `browserMode`
+  时，`npm:` 导入标记为 `external: true`，由运行时解析（与 Deno
+  服务端构建行为一致）。
+- **BuilderServer**：Bun 下使用 esbuild 构建时向 `bunResolverPlugin` 传入
+  `isServerBuild: true`。
+
+---
+
 ## [1.0.35] - 2026-02-23
 
 ### 修复

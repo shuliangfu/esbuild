@@ -8,6 +8,18 @@ and this project adheres to
 
 ---
 
+## [1.0.36] - 2026-02-23
+
+### Added
+
+- **Resolver (Bun)**: `isServerBuild` option. When `true` and not `browserMode`,
+  `npm:` imports are marked `external: true` so the runtime resolves them
+  (aligned with Deno server build behavior).
+- **BuilderServer**: Passes `isServerBuild: true` to `bunResolverPlugin` when
+  building with esbuild under Bun.
+
+---
+
 ## [1.0.35] - 2026-02-23
 
 ### Fixed

@@ -43,6 +43,11 @@ export interface ResolverOptions {
   enabled?: boolean;
   /** 浏览器模式：将 jsr: 和 npm: 依赖转换为 CDN URL（如 esm.sh） */
   browserMode?: boolean;
+  /**
+   * 是否服务端构建（默认：false）
+   * 为 true 且非 browserMode 时，npm: 协议导入直接标记为 external: true，由运行时解析
+   */
+  isServerBuild?: boolean;
   /** 是否输出 debug 日志（默认：false） */
   debug?: boolean;
   /** 构建日志器，debug 时通过 logger.debug 输出 */
@@ -585,6 +590,7 @@ export function bunResolverPlugin(
   const {
     enabled = true,
     browserMode = false,
+    isServerBuild = false,
     debug = false,
     logger: optionsLogger,
   } = options;
@@ -637,6 +643,12 @@ export function bunResolverPlugin(
         { filter: /^npm:/ },
         async (args): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
+
+          // 服务端构建：仅针对 npm 包，直接 external，由运行时解析
+          if (isServerBuild && !browserMode) {
+            debugLog(`服务端构建 npm external: ${path}`);
+            return { path, external: true };
+          }
 
           // 浏览器模式：将依赖标记为 external，让浏览器从 CDN 加载
           if (browserMode) {
