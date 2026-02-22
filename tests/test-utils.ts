@@ -44,15 +44,27 @@ function pathnameToFsPath(pathname: string): string {
 /**
  * 获取测试数据目录路径
  *
+ * 测试用文件与测试输出统一放在 tests/data/ 下，确保不写入库根目录。
  * 每个库的测试数据目录是独立的：{库目录}/tests/data/
  *
  * @returns 测试数据目录的绝对路径
+ * @throws 若解析结果不在 tests/data 下则抛出，避免误写到根目录
  */
 export function getTestDataDir(): string {
   const testDir = pathnameToFsPath(
     new URL(".", import.meta.url).pathname,
   );
-  return resolve(join(testDir, "data"));
+  const dataDir = resolve(join(testDir, "data"));
+  const normalized = dataDir.replace(/\\/g, "/");
+  // 强制约定：测试数据必须在 tests/data 下，防止 cwd/解析差异导致写到库根目录
+  const underTestsData = normalized.includes("/tests/data") ||
+    normalized.endsWith("/tests/data") || normalized.endsWith("tests/data");
+  if (!underTestsData) {
+    throw new Error(
+      `getTestDataDir() 必须解析到 tests/data 下，当前为: ${dataDir}`,
+    );
+  }
+  return dataDir;
 }
 
 /**
@@ -183,12 +195,15 @@ export async function cleanupRootTempFiles(): Promise<void> {
     // 读取根目录内容
     const entries = await readdir(rootDir);
 
-    // 需要清理的文件模式
+    // 需要清理的文件模式（含误生成在根目录的测试产物）
     const tempFilePatterns = [
       /^server\.tmp-/,
       /^server$/,
       /^server\.js$/,
       /\.tmp-\w+$/,
+      /^client-logger\.ts$/,
+      /^logger-bundle\.js$/,
+      /^logger-bundle\.js\.map$/,
     ];
 
     // 删除匹配的临时文件
