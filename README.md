@@ -17,10 +17,17 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.33] - 2026-02-22
+### [1.0.34] - 2026-02-23
 
-- **Added**: Server (Bun) debug logging in `buildWithBun` when `config.debug` is
-  true. Full history: [Changelog](./docs/en-US/CHANGELOG.md)
+- **Fixed**: Bun resolver subpath resolution in workspaces (e.g.
+  `@dreamer/router/client`); normalize bare version to `npm:@jsr/...` for any
+  scope; stop at filesystem root when walking up.
+- **Changed**: Removed `preferBunCacheOverDeno`; script path resolution via
+  `resolveScriptPath()` and `SCRIPT_EXTENSIONS`.
+- **Added**: Bun-only test `resolver-bun-subpath.test.ts` for subpath
+  resolution.
+
+Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
 

@@ -7,6 +7,33 @@
 
 ---
 
+## [1.0.34] - 2026-02-23
+
+### 修复
+
+- **解析器（Bun）**：workspace 下子路径导入（如 `@dreamer/router/client`、
+  `npm:@jsr/pkg@v/client`）现能正确解析。不再依赖插件上下文的
+  `Bun.resolveSync`，改为从 importer 目录向上遍历，在每层
+  `node_modules/@jsr/...` 中按包名查找，再根据 `package.json` exports 解析
+  `./client` 等子路径。
+- **解析器（Bun）**：当 `@scope/name` 或 `@jsr/scope__name` 查到裸版本（如
+  `^1.0.2`）时，规范为 `npm:@jsr/scope__name@version`，以便 onLoad
+  正确解析；通用处理任意 JSR scope（不再写死 dreamer）。
+- **解析器（Bun）**：向上查找时在文件系统根目录停止（`parent === dir`），避免越出项目。
+
+### 变更
+
+- **解析器（Bun）**：移除 `preferBunCacheOverDeno`，不再优先使用 `.bun` 缓存。
+- **解析器（Bun）**：无扩展名的导出路径解析改为使用统一的 `SCRIPT_EXTENSIONS` 与
+  `resolveScriptPath()`，集中匹配 .ts/.tsx/.js/.jsx/.mts/.mjs。
+
+### 新增
+
+- **测试**：`resolver-bun-subpath.test.ts` — Bun 子路径解析集成测试（仅 `IS_BUN`
+  时运行），验证 `@dreamer/router/client` 能正确打包且产物包含 `createRouter`。
+
+---
+
 ## [1.0.33] - 2026-02-22
 
 ### 新增
