@@ -76,9 +76,12 @@ function convertSpecifierToBrowserUrl(specifier: string): string | null {
 
 /**
  * package.json 配置结构
+ * 支持 imports（子路径映射）、dependencies、devDependencies（Bun 下 JSR 常写成 npm:@jsr/...）
  */
 interface PackageJsonConfig {
   imports?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 /**
@@ -106,6 +109,42 @@ function findProjectPackageJson(startDir: string): string | undefined {
     const packageJsonPath = join(currentDir, "package.json");
     if (existsSync(packageJsonPath)) {
       return packageJsonPath;
+    }
+
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+    depth++;
+  }
+
+  return undefined;
+}
+
+/**
+ * 向上查找第一个包含指定包名的 package.json（检查 imports / dependencies / devDependencies）
+ * 用于 monorepo 或 NODE_PATH 场景下从子目录解析到根目录的依赖
+ *
+ * @param startDir - 起始目录
+ * @param packageName - 包名（如 @dreamer/router）
+ * @returns 包含该包的 package.json 路径，未找到返回 undefined
+ */
+function findPackageJsonWithPackage(
+  startDir: string,
+  packageName: string,
+): string | undefined {
+  let currentDir = startDir;
+  const maxDepth = 10;
+  let depth = 0;
+
+  while (depth < maxDepth) {
+    const packageJsonPath = join(currentDir, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const importVal = getPackageImport(packageJsonPath, packageName);
+      if (importVal !== undefined) {
+        return packageJsonPath;
+      }
     }
 
     const parentDir = dirname(currentDir);
@@ -149,10 +188,11 @@ function findProjectTsconfig(startDir: string): string | undefined {
 
 /**
  * 从项目的 package.json 中获取包的导入映射
+ * 优先读 imports，若无则读 dependencies、devDependencies（Bun 下 JSR 已转为 npm:@jsr/...）
  *
  * @param projectPackageJsonPath - 项目的 package.json 路径
  * @param packageName - 包名（如 @dreamer/logger）
- * @returns 包的导入路径（如 jsr:@scope/package@^1.0.0-beta.1），如果未找到返回 undefined
+ * @returns 包的导入路径（如 jsr:... 或 npm:@jsr/...），未找到返回 undefined
  */
 function getPackageImport(
   projectPackageJsonPath: string,
@@ -162,11 +202,16 @@ function getPackageImport(
     const content = readTextFileSync(projectPackageJsonPath);
     const config: PackageJsonConfig = JSON.parse(content);
 
-    if (!config.imports) {
-      return undefined;
+    if (config.imports && config.imports[packageName]) {
+      return config.imports[packageName];
     }
-
-    return config.imports[packageName];
+    if (config.dependencies && config.dependencies[packageName]) {
+      return config.dependencies[packageName];
+    }
+    if (config.devDependencies && config.devDependencies[packageName]) {
+      return config.devDependencies[packageName];
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -321,6 +366,28 @@ function getLoaderFromPath(filePath: string): "ts" | "tsx" | "js" | "jsx" {
 }
 
 /**
+ * Bun 运行时优先使用 node_modules/.bun 缓存，不使用 .deno 缓存。
+ * 若 resolvedPath 指向 node_modules/.deno，则尝试同路径下的 .bun 版本；
+ * 若 .bun 存在则返回 .bun 路径，否则返回 null（调用方不应使用 .deno 路径）。
+ *
+ * @param resolvedPath - import.meta.resolve 得到的绝对路径
+ * @returns 应使用的文件路径（.bun 或原路径），或 null（不应使用 .deno 且 .bun 不存在）
+ */
+function preferBunCacheOverDeno(resolvedPath: string): string | null {
+  if (!resolvedPath.includes("node_modules/.deno")) {
+    return resolvedPath;
+  }
+  const bunPath = resolvedPath.replace(
+    "node_modules/.deno",
+    "node_modules/.bun",
+  );
+  if (existsSync(bunPath)) {
+    return bunPath;
+  }
+  return null;
+}
+
+/**
  * 解析 Bun 协议路径（仅支持 npm:）
  * Bun 原生支持 npm: 协议，可以直接使用 import.meta.resolve
  * 注意：Bun 不支持 jsr: 协议，此函数不应被用于 jsr: 协议
@@ -346,11 +413,15 @@ async function resolveBunProtocolPath(
       }
 
       if (filePath && existsSync(filePath)) {
-        // 返回文件路径，esbuild 会自动从文件路径推断 resolveDir
-        return {
-          path: filePath,
-          namespace: "file",
-        };
+        // Bun 运行时只读 .bun 缓存，不读 .deno；若当前是 .deno 则尝试 .bun
+        const pathToUse = preferBunCacheOverDeno(filePath);
+        if (pathToUse !== null) {
+          return {
+            path: pathToUse,
+            namespace: "file",
+          };
+        }
+        // pathToUse 为 null 表示应使用 .bun 但 .bun 不存在，不返回 .deno 路径
       } else if (filePath) {
         // 文件路径存在但文件不存在，使用 bun-protocol namespace
         return {
@@ -468,6 +539,9 @@ export function bunResolverPlugin(
           const result = await resolveBunProtocolPath(path);
           if (result?.path) {
             debugLog(`npm 协议解析: ${path} -> ${result.path}`);
+            if (result.namespace === "file") {
+              debugLog(`缓存路径: ${path} -> ${result.path}`);
+            }
           }
           return result;
         },
@@ -510,12 +584,15 @@ export function bunResolverPlugin(
           const startDir = args.importer
             ? dirname(args.importer)
             : (args.resolveDir || cwd());
-          const projectPackageJsonPath = findProjectPackageJson(startDir);
+          // 查找包含该包的 package.json（先向上找有该依赖的根，再回退到最近 package.json）
+          const projectPackageJsonPath = findPackageJsonWithPackage(
+            startDir,
+            packageName,
+          ) ?? findProjectPackageJson(startDir);
 
           let packageImport: string | undefined;
 
           if (projectPackageJsonPath) {
-            // 从项目的 package.json 的 imports 中获取包的导入映射
             packageImport = getPackageImport(
               projectPackageJsonPath,
               packageName,
@@ -526,11 +603,9 @@ export function bunResolverPlugin(
           // Bun 可以从缓存读取之前安装过的依赖，即使没有 package.json
           if (!packageImport) {
             try {
-              // 尝试直接解析包路径，看看 Bun 是否能从缓存中解析
-              // 这对于 npm 包特别有用，因为 Bun 会缓存已安装的 npm 包
+              // 尝试直接解析包路径（Bun 可能从缓存解析）
               const resolvedUrl = await import.meta.resolve(path);
 
-              // 如果成功解析为 file:// URL，说明 Bun 从缓存中找到了这个包
               if (resolvedUrl && resolvedUrl.startsWith("file://")) {
                 let filePath = resolvedUrl.slice(7);
                 try {
@@ -540,11 +615,17 @@ export function bunResolverPlugin(
                 }
 
                 if (filePath && existsSync(filePath)) {
-                  debugLog(`bare 子路径(缓存): ${path} -> ${filePath}`);
-                  return {
-                    path: filePath,
-                    namespace: "file",
-                  };
+                  // Bun 运行时只读 .bun 缓存，不读 .deno；若当前是 .deno 则尝试 .bun
+                  const pathToUse = preferBunCacheOverDeno(filePath);
+                  if (pathToUse !== null) {
+                    debugLog(`bare 子路径(缓存): ${path} -> ${pathToUse}`);
+                    debugLog(`缓存路径: ${path} -> ${pathToUse}`);
+                    return {
+                      path: pathToUse,
+                      namespace: "file",
+                    };
+                  }
+                  // pathToUse 为 null 表示应使用 .bun 但 .bun 不存在，继续后续逻辑
                 }
               }
             } catch {
@@ -574,23 +655,18 @@ export function bunResolverPlugin(
             }
           }
 
-          // 如果 packageImport 是 jsr: 协议，Bun 不支持直接解析
-          // 需要通过 package.json imports 映射，然后使用不带 jsr: 前缀的导入
-          if (packageImport.startsWith("jsr:")) {
-            console.warn(
-              `[bun-resolver] Bun 不支持直接使用 jsr: 协议 "${fullProtocolPath}"。` +
-                `请确保 package.json 的 imports 字段正确配置了 JSR 包映射。`,
-            );
-            // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
-            return undefined;
-          }
-
-          // 使用统一的协议路径解析函数（仅支持 npm: 协议）
+          // 使用统一的协议路径解析（Bun 支持 npm:，含 npm:@jsr/... 子路径）
           const result = await resolveBunProtocolPath(fullProtocolPath);
           if (result?.path) {
+            const fromCache = result.path.includes("node_modules/.bun");
             debugLog(
-              `bare 子路径: ${path} -> ${fullProtocolPath} -> ${result.path}`,
+              fromCache
+                ? `bare 子路径(缓存): ${path} -> ${result.path}`
+                : `bare 子路径: ${path} -> ${fullProtocolPath} -> ${result.path}`,
             );
+            if (result.namespace === "file") {
+              debugLog(`缓存路径: ${path} -> ${result.path}`);
+            }
           }
           return result;
         },
@@ -780,14 +856,18 @@ export function bunResolverPlugin(
                 // 忽略解码错误
               }
 
-              // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
-              const resolveDir = dirname(filePath);
+              // Bun 运行时优先使用 .bun 缓存
+              const pathToUse = preferBunCacheOverDeno(filePath) ?? filePath;
+              debugLog(`缓存路径: ${protocolPath} -> ${pathToUse}`);
 
-              if (existsSync(filePath)) {
-                const contents = await readTextFile(filePath);
-                const loader = getLoaderFromPath(filePath);
+              // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
+              const resolveDir = dirname(pathToUse);
+
+              if (existsSync(pathToUse)) {
+                const contents = await readTextFile(pathToUse);
+                const loader = getLoaderFromPath(pathToUse);
                 debugLog(
-                  `onLoad 从文件读取: ${protocolPath} -> ${filePath} (${contents.length} chars)`,
+                  `onLoad 从文件读取: ${protocolPath} -> ${pathToUse} (${contents.length} chars)`,
                 );
                 return {
                   contents,
@@ -796,7 +876,7 @@ export function bunResolverPlugin(
                 };
               } else {
                 // 文件不存在，但仍然需要设置 resolveDir
-                const loader = getLoaderFromPath(filePath);
+                const loader = getLoaderFromPath(pathToUse);
                 return {
                   contents: "",
                   loader,
@@ -826,6 +906,29 @@ export function bunResolverPlugin(
           { filter: /.*/ },
           (args): undefined => {
             debugLog(`resolving: ${args.path}`);
+            return undefined;
+          },
+        );
+        // debug 时对 preact / preact/* 等走默认解析的 bare 包做一次 resolve 并打印缓存路径
+        build.onResolve(
+          { filter: /^(preact|preact\/.*)$/ },
+          async (args): Promise<undefined> => {
+            const path = args.path;
+            try {
+              const resolvedUrl = await import.meta.resolve(path);
+              if (resolvedUrl?.startsWith("file://")) {
+                let filePath = resolvedUrl.slice(7);
+                try {
+                  filePath = decodeURIComponent(filePath);
+                } catch {
+                  // ignore
+                }
+                const pathToUse = preferBunCacheOverDeno(filePath) ?? filePath;
+                debugLog(`缓存路径: ${path} -> ${pathToUse}`);
+              }
+            } catch {
+              // 解析失败不报错，仅跳过打印
+            }
             return undefined;
           },
         );

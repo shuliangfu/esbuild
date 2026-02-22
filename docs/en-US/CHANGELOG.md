@@ -8,6 +8,14 @@ and this project adheres to
 
 ---
 
+## [1.0.32] - 2026-02-22
+
+### Changed
+
+- Chore: JSR release 1.0.32.
+
+---
+
 ## [1.0.31] - 2026-02-20
 
 ### Fixed
