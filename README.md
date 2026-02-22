@@ -17,11 +17,10 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.31] - 2026-02-20
+### [1.0.32] - 2026-02-22
 
-- **Fixed**: Bun server build now injects `globalThis.__DWEB_PROD__ = true;`
-  into output `server.js` so that @dreamer/dweb runs in production mode (no HMR
-  / no hmr-browser.ts). Full history: [Changelog](./docs/en-US/CHANGELOG.md)
+- **Changed**: Chore: JSR release 1.0.32. Full history:
+  [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
 
@@ -1095,10 +1094,9 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.31** (2026-02-20)
+**v1.0.32** (2026-02-22)
 
-- **Fixed**: Bun server build injects `__DWEB_PROD__` banner so that running
-  `dist/server.js` uses production mode (no HMR, no hmr-browser.ts).
+- **Changed**: Chore: JSR release 1.0.32.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

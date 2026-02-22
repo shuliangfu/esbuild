@@ -1059,10 +1059,9 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.31**（2026-02-20）
+**v1.0.32**（2026-02-22）
 
-- **修复**：Bun 服务端构建在输出 `server.js` 中注入 `__DWEB_PROD__`，运行
-  `dist/server.js` 时以生产模式运行（不启用 HMR、不请求 hmr-browser.ts）。
+- **变更**：Chore: JSR 发布 1.0.32。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

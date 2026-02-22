@@ -1,6 +1,6 @@
 {
   "name": "@dreamer/esbuild",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "license": "Apache-2.0",
   "description": "High-performance build tool library compatible with Deno and Bun, providing full-stack compilation, bundling, resource processing, optimization, and more, with subpath on-demand imports.",
   "repository": {
