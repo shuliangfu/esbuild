@@ -8,6 +8,21 @@ and this project adheres to
 
 ---
 
+## [1.0.37] - 2026-02-23
+
+### Fixed
+
+- **Resolver (Bun)**: Bare `@scope/package` (no subpath) is now marked
+  `external: true` in server build so packages like `@dreamer/config` are not
+  bundled; avoids esbuild trying to resolve their dynamic imports (e.g. to
+  `.md`/`LICENSE` files) and failing with "No loader configured for .md files".
+- **Resolver (Bun)**: Path alias resolution from `tsconfig.json` `paths`: when
+  the pattern ends with `/` (e.g. `"@/": ["./src/"]`), paths like
+  `"@/utils/helper.ts"` are now matched correctly (previously only
+  `path.startsWith(pattern + "/")` was used, which did not match `"@/"`).
+
+---
+
 ## [1.0.36] - 2026-02-23
 
 ### Added

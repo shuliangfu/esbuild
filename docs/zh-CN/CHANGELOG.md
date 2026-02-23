@@ -7,6 +7,20 @@
 
 ---
 
+## [1.0.37] - 2026-02-23
+
+### 修复
+
+- **解析器（Bun）**：服务端构建下将裸的 `@scope/package`（无子路径）标为
+  `external: true`，避免将如 `@dreamer/config` 打进 bundle，从而避免 esbuild
+  解析其动态 import（如指向 `.md`/`LICENSE`）时报 “No loader configured for .md
+  files”。
+- **解析器（Bun）**：从 `tsconfig.json` 的 `paths` 解析路径别名时，当 pattern 以
+  `/` 结尾（如 `"@/": ["./src/"]`）时，现能正确匹配 `"@/utils/helper.ts"`
+  等路径（此前仅用 `path.startsWith(pattern + "/")`，无法匹配 `"@/"`）。
+
+---
+
 ## [1.0.36] - 2026-02-23
 
 ### 新增

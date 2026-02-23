@@ -17,11 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.36] - 2026-02-23
+### [1.0.37] - 2026-02-23
 
-- **Added**: `isServerBuild` option for Bun resolver; when true, `npm:` imports
-  are marked external. BuilderServer passes `isServerBuild: true` to
-  `bunResolverPlugin` when building with esbuild under Bun.
+- **Fixed**: Resolver (Bun) — bare `@scope/package` marked external in server
+  build to avoid bundling packages that dynamic-import non-JS files; path alias
+  from tsconfig `paths` when pattern ends with `/` (e.g. `"@/"`) now matches
+  correctly.
 
 Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 

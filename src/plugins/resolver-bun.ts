@@ -328,8 +328,13 @@ function resolvePathAlias(
                 }
               }
             }
-          } else if (path === pattern || path.startsWith(pattern + "/")) {
-            // 精确匹配或前缀匹配
+          } else if (
+            path === pattern ||
+            path.startsWith(pattern + "/") ||
+            (pattern.endsWith("/") && path.startsWith(pattern) &&
+              path.length > pattern.length)
+          ) {
+            // 精确匹配或前缀匹配（含 "@/" 匹配 "@/utils/helper.ts" 这类）
             for (const mappedPath of paths) {
               const remainingPath = path.slice(pattern.length);
               const resolvedPath = join(baseUrl, mappedPath, remainingPath);
@@ -695,6 +700,19 @@ export function bunResolverPlugin(
               `请通过 package.json 的 imports 字段映射 JSR 包，然后使用不带 jsr: 前缀的导入。`,
           );
           // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
+          return undefined;
+        },
+      );
+
+      // 2.6. 服务端构建：裸的 @scope/package（无子路径）标为 external，避免打进 bundle 后触发对 .md/LICENSE 等动态 import
+      // Deno 侧因 import 多为 npm:/jsr: 协议会先被上面命中并 external，Bun 侧多为 @dreamer/config 等裸名，会落到默认解析并被打包
+      build.onResolve(
+        { filter: /^@[^/]+\/[^/]+$/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          if (isServerBuild && !browserMode) {
+            debugLog(`服务端构建 bare 包 external: ${args.path}`);
+            return { path: args.path, external: true };
+          }
           return undefined;
         },
       );
