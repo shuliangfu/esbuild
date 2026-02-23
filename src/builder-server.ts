@@ -10,6 +10,7 @@
 
 import {
   createCommand,
+  cwd,
   dirname,
   existsSync,
   IS_BUN,
@@ -24,6 +25,7 @@ import {
   writeTextFile,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
+import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import { denoResolverPlugin } from "./plugins/resolver-deno.ts";
 import type {
@@ -32,7 +34,6 @@ import type {
   OutputFileContent,
   ServerConfig,
 } from "./types.ts";
-import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -107,9 +108,9 @@ export class BuilderServer {
       return this.buildWithNativeCompile(options);
     }
 
-    // 根据运行时环境选择编译方式
+    // 根据运行时环境选择编译方式（Bun 下用 bun build；esbuild 会拉进 @dreamer/config 等对 .md/LICENSE 的动态 import 导致构建失败）
     if (IS_BUN) {
-      return this.buildWithBun(options);
+      // return this.buildWithBun(options);
     }
     return this.buildWithEsbuild(options);
   }
@@ -501,20 +502,19 @@ export class BuilderServer {
           $tr("log.esbuild.builder.validateServerMissingOutput"),
         );
       }
-      outputDir = await resolve(this.config.output);
+      outputDir = resolve(this.config.output);
       // 确保输出目录存在
       await mkdir(outputDir, { recursive: true });
     } else {
       // 内存模式不需要输出目录，使用临时目录
-      outputDir = await resolve(this.config.output || "./");
+      outputDir = resolve(this.config.output || "./");
     }
 
     // 根据 mode 设置编译选项
     const isProd = mode === "prod";
 
     // 解析入口文件路径
-    const entryPoint = await resolve(this.config.entry);
-    const entryDir = dirname(entryPoint);
+    const entryPoint = resolve(this.config.entry);
 
     this.debugLog(
       $tr("log.esbuild.server.debugEntryFile", { path: entryPoint }),
@@ -523,7 +523,7 @@ export class BuilderServer {
       $tr("log.esbuild.server.debugOutputDir", { path: outputDir }),
     );
     this.debugLog(
-      $tr("log.esbuild.server.debugWorkingDir", { path: entryDir }),
+      $tr("log.esbuild.server.debugWorkingDir", { path: cwd() }),
     );
 
     // 合并配置选项和模式选项
@@ -537,29 +537,19 @@ export class BuilderServer {
     const outputFileName = "server.js";
     const outfile = join(outputDir, outputFileName);
 
-    // 在 Bun 环境下，bun build 的行为：
-    // 1. 对于相对路径导入，不需要 package.json，可以直接工作
-    // 2. 对于 npm 包，可以从缓存读取，不需要 package.json
-    // 3. 对于路径别名（@/, ~/），需要 package.json 的 imports 或 tsconfig.json 的 paths
-    //
-    // 优化策略：
-    // - 优先使用入口文件所在目录（如果存在 package.json 或 tsconfig.json）
-    // - 如果没有配置文件，也可以工作（Bun 可以从缓存读取 npm 包）
-    // - 对于输出目录，如果是内存模式使用临时目录，否则使用配置的输出目录
-    const entryPackageJson = join(entryDir, "package.json");
-    const entryTsconfig = join(entryDir, "tsconfig.json");
-    const hasConfig = existsSync(entryPackageJson) || existsSync(entryTsconfig);
-
-    // 如果是内存模式，使用临时目录
+    // 在 Bun 环境下，bun build 需在项目根（cwd）执行，才能解析 node_modules，使 --external 生效，避免双实例（如 React）。
     const tempDir = write
       ? null
       : await makeTempDir({ prefix: "esbuild-server-" });
     const actualOutputDir = write ? outputDir : tempDir!;
     const actualOutfile = join(actualOutputDir, outputFileName);
 
-    // 确定工作目录：如果有配置文件，在入口文件目录执行；否则使用输出目录
-    // 注意：即使没有配置文件，Bun 也能从缓存读取 npm 包，所以也可以工作
-    const workDir = hasConfig ? entryDir : actualOutputDir;
+    // workDir 即构建时的当前工作目录（项目根），与 node_modules、package.json 一致
+    const workDir = cwd();
+    const buildEntry = relative(workDir, entryPoint);
+    const outputRelativeDir = actualOutputDir === workDir
+      ? "."
+      : relative(workDir, actualOutputDir);
 
     this.debugLog(
       $tr("log.esbuild.server.debugExternal", {
@@ -572,8 +562,8 @@ export class BuilderServer {
 
     try {
       // 构建 bun build 命令参数
-      // 始终使用绝对路径作为入口，避免与 tests/data 下其他测试的 main.ts 等文件冲突
-      const args: string[] = ["build", entryPoint];
+      // workDir 为项目根时使用相对入口路径；否则使用绝对路径，避免与 tests/data 等冲突
+      const args: string[] = ["build", buildEntry];
 
       // 设置目标平台为 node（服务端）
       args.push("--target", "node");
@@ -583,9 +573,6 @@ export class BuilderServer {
 
       // 使用 --outdir 而非 --outfile：Bun 会生成多文件（如 server.js + 原生 .node 等），
       // 单文件输出会报 "cannot write multiple output files without an output directory"
-      const outputRelativeDir = hasConfig
-        ? relative(entryDir, actualOutputDir)
-        : ".";
       args.push("--outdir", outputRelativeDir);
       args.push("--entry-naming", "server.[ext]");
 
