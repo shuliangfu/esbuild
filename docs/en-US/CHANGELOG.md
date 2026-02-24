@@ -8,6 +8,21 @@ and this project adheres to
 
 ---
 
+## [1.0.39] - 2026-02-24
+
+### Changed
+
+- **AssetsProcessor**: When building the asset path map after processing images,
+  also register a short key (path without `assetsDir` prefix), e.g.
+  `images/0.png` → hashed path, so that source references like `/images/0.png`
+  (e.g. in view gallery) can be resolved.
+- **AssetsProcessor**: In JS file path replacement, replace both the exact key
+  and `"/" + key` with the hashed path, so that strings like `"/images/0.png"`
+  in the bundle are updated to `"/assets/images/0.xxx.avif"`. Enables production
+  to use hashed image URLs without relying on runtime asset-manifest.json.
+
+---
+
 ## [1.0.38] - 2026-02-24
 
 ### Fixed

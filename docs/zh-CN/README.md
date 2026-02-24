@@ -1059,13 +1059,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.38**（2026-02-24）
+**v1.0.39**（2026-02-24）
 
-- **修复**：解析器（Bun）— 在 dweb-cli 创建的 Bun 项目下服务端构建时，
-  `@dreamer/plugins/*`（如 tailwindcss、static）现能正确解析，不再在
-  `bun run build` / `bun run start` 后出现 `(void 0)`。
-- **变更**：解析器（Bun）— 全部文案 i18n、使用 logger 替代 console；i18n 与
-  logger 推广至其余 `src/` 模块。
+- **变更**：AssetsProcessor — 登记短路径并替换 JS 中 `"/images/xxx"` 形式引用为
+  带 hash 的 URL，生产环境可直接使用带 hash 的图片，无需 asset-manifest。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
