@@ -21,6 +21,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import type { BuildOptions, BuildResult } from "./types.ts";
 import { logger } from "./utils/logger.ts";
+import { $tr } from "./i18n.ts";
 
 /**
  * 缓存统计信息
@@ -320,7 +321,7 @@ export class CacheManager {
       await writeTextFile(cacheFile, jsonContent);
     } catch (error) {
       // 缓存写入失败，但不影响构建
-      logger.warn("缓存写入失败", { error });
+      logger.warn($tr("log.esbuild.cache.writeFailed"), { error });
     }
   }
 

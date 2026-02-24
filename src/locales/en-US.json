@@ -73,7 +73,15 @@
         "suggestionFiles": "Related files",
         "validateEsbuildMissing": "esbuild dependency not found, build may fail",
         "validateEsbuildDenoMissing": "esbuild import not found in deno.json, build may fail",
-        "contextNotCreated": "Build context not created, call createContext() first"
+        "contextNotCreated": "Build context not created, call createContext() first",
+        "validateOutputWarningLine": "  ⚠️  {warning}",
+        "validateOutputErrorLine": "  ❌ {error}",
+        "validateHtmlMissingDoctype": "HTML file missing DOCTYPE declaration: {filePath}",
+        "validateHtmlScriptMissingSrc": "HTML script tag may be missing src attribute: {filePath}",
+        "validateHtmlLinkMissingHref": "HTML link tag missing href attribute: {filePath}",
+        "validateHtmlFileError": "Cannot validate HTML file format {filePath}: {error}",
+        "validateCssResourceMissing": "Referenced resource in CSS may not exist: {resourcePath} (in {filePath})",
+        "suggestionFilesMore": " and {count} more file(s)"
       },
       "server": {
         "missingOutput": "Server config missing output path (output)",
@@ -135,6 +143,75 @@
       },
       "html": {
         "cannotReadTemplate": "Cannot read HTML template: {path}, using default"
+      },
+      "resolverBun": {
+        "pluginLoaded": "plugin loaded (debug enabled)",
+        "pathAlias": "Path alias: {path} -> {resolvedPath}",
+        "serverNpmExternal": "Server build npm external: {path}",
+        "npmBrowserExternal": "npm browser external: {path} -> {browserUrl}",
+        "npmProtocolResolved": "npm protocol resolved: {path} -> {resultPath}",
+        "cachePath": "Cache path: {from} -> {to}",
+        "jsrProtocolSkipped": "jsr protocol skipped (Bun not supported): {path}",
+        "jsrUnsupportedWarn": "[bun-resolver] Bun does not support jsr: protocol \"{path}\". Please map JSR packages via package.json imports.",
+        "serverBareExternal": "Server build bare package external: {path}",
+        "bareSubpathCache": "bare subpath (cache): {path} -> {filePath}",
+        "bareSubpathResolved": "bare subpath: {path} -> {fullPath} -> {resultPath}",
+        "subpathBrowserExternal": "Subpath browser external: {path} -> {browserUrl}",
+        "bunProtocolRelativeByImporter": "bun-protocol relative path (by importer dir): {importer} + {relativePath} -> {pathToUse}",
+        "bunProtocolRelative": "bun-protocol relative path: {importer} + {relativePath} -> {resolvedPath}",
+        "bunProtocolProtocolRelative": "bun-protocol protocol relative: {importer} + {relativePath} -> {resolvedPath}",
+        "onLoadBunProtocol": "onLoad bun-protocol: {protocolPath}",
+        "onLoadSubpathTry": "onLoad subpath try: {protocolPath} (base={base}, subpath={subpath})",
+        "onLoadSubpathCannotParseBase": "onLoad subpath: cannot parse base={base}",
+        "onLoadSubpathByExports": "onLoad subpath (by exports): {protocolPath} -> {pathToUse} ({count} chars)",
+        "onLoadSubpathByImportsKey": "onLoad subpath (by imports key {importKey}): {protocolPath} -> {pathToUse} ({count} chars)",
+        "onLoadSubpathPackageNotFound": "onLoad subpath: package not found in node_modules base={base}",
+        "onLoadSubpathError": "onLoad subpath error: {protocolPath} -> {message}",
+        "onLoadFromFile": "onLoad read from file: {protocolPath} -> {pathToUse} ({count} chars)",
+        "resolving": "resolving: {path}"
+      },
+      "bundle": {
+        "noOutputFiles": "esbuild bundle failed: no output files. Entry: {entryPoint}",
+        "outputFileEmpty": "esbuild bundle failed: output file is empty. Entry: {entryPoint}",
+        "bunBundleFailed": "Bun bundle failed: {stderr}. Entry: {entryPoint}",
+        "unknownError": "Unknown error"
+      },
+      "assets": {
+        "readImageFailed": "Failed to read image",
+        "formatConvertFailed": "Image format conversion failed, keeping original format and continuing hash",
+        "compressFailed": "Image compression failed, keeping original and continuing hash",
+        "hashFailed": "Image hashing failed",
+        "processedPath": "./{path}"
+      },
+      "cache": {
+        "writeFailed": "Cache write failed"
+      },
+      "conditionalCompile": {
+        "unclosedBlock": "Conditional compile warning: unclosed conditional block (#ifdef without matching #endif)"
+      },
+      "resolverDeno": {
+        "buildModuleCacheStart": "buildModuleCache start: entry={entryPoint}, workDir={workDir}",
+        "buildModuleCacheDenoInfoFailed": "buildModuleCache deno info failed: {stderr}",
+        "buildModuleCacheAdd": "buildModuleCache add: {jsrKey} -> {localPath}",
+        "buildModuleCacheNpm": "buildModuleCache npm: {spec} -> {localPath}",
+        "buildModuleCacheNpmResolveFailed": "buildModuleCache npm resolve failed: {spec}",
+        "buildModuleCacheDone": "buildModuleCache done: {count} module(s)",
+        "buildModuleCacheError": "buildModuleCache error: {error}",
+        "cdnCssExternal": "CDN CSS external: {path}",
+        "fileRelativePath": "file relative path: {path} -> {resolved}",
+        "fileRelativePathCss": "file relative path (+.css): {path} -> {withCss}",
+        "serverBuildExternal": "Server build external: {specifier}",
+        "noModuleCache": "No moduleCache, jsr/npm cannot be resolved",
+        "useProjectVersion": "Using project version: {specifier} -> {tryPath}",
+        "cacheLookupHit": "cacheLookup hit: {tryPath} -> {localPath}",
+        "cacheLookupHitOriginal": "cacheLookup hit (original specifier): {specifier} -> {fallback}",
+        "cacheLookupMiss": "cacheLookup miss: {tryPath}",
+        "barePkgResolve": "bare package resolve: {packageName} -> {packageImport}",
+        "resolveOverrides": "resolveOverrides: {path} -> {override}",
+        "bareSubpathResolve": "bare subpath resolve: {path} -> {packageImport}",
+        "resolveRelative": "resolveRelative: {protocolPath} + {relativePath} -> {targetSpecifier}",
+        "onLoadProtocol": "onLoad {protocolPath}",
+        "onLoadFromCache": "onLoad read from cache {protocolPath} -> {localPath} ({count} chars)"
       }
     }
   }

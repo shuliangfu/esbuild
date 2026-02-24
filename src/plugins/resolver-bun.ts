@@ -27,13 +27,10 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import type { BuildLogger } from "../types.ts";
+import { $tr } from "../i18n.ts";
+import { logger } from "../utils/logger.ts";
 
 const PREFIX = "[resolver-bun]";
-
-const NOOP_LOGGER: BuildLogger = {
-  debug: () => {},
-  info: () => {},
-};
 
 /**
  * 解析器选项
@@ -359,6 +356,61 @@ function resolvePathAlias(
   return undefined;
 }
 
+/** 从 npm 协议路径提取包身份（不含版本），如 npm:@jsr/dreamer__plugins@^1.0.6 -> @jsr/dreamer__plugins */
+function npmBaseToPackageIdentity(base: string): string {
+  if (!base.startsWith("npm:")) return base;
+  const after = base.slice(4);
+  const slashIdx = after.indexOf("/");
+  if (slashIdx === -1) return after;
+  const scope = after.slice(0, slashIdx);
+  const nameWithVer = after.slice(slashIdx + 1);
+  const name = nameWithVer.includes("@")
+    ? nameWithVer.split("@")[0]!
+    : nameWithVer;
+  return `${scope}/${name}`;
+}
+
+/**
+ * 从项目 package.json 的 imports/dependencies 中查找映射到同一 npm 包的键（如 "@dreamer/plugins" -> npm:@jsr/dreamer__plugins@^1.0.6）
+ * Bun 安装时可能按键名落在 node_modules/@dreamer/plugins，需用此键解析目录
+ *
+ * @param projectDir - 项目根目录（含 package.json）
+ * @param npmBase - 协议 base，如 npm:@jsr/dreamer__plugins@^1.0.6
+ * @returns 映射到该包的 import 键（如 @dreamer/plugins），未找到返回 undefined
+ */
+function findImportKeyForNpmBase(
+  projectDir: string,
+  npmBase: string,
+): string | undefined {
+  const pkgPath = join(projectDir, "package.json");
+  if (!existsSync(pkgPath)) return undefined;
+  try {
+    const raw = readTextFileSync(pkgPath);
+    const config = JSON.parse(raw) as {
+      imports?: Record<string, string>;
+      dependencies?: Record<string, string>;
+    };
+    const targetId = npmBaseToPackageIdentity(npmBase);
+    const sources = [
+      config.imports as Record<string, string> | undefined,
+      config.dependencies as Record<string, string> | undefined,
+    ].filter(Boolean) as Record<string, string>[];
+    for (const map of sources) {
+      for (const [key, value] of Object.entries(map)) {
+        if (!value || typeof value !== "string") continue;
+        const val = value.trim().replace(/^npm:\/+/, "npm:");
+        if (!val.startsWith("npm:")) continue;
+        if (npmBaseToPackageIdentity(val) === targetId) {
+          return key;
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
 /** 脚本扩展名，与 resolver-deno 一致，用于无扩展名路径的解析 */
 const SCRIPT_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"];
 
@@ -459,6 +511,61 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
         }
       } catch {
         /* 当前层读取失败，继续向上 */
+      }
+    }
+    // 按 package.json imports 键路径回退（如 node_modules/@dreamer/plugins）
+    const importKey = findImportKeyForNpmBase(dir, base);
+    if (importKey) {
+      const keyParts = importKey.split("/");
+      const keyScope = keyParts[0] ?? "";
+      const keyName = keyParts[1] ?? "";
+      if (keyScope && keyName) {
+        const keyScopeDir = join(dir, "node_modules", keyScope);
+        if (existsSync(keyScopeDir)) {
+          try {
+            const keyEntries = readdirSync(keyScopeDir);
+            const keyPkgDir = keyEntries.find(
+              (e: { isFile: boolean; name: string }) =>
+                !e.isFile && e.name.startsWith(keyName),
+            );
+            if (keyPkgDir) {
+              const keyPkgRoot = join(keyScopeDir, keyPkgDir.name);
+              const keyPkgJsonPath = join(keyPkgRoot, "package.json");
+              if (existsSync(keyPkgJsonPath)) {
+                const keyRaw = readTextFileSync(keyPkgJsonPath);
+                const keyPkg = JSON.parse(keyRaw) as {
+                  exports?: Record<
+                    string,
+                    string | { import?: string; default?: string }
+                  >;
+                };
+                const keyExportEntry = keyPkg.exports?.["./" + subpath];
+                let keyTarget: string | undefined;
+                if (typeof keyExportEntry === "string") {
+                  keyTarget = keyExportEntry;
+                } else if (
+                  keyExportEntry &&
+                  typeof keyExportEntry === "object"
+                ) {
+                  keyTarget =
+                    (keyExportEntry as { import?: string; default?: string })
+                      .import ??
+                      (keyExportEntry as { import?: string; default?: string })
+                        .default;
+                }
+                if (keyTarget != null && typeof keyTarget === "string") {
+                  const keyRes = join(keyPkgRoot, keyTarget);
+                  const keyPathToUse = resolveScriptPath(keyRes);
+                  if (keyPathToUse) {
+                    return dirname(keyPathToUse);
+                  }
+                }
+              }
+            }
+          } catch {
+            /* 当前层读取失败 */
+          }
+        }
       }
     }
     const parent = dirname(dir);
@@ -600,7 +707,7 @@ export function bunResolverPlugin(
     logger: optionsLogger,
   } = options;
 
-  const log = optionsLogger ?? NOOP_LOGGER;
+  const log = optionsLogger ?? logger;
   const debugLog = (msg: string) => {
     if (debug) log.debug(`${PREFIX} ${msg}`);
   };
@@ -612,7 +719,7 @@ export function bunResolverPlugin(
         return;
       }
       // 插件加载时打一条 debug，便于确认 debug 与 logger 已正确传入（Bun 下很多解析走默认，可能不会命中后续 onResolve）
-      debugLog("plugin loaded (debug enabled)");
+      debugLog($tr("log.esbuild.resolverBun.pluginLoaded"));
 
       // 1. 处理路径别名（通过 package.json imports 或 tsconfig.json paths 配置）
       // 例如：import { x } from "@/utils.ts"
@@ -629,7 +736,9 @@ export function bunResolverPlugin(
 
           const resolvedPath = resolvePathAlias(path, startDir);
           if (resolvedPath) {
-            debugLog(`路径别名: ${path} -> ${resolvedPath}`);
+            debugLog(
+              $tr("log.esbuild.resolverBun.pathAlias", { path, resolvedPath }),
+            );
             return {
               path: resolvedPath,
               namespace: "file",
@@ -651,7 +760,9 @@ export function bunResolverPlugin(
 
           // 服务端构建：仅针对 npm 包，直接 external，由运行时解析
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 npm external: ${path}`);
+            debugLog(
+              $tr("log.esbuild.resolverBun.serverNpmExternal", { path }),
+            );
             return { path, external: true };
           }
 
@@ -659,7 +770,12 @@ export function bunResolverPlugin(
           if (browserMode) {
             const browserUrl = convertSpecifierToBrowserUrl(path);
             if (browserUrl) {
-              debugLog(`npm 浏览器 external: ${path} -> ${browserUrl}`);
+              debugLog(
+                $tr("log.esbuild.resolverBun.npmBrowserExternal", {
+                  path,
+                  browserUrl,
+                }),
+              );
               return {
                 path: browserUrl,
                 external: true,
@@ -669,9 +785,19 @@ export function bunResolverPlugin(
 
           const result = await resolveBunProtocolPath(path);
           if (result?.path) {
-            debugLog(`npm 协议解析: ${path} -> ${result.path}`);
+            debugLog(
+              $tr("log.esbuild.resolverBun.npmProtocolResolved", {
+                path,
+                resultPath: result.path,
+              }),
+            );
             if (result.namespace === "file") {
-              debugLog(`缓存路径: ${path} -> ${result.path}`);
+              debugLog(
+                $tr("log.esbuild.resolverBun.cachePath", {
+                  from: path,
+                  to: result.path,
+                }),
+              );
             }
             // 必须只返回 protocolPath 作为 path，否则同一逻辑模块会因 importer 不同被 esbuild 视为不同模块，导致重复打包、chunk/路由体积暴增
             if (result.namespace === "bun-protocol") {
@@ -691,13 +817,18 @@ export function bunResolverPlugin(
       build.onResolve(
         { filter: /^jsr:/ },
         (args): esbuild.OnResolveResult | undefined => {
-          debugLog(`jsr 协议跳过（Bun 不支持）: ${args.path}`);
+          debugLog(
+            $tr("log.esbuild.resolverBun.jsrProtocolSkipped", {
+              path: args.path,
+            }),
+          );
           // Bun 不支持直接使用 jsr: 协议
           // 建议用户通过 package.json imports 映射来使用 JSR 包
           // 然后代码中使用：import { x } from "@dreamer/logger/client"
-          console.warn(
-            `[bun-resolver] Bun 不支持直接使用 jsr: 协议导入 "${args.path}"。` +
-              `请通过 package.json 的 imports 字段映射 JSR 包，然后使用不带 jsr: 前缀的导入。`,
+          log.warn?.(
+            $tr("log.esbuild.resolverBun.jsrUnsupportedWarn", {
+              path: args.path,
+            }),
           );
           // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
           return undefined;
@@ -710,7 +841,11 @@ export function bunResolverPlugin(
         { filter: /^@[^/]+\/[^/]+$/ },
         (args): esbuild.OnResolveResult | undefined => {
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 bare 包 external: ${args.path}`);
+            debugLog(
+              $tr("log.esbuild.resolverBun.serverBareExternal", {
+                path: args.path,
+              }),
+            );
             return { path: args.path, external: true };
           }
           return undefined;
@@ -784,8 +919,18 @@ export function bunResolverPlugin(
                 }
 
                 if (filePath && existsSync(filePath)) {
-                  debugLog(`bare 子路径(缓存): ${path} -> ${filePath}`);
-                  debugLog(`缓存路径: ${path} -> ${filePath}`);
+                  debugLog(
+                    $tr("log.esbuild.resolverBun.bareSubpathCache", {
+                      path,
+                      filePath,
+                    }),
+                  );
+                  debugLog(
+                    $tr("log.esbuild.resolverBun.cachePath", {
+                      from: path,
+                      to: filePath,
+                    }),
+                  );
                   return {
                     path: filePath,
                     namespace: "file",
@@ -811,7 +956,12 @@ export function bunResolverPlugin(
           if (browserMode) {
             const browserUrl = convertSpecifierToBrowserUrl(fullProtocolPath);
             if (browserUrl) {
-              debugLog(`子路径浏览器 external: ${path} -> ${browserUrl}`);
+              debugLog(
+                $tr("log.esbuild.resolverBun.subpathBrowserExternal", {
+                  path,
+                  browserUrl,
+                }),
+              );
               return {
                 path: browserUrl,
                 external: true,
@@ -825,11 +975,23 @@ export function bunResolverPlugin(
             const fromCache = result.path.includes("node_modules/.bun");
             debugLog(
               fromCache
-                ? `bare 子路径(缓存): ${path} -> ${result.path}`
-                : `bare 子路径: ${path} -> ${fullProtocolPath} -> ${result.path}`,
+                ? $tr("log.esbuild.resolverBun.bareSubpathCache", {
+                  path,
+                  filePath: result.path,
+                })
+                : $tr("log.esbuild.resolverBun.bareSubpathResolved", {
+                  path,
+                  fullPath: fullProtocolPath,
+                  resultPath: result.path,
+                }),
             );
             if (result.namespace === "file") {
-              debugLog(`缓存路径: ${path} -> ${result.path}`);
+              debugLog(
+                $tr("log.esbuild.resolverBun.cachePath", {
+                  from: path,
+                  to: result.path,
+                }),
+              );
             }
             // 必须只返回 protocolPath，否则同一子路径会因 importer 不同被 esbuild 重复打包
             if (result.namespace === "bun-protocol") {
@@ -867,7 +1029,14 @@ export function bunResolverPlugin(
                   (existsSync(absolutePath) ? absolutePath : null);
                 if (pathToUse) {
                   debugLog(
-                    `bun-protocol 相对路径(按 importer 目录): ${importer} + ${args.path} -> ${pathToUse}`,
+                    $tr(
+                      "log.esbuild.resolverBun.bunProtocolRelativeByImporter",
+                      {
+                        importer,
+                        relativePath: args.path,
+                        pathToUse,
+                      },
+                    ),
                   );
                   return {
                     path: pathToUse,
@@ -909,7 +1078,11 @@ export function bunResolverPlugin(
 
                 if (existsSync(resolvedPath)) {
                   debugLog(
-                    `bun-protocol 相对路径: ${importer} + ${args.path} -> ${resolvedPath}`,
+                    $tr("log.esbuild.resolverBun.bunProtocolRelative", {
+                      importer,
+                      relativePath: args.path,
+                      resolvedPath,
+                    }),
                   );
                   return {
                     path: resolvedPath,
@@ -959,7 +1132,14 @@ export function bunResolverPlugin(
 
                   if (existsSync(resolvedProtocolPath)) {
                     debugLog(
-                      `bun-protocol 协议相对: ${importer} + ${args.path} -> ${resolvedProtocolPath}`,
+                      $tr(
+                        "log.esbuild.resolverBun.bunProtocolProtocolRelative",
+                        {
+                          importer,
+                          relativePath: args.path,
+                          resolvedPath: resolvedProtocolPath,
+                        },
+                      ),
                     );
                     return {
                       path: resolvedProtocolPath,
@@ -992,13 +1172,16 @@ export function bunResolverPlugin(
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           // path 仅为 protocolPath（不包含 importer），保证同一逻辑模块只对应一个 key，避免重复打包
           const protocolPath = args.path;
-          debugLog(`onLoad bun-protocol: ${protocolPath}`);
+          debugLog(
+            $tr("log.esbuild.resolverBun.onLoadBunProtocol", { protocolPath }),
+          );
 
           // 如果协议路径是 jsr:，Bun 不支持，返回 undefined
           if (protocolPath.startsWith("jsr:")) {
-            console.warn(
-              `[bun-resolver] Bun 不支持直接使用 jsr: 协议 "${protocolPath}"。` +
-                `请通过 package.json 的 imports 字段映射 JSR 包。`,
+            log.warn?.(
+              $tr("log.esbuild.resolverBun.jsrUnsupportedWarn", {
+                path: protocolPath,
+              }),
             );
             return undefined;
           }
@@ -1014,7 +1197,11 @@ export function bunResolverPlugin(
                 if (subpath && !subpath.includes("..")) {
                   try {
                     debugLog(
-                      `onLoad 子路径尝试: ${protocolPath} (base=${base}, subpath=${subpath})`,
+                      $tr("log.esbuild.resolverBun.onLoadSubpathTry", {
+                        protocolPath,
+                        base,
+                        subpath,
+                      }),
                     );
                     // 不依赖 Bun.resolveSync，从 importer 向上在 node_modules 里按包名查找（npm:@jsr/name@v -> node_modules/@jsr/name@*）
                     const baseParts = base.split("/");
@@ -1026,11 +1213,17 @@ export function bunResolverPlugin(
                       ? nameWithVer.split("@")[0]!
                       : nameWithVer;
                     if (!scope || !namePrefix) {
-                      debugLog(`onLoad 子路径: 无法解析 base=${base}`);
+                      debugLog(
+                        $tr(
+                          "log.esbuild.resolverBun.onLoadSubpathCannotParseBase",
+                          { base },
+                        ),
+                      );
                     } else {
                       // 从 cwd() 向上找 node_modules（不再用 importer，避免 path 含 importer 导致 esbuild 重复打包）
                       let dir = cwd();
                       for (let up = 0; up < 20 && dir; up++) {
+                        // 1) 先按协议路径解析：node_modules/@jsr/dreamer__plugins*
                         const scopeDir = join(dir, "node_modules", scope);
                         if (existsSync(scopeDir)) {
                           try {
@@ -1042,7 +1235,10 @@ export function bunResolverPlugin(
                             );
                             if (pkgDir) {
                               const pkgRoot = join(scopeDir, pkgDir.name);
-                              const pkgJsonPath = join(pkgRoot, "package.json");
+                              const pkgJsonPath = join(
+                                pkgRoot,
+                                "package.json",
+                              );
                               if (existsSync(pkgJsonPath)) {
                                 const raw = readTextFileSync(pkgJsonPath);
                                 const pkg = JSON.parse(raw) as {
@@ -1084,7 +1280,14 @@ export function bunResolverPlugin(
                                     );
                                     const loader = getLoaderFromPath(pathToUse);
                                     debugLog(
-                                      `onLoad 子路径(按 exports): ${protocolPath} -> ${pathToUse} (${contents.length} chars)`,
+                                      $tr(
+                                        "log.esbuild.resolverBun.onLoadSubpathByExports",
+                                        {
+                                          protocolPath,
+                                          pathToUse,
+                                          count: String(contents.length),
+                                        },
+                                      ),
                                     );
                                     return {
                                       contents,
@@ -1099,19 +1302,131 @@ export function bunResolverPlugin(
                             /* 当前层 readdir 失败，继续向上 */
                           }
                         }
+
+                        // 2) 未找到则按 package.json imports 键路径查找（Bun 可能装在 node_modules/@dreamer/plugins）
+                        const importKey = findImportKeyForNpmBase(dir, base);
+                        if (importKey) {
+                          const keyParts = importKey.split("/");
+                          const keyScope = keyParts[0] ?? "";
+                          const keyName = keyParts[1] ?? "";
+                          if (keyScope && keyName) {
+                            const keyScopeDir = join(
+                              dir,
+                              "node_modules",
+                              keyScope,
+                            );
+                            if (existsSync(keyScopeDir)) {
+                              try {
+                                const keyEntries = readdirSync(keyScopeDir);
+                                const keyPkgDir = keyEntries.find(
+                                  (e: { isFile: boolean; name: string }) =>
+                                    !e.isFile &&
+                                    e.name.startsWith(keyName),
+                                );
+                                if (keyPkgDir) {
+                                  const keyPkgRoot = join(
+                                    keyScopeDir,
+                                    keyPkgDir.name,
+                                  );
+                                  const keyPkgJsonPath = join(
+                                    keyPkgRoot,
+                                    "package.json",
+                                  );
+                                  if (existsSync(keyPkgJsonPath)) {
+                                    const keyRaw = readTextFileSync(
+                                      keyPkgJsonPath,
+                                    );
+                                    const keyPkg = JSON.parse(keyRaw) as {
+                                      exports?: Record<
+                                        string,
+                                        string | {
+                                          import?: string;
+                                          default?: string;
+                                        }
+                                      >;
+                                    };
+                                    const keyExportEntry = keyPkg.exports
+                                      ?.["./" + subpath];
+                                    let keyTarget: string | undefined;
+                                    if (
+                                      typeof keyExportEntry === "string"
+                                    ) {
+                                      keyTarget = keyExportEntry;
+                                    } else if (
+                                      keyExportEntry &&
+                                      typeof keyExportEntry === "object"
+                                    ) {
+                                      keyTarget = (keyExportEntry as {
+                                        import?: string;
+                                        default?: string;
+                                      }).import ??
+                                        (keyExportEntry as {
+                                          import?: string;
+                                          default?: string;
+                                        }).default;
+                                    }
+                                    if (
+                                      keyTarget != null &&
+                                      typeof keyTarget === "string"
+                                    ) {
+                                      const keyRes = join(
+                                        keyPkgRoot,
+                                        keyTarget,
+                                      );
+                                      const keyPathToUse = resolveScriptPath(
+                                        keyRes,
+                                      );
+                                      if (keyPathToUse) {
+                                        const keyContents = await readTextFile(
+                                          keyPathToUse,
+                                        );
+                                        const keyLoader = getLoaderFromPath(
+                                          keyPathToUse,
+                                        );
+                                        debugLog(
+                                          $tr(
+                                            "log.esbuild.resolverBun.onLoadSubpathByImportsKey",
+                                            {
+                                              importKey,
+                                              protocolPath,
+                                              pathToUse: keyPathToUse,
+                                              count: String(keyContents.length),
+                                            },
+                                          ),
+                                        );
+                                        return {
+                                          contents: keyContents,
+                                          loader: keyLoader,
+                                          resolveDir: dirname(keyPathToUse),
+                                        };
+                                      }
+                                    }
+                                  }
+                                }
+                              } catch {
+                                /* 当前层 readdir 失败 */
+                              }
+                            }
+                          }
+                        }
+
                         const parent = dirname(dir);
                         if (parent === dir) break; // 已到根目录
                         dir = parent;
                       }
                       debugLog(
-                        `onLoad 子路径: 未在 node_modules 中找到包 base=${base}`,
+                        $tr(
+                          "log.esbuild.resolverBun.onLoadSubpathPackageNotFound",
+                          { base },
+                        ),
                       );
                     }
                   } catch (e) {
                     debugLog(
-                      `onLoad 子路径异常: ${protocolPath} -> ${
-                        e instanceof Error ? e.message : String(e)
-                      }`,
+                      $tr("log.esbuild.resolverBun.onLoadSubpathError", {
+                        protocolPath,
+                        message: e instanceof Error ? e.message : String(e),
+                      }),
                     );
                   }
                 }
@@ -1160,7 +1475,12 @@ export function bunResolverPlugin(
               }
 
               const pathToUse = filePath;
-              debugLog(`缓存路径: ${protocolPath} -> ${pathToUse}`);
+              debugLog(
+                $tr("log.esbuild.resolverBun.cachePath", {
+                  from: protocolPath,
+                  to: pathToUse,
+                }),
+              );
 
               // 设置 resolveDir 为文件所在目录，以便 esbuild 能解析文件内部的相对路径导入
               const resolveDir = dirname(pathToUse);
@@ -1169,7 +1489,11 @@ export function bunResolverPlugin(
                 const contents = await readTextFile(pathToUse);
                 const loader = getLoaderFromPath(pathToUse);
                 debugLog(
-                  `onLoad 从文件读取: ${protocolPath} -> ${pathToUse} (${contents.length} chars)`,
+                  $tr("log.esbuild.resolverBun.onLoadFromFile", {
+                    protocolPath,
+                    pathToUse,
+                    count: String(contents.length),
+                  }),
                 );
                 return {
                   contents,
@@ -1207,7 +1531,9 @@ export function bunResolverPlugin(
         build.onResolve(
           { filter: /.*/ },
           (args): undefined => {
-            debugLog(`resolving: ${args.path}`);
+            debugLog(
+              $tr("log.esbuild.resolverBun.resolving", { path: args.path }),
+            );
             return undefined;
           },
         );
@@ -1226,7 +1552,12 @@ export function bunResolverPlugin(
                   // ignore
                 }
                 const pathToUse = filePath;
-                debugLog(`缓存路径: ${path} -> ${pathToUse}`);
+                debugLog(
+                  $tr("log.esbuild.resolverBun.cachePath", {
+                    from: path,
+                    to: pathToUse,
+                  }),
+                );
               }
             } catch {
               // 解析失败不报错，仅跳过打印
