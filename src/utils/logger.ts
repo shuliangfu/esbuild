@@ -14,6 +14,7 @@ import { createLogger, type Logger } from "@dreamer/logger";
 export const logger: Logger = createLogger({
   level: "info",
   format: "text",
+  showTime: false,
   output: {
     console: true,
   },

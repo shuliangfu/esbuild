@@ -73,7 +73,15 @@
         "suggestionFiles": "相关文件",
         "validateEsbuildMissing": "未找到 esbuild 依赖，构建可能失败",
         "validateEsbuildDenoMissing": "未在 deno.json 中找到 esbuild 导入，构建可能失败",
-        "contextNotCreated": "构建上下文未创建，请先调用 createContext()"
+        "contextNotCreated": "构建上下文未创建，请先调用 createContext()",
+        "validateOutputWarningLine": "  ⚠️  {warning}",
+        "validateOutputErrorLine": "  ❌ {error}",
+        "validateHtmlMissingDoctype": "HTML 文件缺少 DOCTYPE 声明: {filePath}",
+        "validateHtmlScriptMissingSrc": "HTML 中的 script 标签可能缺少 src 属性: {filePath}",
+        "validateHtmlLinkMissingHref": "HTML 中的 link 标签缺少 href 属性: {filePath}",
+        "validateHtmlFileError": "无法验证 HTML 文件格式 {filePath}: {error}",
+        "validateCssResourceMissing": "CSS 文件中引用的资源可能不存在: {resourcePath} (在 {filePath} 中)",
+        "suggestionFilesMore": " 等 {count} 个文件"
       },
       "server": {
         "missingOutput": "服务端配置缺少输出路径 (output)",
@@ -135,6 +143,75 @@
       },
       "html": {
         "cannotReadTemplate": "无法读取 HTML 模板: {path}，使用默认模板"
+      },
+      "resolverBun": {
+        "pluginLoaded": "插件已加载（debug 已开启）",
+        "pathAlias": "路径别名: {path} -> {resolvedPath}",
+        "serverNpmExternal": "服务端构建 npm external: {path}",
+        "npmBrowserExternal": "npm 浏览器 external: {path} -> {browserUrl}",
+        "npmProtocolResolved": "npm 协议解析: {path} -> {resultPath}",
+        "cachePath": "缓存路径: {from} -> {to}",
+        "jsrProtocolSkipped": "jsr 协议跳过（Bun 不支持）: {path}",
+        "jsrUnsupportedWarn": "[bun-resolver] Bun 不支持直接使用 jsr: 协议 \"{path}\"。请通过 package.json 的 imports 字段映射 JSR 包。",
+        "serverBareExternal": "服务端构建 bare 包 external: {path}",
+        "bareSubpathCache": "bare 子路径(缓存): {path} -> {filePath}",
+        "bareSubpathResolved": "bare 子路径: {path} -> {fullPath} -> {resultPath}",
+        "subpathBrowserExternal": "子路径浏览器 external: {path} -> {browserUrl}",
+        "bunProtocolRelativeByImporter": "bun-protocol 相对路径(按 importer 目录): {importer} + {relativePath} -> {pathToUse}",
+        "bunProtocolRelative": "bun-protocol 相对路径: {importer} + {relativePath} -> {resolvedPath}",
+        "bunProtocolProtocolRelative": "bun-protocol 协议相对: {importer} + {relativePath} -> {resolvedPath}",
+        "onLoadBunProtocol": "onLoad bun-protocol: {protocolPath}",
+        "onLoadSubpathTry": "onLoad 子路径尝试: {protocolPath} (base={base}, subpath={subpath})",
+        "onLoadSubpathCannotParseBase": "onLoad 子路径: 无法解析 base={base}",
+        "onLoadSubpathByExports": "onLoad 子路径(按 exports): {protocolPath} -> {pathToUse} ({count} chars)",
+        "onLoadSubpathByImportsKey": "onLoad 子路径(按 imports 键 {importKey}): {protocolPath} -> {pathToUse} ({count} chars)",
+        "onLoadSubpathPackageNotFound": "onLoad 子路径: 未在 node_modules 中找到包 base={base}",
+        "onLoadSubpathError": "onLoad 子路径异常: {protocolPath} -> {message}",
+        "onLoadFromFile": "onLoad 从文件读取: {protocolPath} -> {pathToUse} ({count} chars)",
+        "resolving": "resolving: {path}"
+      },
+      "bundle": {
+        "noOutputFiles": "esbuild 打包失败：没有生成输出文件。入口文件: {entryPoint}",
+        "outputFileEmpty": "esbuild 打包失败：输出文件为空。入口文件: {entryPoint}",
+        "bunBundleFailed": "Bun 打包失败: {stderr}。入口文件: {entryPoint}",
+        "unknownError": "未知错误"
+      },
+      "assets": {
+        "readImageFailed": "读取图片失败",
+        "formatConvertFailed": "图片格式转换失败，保持原格式并继续 hash",
+        "compressFailed": "图片压缩失败，保持原样并继续 hash",
+        "hashFailed": "图片 hash 化失败",
+        "processedPath": "./{path}"
+      },
+      "cache": {
+        "writeFailed": "缓存写入失败"
+      },
+      "conditionalCompile": {
+        "unclosedBlock": "条件编译警告：检测到未关闭的条件编译块（#ifdef 没有对应的 #endif）"
+      },
+      "resolverDeno": {
+        "buildModuleCacheStart": "buildModuleCache 开始: entry={entryPoint}, workDir={workDir}",
+        "buildModuleCacheDenoInfoFailed": "buildModuleCache deno info 失败: {stderr}",
+        "buildModuleCacheAdd": "buildModuleCache 添加: {jsrKey} -> {localPath}",
+        "buildModuleCacheNpm": "buildModuleCache npm: {spec} -> {localPath}",
+        "buildModuleCacheNpmResolveFailed": "buildModuleCache npm resolve 失败: {spec}",
+        "buildModuleCacheDone": "buildModuleCache 完成: {count} 个模块",
+        "buildModuleCacheError": "buildModuleCache 错误: {error}",
+        "cdnCssExternal": "CDN CSS external: {path}",
+        "fileRelativePath": "file 相对路径: {path} -> {resolved}",
+        "fileRelativePathCss": "file 相对路径(+.css): {path} -> {withCss}",
+        "serverBuildExternal": "服务端构建 external: {specifier}",
+        "noModuleCache": "无 moduleCache，jsr/npm 无法解析",
+        "useProjectVersion": "使用项目版本: {specifier} -> {tryPath}",
+        "cacheLookupHit": "cacheLookup 命中: {tryPath} -> {localPath}",
+        "cacheLookupHitOriginal": "cacheLookup 命中(原 specifier): {specifier} -> {fallback}",
+        "cacheLookupMiss": "cacheLookup 未命中: {tryPath}",
+        "barePkgResolve": "bare 包解析: {packageName} -> {packageImport}",
+        "resolveOverrides": "resolveOverrides: {path} -> {override}",
+        "bareSubpathResolve": "bare 子路径解析: {path} -> {packageImport}",
+        "resolveRelative": "resolveRelative: {protocolPath} + {relativePath} -> {targetSpecifier}",
+        "onLoadProtocol": "onLoad {protocolPath}",
+        "onLoadFromCache": "onLoad 从缓存读取 {protocolPath} -> {localPath} ({count} chars)"
       }
     }
   }

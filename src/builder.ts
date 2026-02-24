@@ -841,7 +841,10 @@ export class Builder implements IBuilder {
           ":",
       );
       for (const error of errors) {
-        this.log("error", `  ❌ ${error}`);
+        this.log(
+          "error",
+          $tr("log.esbuild.builder.validateOutputErrorLine", { error }),
+        );
       }
       throw new Error(
         $tr("log.esbuild.builder.configValidationFailed"),
@@ -1167,7 +1170,9 @@ export class Builder implements IBuilder {
         { warnings },
       );
       for (const warning of warnings) {
-        logger.warn(`  ⚠️  ${warning}`);
+        logger.warn(
+          $tr("log.esbuild.builder.validateOutputWarningLine", { warning }),
+        );
       }
     }
 
@@ -1177,7 +1182,9 @@ export class Builder implements IBuilder {
         { errors },
       );
       for (const error of errors) {
-        logger.error(`  ❌ ${error}`);
+        logger.error(
+          $tr("log.esbuild.builder.validateOutputErrorLine", { error }),
+        );
       }
       throw new Error(
         $tr("log.esbuild.builder.validateOutputFailed"),
@@ -1198,25 +1205,38 @@ export class Builder implements IBuilder {
 
       // 检查基本 HTML 结构
       if (!content.includes("<!DOCTYPE") && !content.includes("<html")) {
-        warnings.push(`HTML 文件缺少 DOCTYPE 声明: ${filePath}`);
+        warnings.push(
+          $tr("log.esbuild.builder.validateHtmlMissingDoctype", { filePath }),
+        );
       }
 
       // 简单检查：script 和 link 标签是否有正确的属性
       const scriptTags = content.match(/<script[^>]*>/g) || [];
       for (const tag of scriptTags) {
         if (!tag.includes("src=") && !tag.includes("type=")) {
-          warnings.push(`HTML 中的 script 标签可能缺少 src 属性: ${filePath}`);
+          warnings.push(
+            $tr("log.esbuild.builder.validateHtmlScriptMissingSrc", {
+              filePath,
+            }),
+          );
         }
       }
 
       const linkTags = content.match(/<link[^>]*>/g) || [];
       for (const tag of linkTags) {
         if (tag.includes('rel="stylesheet"') && !tag.includes("href=")) {
-          errors.push(`HTML 中的 link 标签缺少 href 属性: ${filePath}`);
+          errors.push(
+            $tr("log.esbuild.builder.validateHtmlLinkMissingHref", {
+              filePath,
+            }),
+          );
         }
       }
     } catch (error) {
-      warnings.push(`无法验证 HTML 文件格式 ${filePath}: ${error}`);
+      warnings.push($tr("log.esbuild.builder.validateHtmlFileError", {
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      }));
     }
   }
 
@@ -1249,7 +1269,10 @@ export class Builder implements IBuilder {
               const fullPath = dir + "/" + resourcePath;
               if (!(await exists(fullPath))) {
                 warnings.push(
-                  `CSS 文件中引用的资源可能不存在: ${resourcePath} (在 ${filePath} 中)`,
+                  $tr("log.esbuild.builder.validateCssResourceMissing", {
+                    resourcePath,
+                    filePath,
+                  }),
                 );
               }
             }
@@ -1639,7 +1662,9 @@ export class Builder implements IBuilder {
       if (suggestion.files && suggestion.files.length > 0) {
         const fileList = suggestion.files.slice(0, 5).join(", ");
         const more = suggestion.files.length > 5
-          ? ` 等 ${suggestion.files.length} 个文件`
+          ? $tr("log.esbuild.builder.suggestionFilesMore", {
+            count: String(suggestion.files.length),
+          })
           : "";
         logger.info(
           `   ${

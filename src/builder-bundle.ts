@@ -30,6 +30,7 @@ import {
 } from "./plugins/resolver-deno.ts";
 import { logger } from "./utils/logger.ts";
 import type { BuildLogger } from "./types.ts";
+import { $tr } from "./i18n.ts";
 
 /**
  * 简单打包选项
@@ -262,14 +263,18 @@ export class BuilderBundle {
     // 获取打包后的代码
     if (!buildResult.outputFiles || buildResult.outputFiles.length === 0) {
       throw new Error(
-        `esbuild 打包失败：没有生成输出文件。入口文件: ${options.entryPoint}`,
+        $tr("log.esbuild.bundle.noOutputFiles", {
+          entryPoint: options.entryPoint,
+        }),
       );
     }
 
     const outputFile = buildResult.outputFiles[0];
     if (!outputFile) {
       throw new Error(
-        `esbuild 打包失败：输出文件为空。入口文件: ${options.entryPoint}`,
+        $tr("log.esbuild.bundle.outputFileEmpty", {
+          entryPoint: options.entryPoint,
+        }),
       );
     }
 
@@ -435,9 +440,14 @@ export class BuilderBundle {
       const output = await command.output();
 
       if (!output.success) {
-        const stderr = output.stderr || "未知错误";
+        const stderrStr = output.stderr
+          ? new TextDecoder().decode(output.stderr)
+          : $tr("log.esbuild.bundle.unknownError");
         throw new Error(
-          `Bun 打包失败: ${stderr}。入口文件: ${options.entryPoint}`,
+          $tr("log.esbuild.bundle.bunBundleFailed", {
+            stderr: stderrStr,
+            entryPoint: options.entryPoint,
+          }),
         );
       }
 

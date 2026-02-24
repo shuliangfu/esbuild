@@ -199,7 +199,8 @@ export class BuilderServer {
       // 注意：deno compile 不支持 --external 参数
       // 如果配置了 external，需要提示用户
       if (externalModules.length > 0) {
-        console.warn(
+        const log = this.config.logger ?? logger;
+        log.warn?.(
           $tr(
             "log.esbuild.server.denoCompileExternalWarning",
             { modules: externalModules.join(", ") },

@@ -14,6 +14,7 @@
 import { readTextFile } from "@dreamer/runtime-adapter";
 import type { BuildPlugin, OnLoadArgs, OnLoadResult } from "../plugin.ts";
 import { logger } from "../utils/logger.ts";
+import { $tr } from "../i18n.ts";
 
 /**
  * 条件编译插件选项
@@ -241,9 +242,7 @@ function processConditionalCompile(
 
   // 如果还有未关闭的条件编译块，发出警告
   if (inConditionalBlock) {
-    logger.warn(
-      "条件编译警告：检测到未关闭的条件编译块（#ifdef 没有对应的 #endif）",
-    );
+    logger.warn($tr("log.esbuild.conditionalCompile.unclosedBlock"));
   }
 
   return result.join("\n");

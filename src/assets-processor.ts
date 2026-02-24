@@ -24,6 +24,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import type { AssetsConfig } from "./types.ts";
 import { logger } from "./utils/logger.ts";
+import { $tr } from "./i18n.ts";
 
 /**
  * 静态资源处理器
@@ -266,7 +267,7 @@ export class AssetsProcessor {
     try {
       imageData = await readFile(filePath);
     } catch (error) {
-      logger.warn("读取图片失败", {
+      logger.warn($tr("log.esbuild.assets.readImageFailed"), {
         filePath,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -294,7 +295,7 @@ export class AssetsProcessor {
           outputPath = filePath.replace(/\.[^.]+$/, `.${ext}`);
         }
       } catch (error) {
-        logger.warn("图片格式转换失败，保持原格式并继续 hash", {
+        logger.warn($tr("log.esbuild.assets.formatConvertFailed"), {
           filePath,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -320,7 +321,7 @@ export class AssetsProcessor {
             | undefined,
         });
       } catch (error) {
-        logger.warn("图片压缩失败，保持原样并继续 hash", {
+        logger.warn($tr("log.esbuild.assets.compressFailed"), {
           filePath,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -348,7 +349,9 @@ export class AssetsProcessor {
         await writeFile(outputPath, processedData);
         // 输出处理后的图片路径（与 builder 产物列表格式一致）
         const displayPath = relative(cwd(), outputPath);
-        logger.info(`./${displayPath}`);
+        logger.info(
+          $tr("log.esbuild.assets.processedPath", { path: displayPath }),
+        );
         if (outputPath !== filePath) {
           try {
             await remove(filePath);
@@ -357,7 +360,7 @@ export class AssetsProcessor {
           }
         }
       } catch (error) {
-        logger.warn("图片 hash 化失败", {
+        logger.warn($tr("log.esbuild.assets.hashFailed"), {
           filePath,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -366,7 +369,9 @@ export class AssetsProcessor {
       await writeFile(outputPath, processedData);
       // 输出处理后的图片路径（无 hash 时，压缩/转换后仍输出）
       const displayPath = relative(cwd(), outputPath);
-      logger.info(`./${displayPath}`);
+      logger.info(
+        $tr("log.esbuild.assets.processedPath", { path: displayPath }),
+      );
       if (outputPath !== filePath) {
         try {
           await remove(filePath);

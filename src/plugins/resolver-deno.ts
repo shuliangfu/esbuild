@@ -20,6 +20,7 @@ import {
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import type { BuildLogger } from "../types.ts";
+import { $tr } from "../i18n.ts";
 
 const PREFIX = "[resolver-deno]";
 
@@ -85,7 +86,12 @@ export async function buildModuleCache(
   const debugLog = (msg: string) => {
     if (debug) log.debug(`${PREFIX} ${msg}`);
   };
-  debugLog(`buildModuleCache 开始: entry=${entryPoint}, workDir=${workDir}`);
+  debugLog(
+    $tr("log.esbuild.resolverDeno.buildModuleCacheStart", {
+      entryPoint,
+      workDir,
+    }),
+  );
 
   const projectDenoJson = findProjectDenoJson(workDir);
   const configArgs = projectDenoJson
@@ -107,7 +113,11 @@ export async function buildModuleCache(
     const output = await proc.output();
     if (!output.success) {
       const stderr = new TextDecoder().decode(output.stderr);
-      debugLog(`buildModuleCache deno info 失败: ${stderr}`);
+      debugLog(
+        $tr("log.esbuild.resolverDeno.buildModuleCacheDenoInfoFailed", {
+          stderr,
+        }),
+      );
       return cache;
     }
     const stdout = new TextDecoder().decode(output.stdout);
@@ -134,7 +144,12 @@ export async function buildModuleCache(
         const jsrKey = `jsr:${scopeAndName}@${version}/${path}`;
         if (localPath) {
           cache.set(jsrKey, localPath);
-          debugLog(`buildModuleCache 添加: ${jsrKey} -> ${localPath}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.buildModuleCacheAdd", {
+              jsrKey,
+              localPath,
+            }),
+          );
         }
       } else if (mod.specifier.startsWith("npm:")) {
         const spec = mod.specifier.replace(/^npm:\/+/, "npm:");
@@ -166,18 +181,35 @@ export async function buildModuleCache(
             const localPath = fileUrlToPath(line);
             if (existsSync(localPath)) {
               cache.set(spec, localPath);
-              debugLog(`buildModuleCache npm: ${spec} -> ${localPath}`);
+              debugLog(
+                $tr("log.esbuild.resolverDeno.buildModuleCacheNpm", {
+                  spec,
+                  localPath,
+                }),
+              );
             }
           }
         }
       } catch {
-        debugLog(`buildModuleCache npm resolve 失败: ${spec}`);
+        debugLog(
+          $tr("log.esbuild.resolverDeno.buildModuleCacheNpmResolveFailed", {
+            spec,
+          }),
+        );
       }
     }
 
-    debugLog(`buildModuleCache 完成: ${cache.size} 个模块`);
+    debugLog(
+      $tr("log.esbuild.resolverDeno.buildModuleCacheDone", {
+        count: String(cache.size),
+      }),
+    );
   } catch (e) {
-    debugLog(`buildModuleCache 错误: ${e}`);
+    debugLog(
+      $tr("log.esbuild.resolverDeno.buildModuleCacheError", {
+        error: String(e),
+      }),
+    );
   }
   return cache;
 }
@@ -566,7 +598,9 @@ export function denoResolverPlugin(
       build.onResolve(
         { filter: /^https?:\/\/.*\.css$/ },
         (args): esbuild.OnResolveResult | undefined => {
-          debugLog(`CDN CSS external: ${args.path}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.cdnCssExternal", { path: args.path }),
+          );
           return { path: args.path, external: true };
         },
       );
@@ -584,13 +618,23 @@ export function denoResolverPlugin(
           if (isFileNs && /^\.\.?\/.*/.test(args.path)) {
             const resolved = resolve(join(startDir, args.path));
             if (existsSync(resolved)) {
-              debugLog(`file 相对路径: ${args.path} -> ${resolved}`);
+              debugLog(
+                $tr("log.esbuild.resolverDeno.fileRelativePath", {
+                  path: args.path,
+                  resolved,
+                }),
+              );
               return { path: resolved, namespace: "file" };
             }
             if (!/\.[a-z0-9]+$/i.test(args.path)) {
               const withCss = resolve(join(startDir, args.path + ".css"));
               if (existsSync(withCss)) {
-                debugLog(`file 相对路径(+.css): ${args.path} -> ${withCss}`);
+                debugLog(
+                  $tr("log.esbuild.resolverDeno.fileRelativePathCss", {
+                    path: args.path,
+                    withCss,
+                  }),
+                );
                 return { path: withCss, namespace: "file" };
               }
             }
@@ -637,7 +681,11 @@ export function denoResolverPlugin(
         (args): esbuild.OnResolveResult | undefined => {
           const specifier = normalizeProtocolSpecifier(args.path);
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 external: ${specifier}`);
+            debugLog(
+              $tr("log.esbuild.resolverDeno.serverBuildExternal", {
+                specifier,
+              }),
+            );
             return { path: specifier, external: true };
           }
           // 客户端构建时 preact/react/@dreamer/view 等运行时必须打包进 bundle，不能 external，否则与 SSR 水合不一致
@@ -653,7 +701,7 @@ export function denoResolverPlugin(
             return { path: override, namespace: "file" };
           }
           if (!moduleCache) {
-            debugLog("无 moduleCache，jsr/npm 无法解析");
+            debugLog($tr("log.esbuild.resolverDeno.noModuleCache"));
             return undefined;
           }
           let tryPath = specifier;
@@ -676,26 +724,41 @@ export function denoResolverPlugin(
                   tryPath = projectImport;
                 }
                 if (tryPath !== specifier) {
-                  debugLog(`使用项目版本: ${specifier} -> ${tryPath}`);
+                  debugLog(
+                    $tr("log.esbuild.resolverDeno.useProjectVersion", {
+                      specifier,
+                      tryPath,
+                    }),
+                  );
                 }
               }
             }
           }
           const localPath = cacheLookupWithCheck(tryPath);
           if (localPath) {
-            debugLog(`cacheLookup 命中: ${tryPath} -> ${localPath}`);
+            debugLog(
+              $tr("log.esbuild.resolverDeno.cacheLookupHit", {
+                tryPath,
+                localPath,
+              }),
+            );
             return { path: tryPath, namespace: NAMESPACE_DENO_PROTOCOL };
           }
           if (tryPath !== specifier) {
             const fallback = cacheLookupWithCheck(specifier);
             if (fallback) {
               debugLog(
-                `cacheLookup 命中(原 specifier): ${specifier} -> ${fallback}`,
+                $tr("log.esbuild.resolverDeno.cacheLookupHitOriginal", {
+                  specifier,
+                  fallback,
+                }),
               );
               return { path: specifier, namespace: NAMESPACE_DENO_PROTOCOL };
             }
           }
-          debugLog(`cacheLookup 未命中: ${tryPath}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.cacheLookupMiss", { tryPath }),
+          );
           return undefined;
         },
       );
@@ -760,7 +823,11 @@ export function denoResolverPlugin(
             return undefined;
           }
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 external: ${packageImport}`);
+            debugLog(
+              $tr("log.esbuild.resolverDeno.serverBuildExternal", {
+                specifier: packageImport,
+              }),
+            );
             return { path: packageImport, external: true };
           }
           const forceBundle = !isServerBuild && isRuntimePkg;
@@ -771,7 +838,12 @@ export function denoResolverPlugin(
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
             return undefined;
           }
-          debugLog(`bare 包解析: ${packageName} -> ${packageImport}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.barePkgResolve", {
+              packageName,
+              packageImport,
+            }),
+          );
           return { path: packageImport, namespace: NAMESPACE_DENO_PROTOCOL };
         },
       );
@@ -783,7 +855,12 @@ export function denoResolverPlugin(
           const path = args.path;
           const override = resolveOverrides[path];
           if (override && existsSync(override)) {
-            debugLog(`resolveOverrides: ${path} -> ${override}`);
+            debugLog(
+              $tr("log.esbuild.resolverDeno.resolveOverrides", {
+                path,
+                override,
+              }),
+            );
             return { path: override, namespace: "file" };
           }
           const slashIdx = path.indexOf("/");
@@ -819,7 +896,11 @@ export function denoResolverPlugin(
             return undefined;
           }
           if (isServerBuild && !browserMode) {
-            debugLog(`服务端构建 external: ${packageImport}`);
+            debugLog(
+              $tr("log.esbuild.resolverDeno.serverBuildExternal", {
+                specifier: packageImport,
+              }),
+            );
             return { path: packageImport, external: true };
           }
           const forceBundleSubpath = !isServerBuild && isRuntimePkg;
@@ -830,7 +911,12 @@ export function denoResolverPlugin(
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
             return undefined;
           }
-          debugLog(`bare 子路径解析: ${path} -> ${packageImport}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.bareSubpathResolve", {
+              path,
+              packageImport,
+            }),
+          );
           return { path: packageImport, namespace: NAMESPACE_DENO_PROTOCOL };
         },
       );
@@ -864,7 +950,11 @@ export function denoResolverPlugin(
           );
           if (targetSpecifier) {
             debugLog(
-              `resolveRelative: ${protocolPath} + ${args.path} -> ${targetSpecifier}`,
+              $tr("log.esbuild.resolverDeno.resolveRelative", {
+                protocolPath,
+                relativePath: args.path,
+                targetSpecifier,
+              }),
             );
             return {
               path: targetSpecifier,
@@ -880,7 +970,9 @@ export function denoResolverPlugin(
         { filter: /.*/, namespace: NAMESPACE_DENO_PROTOCOL },
         async (args): Promise<esbuild.OnLoadResult | undefined> => {
           const protocolPath = normalizeProtocolSpecifier(args.path);
-          debugLog(`onLoad ${protocolPath}`);
+          debugLog(
+            $tr("log.esbuild.resolverDeno.onLoadProtocol", { protocolPath }),
+          );
           if (!moduleCache) return undefined;
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
           if (!result) return undefined;
@@ -891,7 +983,11 @@ export function denoResolverPlugin(
             : getLoaderFromPath(localPath);
           const resolveDir = dirname(localPath);
           debugLog(
-            `onLoad 从缓存读取 ${protocolPath} -> ${localPath} (${contents.length} chars)`,
+            $tr("log.esbuild.resolverDeno.onLoadFromCache", {
+              protocolPath,
+              localPath,
+              count: String(contents.length),
+            }),
           );
           return { contents, loader, resolveDir };
         },
