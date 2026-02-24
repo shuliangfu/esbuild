@@ -17,6 +17,16 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
+### [1.0.38] - 2026-02-24
+
+- **Fixed**: Resolver (Bun) — server build when using dweb-cli–created Bun
+  projects: `@dreamer/plugins/*` (e.g. tailwindcss, static) now resolve
+  correctly; no more `(void 0)` at runtime after `bun run build` /
+  `bun run start`.
+- **Changed**: Resolver (Bun) — i18n for all messages, use logger instead of
+  console; i18n and logger usage extended to rest of `src/`.
+- Full history: [Changelog](./docs/en-US/CHANGELOG.md)
+
 ### [1.0.37] - 2026-02-23
 
 - **Fixed**: Resolver (Bun) — bare `@scope/package` marked external in server
@@ -1098,9 +1108,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.32** (2026-02-22)
+**v1.0.38** (2026-02-24)
 
-- **Changed**: Chore: JSR release 1.0.32.
+- **Fixed**: Resolver (Bun) — server build fix for dweb-cli Bun projects;
+  `@dreamer/plugins/*` resolve correctly, no more `(void 0)` at runtime.
+- **Changed**: Resolver (Bun) i18n + logger; i18n extended to rest of `src/`.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
