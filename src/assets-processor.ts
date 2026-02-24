@@ -345,6 +345,12 @@ export class AssetsProcessor {
         const oldRelPath = relative(this.outputDir, filePath);
         const newRelPath = relative(this.outputDir, outputPath);
         this.assetPathMap.set(oldRelPath, newRelPath);
+        // 同时登记「无 assetsDir 前缀」的路径，便于替换源码中的 /images/xxx（如 view 相册用的 /images/0.png）
+        const assetsDir = this.config.assetsDir || "assets";
+        if (oldRelPath.startsWith(assetsDir + "/")) {
+          const shortKey = oldRelPath.slice((assetsDir + "/").length);
+          this.assetPathMap.set(shortKey, newRelPath);
+        }
 
         await writeFile(outputPath, processedData);
         // 输出处理后的图片路径（与 builder 产物列表格式一致）
@@ -512,10 +518,16 @@ export class AssetsProcessor {
       );
     }
 
-    // 更新 JS 中的资源路径（将 assets/xxx.png 等替换为带 hash 的路径）
+    // 更新 JS 中的资源路径：替换为带 hash 的路径，支持 "assets/xxx" 与 "/images/xxx" 两种写法
     if (filePath.endsWith(".js")) {
       for (const [oldRelPath, newRelPath] of this.assetPathMap) {
         updatedContent = updatedContent.replaceAll(oldRelPath, newRelPath);
+        if (!oldRelPath.startsWith("/")) {
+          updatedContent = updatedContent.replaceAll(
+            "/" + oldRelPath,
+            "/" + newRelPath,
+          );
+        }
       }
     }
 

@@ -7,6 +7,20 @@
 
 ---
 
+## [1.0.39] - 2026-02-24
+
+### 变更
+
+- **AssetsProcessor**：处理图片后构建路径映射时，额外登记「无 assetsDir 前缀」的
+  短路径（如 `images/0.png` → 带 hash 路径），使源码中的 `/images/0.png`（如
+  view 相册）等引用可被解析。
+- **AssetsProcessor**：在 JS 文件路径替换中，除原 key 外再替换 `"/" + key` 为带
+  hash 路径，使打包后 JS 中的 `"/images/0.png"` 被更新为
+  `"/assets/images/0.xxx.avif"`， 生产环境可直接使用带 hash
+  的图片地址，无需依赖运行时 asset-manifest.json。
+
+---
+
 ## [1.0.38] - 2026-02-24
 
 ### 修复
