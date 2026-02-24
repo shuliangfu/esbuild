@@ -8,6 +8,33 @@ and this project adheres to
 
 ---
 
+## [1.0.38] - 2026-02-24
+
+### Fixed
+
+- **Resolver (Bun)**: Fixed server build under Bun when using dweb-cli–created
+  projects: `@dreamer/plugins/*` (e.g. tailwindcss, static) are now marked
+  external and resolved correctly. When package.json has
+  `"@dreamer/plugins": "npm:@jsr/dreamer__plugins@^1.0.6"`, Bun installs under
+  `node_modules/@dreamer/plugins`; onLoad now falls back to that path (via
+  `findImportKeyForNpmBase`) in addition to `node_modules/@jsr/...`, so plugin
+  subpaths resolve and no longer produce `(void 0)` at runtime after
+  `bun run build` / `bun run start`.
+
+### Changed
+
+- **Resolver (Bun)**: All debug and warning messages now use i18n (`$tr`) with
+  keys under `log.esbuild.resolverBun.*`; no hardcoded strings. Replaced
+  `console.warn` with config logger or default `utils/logger` (when `logger` is
+  not passed).
+- **i18n**: Extended to all `src/` modules — builder, bundle, assets, cache,
+  conditionalCompile, resolverDeno now use `$tr()` with locale entries in
+  `en-US.json` and `zh-CN.json`.
+- **Logging**: `builder-server.ts` Deno compile external warning now uses
+  `this.config.logger ?? logger` instead of `console.warn`.
+
+---
+
 ## [1.0.37] - 2026-02-23
 
 ### Fixed

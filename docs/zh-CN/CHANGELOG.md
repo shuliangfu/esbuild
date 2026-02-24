@@ -7,6 +7,31 @@
 
 ---
 
+## [1.0.38] - 2026-02-24
+
+### 修复
+
+- **解析器（Bun）**：修复 Bun 服务端构建在 dweb-cli 创建项目下的问题：
+  `@dreamer/plugins/*`（如 tailwindcss、static）现正确标记为 external 并解析。
+  当 package.json 配置为
+  `"@dreamer/plugins": "npm:@jsr/dreamer__plugins@^1.0.6"` 时，Bun 会安装到
+  `node_modules/@dreamer/plugins`；onLoad 在 `node_modules/@jsr/...` 之外增加 按
+  `findImportKeyForNpmBase` 回退到该路径的查找，插件子路径可正确解析， 不再在
+  `bun run build` / `bun run start` 后运行时出现 `(void 0)`。
+
+### 变更
+
+- **解析器（Bun）**：所有 debug 与警告文案改为使用 i18n（`$tr`），键位于
+  `log.esbuild.resolverBun.*`，不再硬编码。`console.warn` 改为使用配置的 logger
+  或默认 `utils/logger`（未传 `logger` 时）。
+- **i18n**：推广至全部 `src/` 模块 — builder、bundle、assets、cache、
+  conditionalCompile、resolverDeno 均使用 `$tr()`，并在 `en-US.json`、
+  `zh-CN.json` 中维护对应文案。
+- **日志**：`builder-server.ts` 中 Deno compile 的 external 警告改为使用
+  `this.config.logger ?? logger`，不再直接使用 `console.warn`。
+
+---
+
 ## [1.0.37] - 2026-02-23
 
 ### 修复
