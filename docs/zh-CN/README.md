@@ -1059,10 +1059,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.39**（2026-02-24）
+**v1.0.40**（2026-02-25）
 
-- **变更**：AssetsProcessor — 登记短路径并替换 JS 中 `"/images/xxx"` 形式引用为
-  带 hash 的 URL，生产环境可直接使用带 hash 的图片，无需 asset-manifest。
+- **修复**：解析器（Deno）— `buildModuleCache` 为 `deno info` / `deno eval`
+  子进程传入 `stdin: "null"`，避免无 TTY 的 CI 下阻塞。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
