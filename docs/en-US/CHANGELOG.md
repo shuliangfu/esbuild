@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.0.40] - 2026-02-25
+
+### Fixed
+
+- **Resolver (Deno)**: In `buildModuleCache`, pass `stdin: "null"` to the
+  `deno info` and `deno eval` subprocesses so they do not block waiting for
+  stdin in CI environments without a TTY (e.g. GitHub Actions on macOS), fixing
+  view build timeout on Deno Mac CI.
+
+---
+
 ## [1.0.39] - 2026-02-24
 
 ### Changed

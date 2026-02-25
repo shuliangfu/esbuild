@@ -7,6 +7,16 @@
 
 ---
 
+## [1.0.40] - 2026-02-25
+
+### 修复
+
+- **解析器（Deno）**：在 `buildModuleCache` 中为 `deno info` 与 `deno eval`
+  子进程传入 `stdin: "null"`，避免在无 TTY 的 CI 环境（如 GitHub Actions
+  macOS）下因等待 stdin 而阻塞，修复 view 在 Deno Mac CI 上 build 超时问题。
+
+---
+
 ## [1.0.39] - 2026-02-24
 
 ### 变更

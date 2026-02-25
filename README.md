@@ -17,11 +17,11 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.39] - 2026-02-24
+### [1.0.40] - 2026-02-25
 
-- **Changed**: AssetsProcessor — register short path keys (e.g. `images/0.png`)
-  and replace both key and `"/" + key` in JS so `/images/0.png` in bundles
-  becomes hashed URLs; production can use hashed images without asset-manifest.
+- **Fixed**: Resolver (Deno) — `buildModuleCache` now passes `stdin: "null"` to
+  `deno info` / `deno eval` subprocesses to avoid blocking in CI without TTY
+  (fixes view build timeout on Deno Mac CI).
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
@@ -1096,11 +1096,10 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.39** (2026-02-24)
+**v1.0.40** (2026-02-25)
 
-- **Changed**: AssetsProcessor — short path mapping and JS replace for
-  `"/images/xxx"`-style refs so production uses hashed image URLs without
-  asset-manifest.
+- **Fixed**: Resolver (Deno) — `buildModuleCache` passes `stdin: "null"` to
+  `deno info` / `deno eval` subprocesses to avoid blocking in CI without TTY.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

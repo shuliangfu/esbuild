@@ -104,9 +104,11 @@ export async function buildModuleCache(
     : toForwardSlash(entryRelative);
 
   try {
+    // stdin: "null" 避免 CI 无 TTY 时 deno info 子进程阻塞（见 view 仓库 Deno Mac CI build 超时）
     const proc = createCommand("deno", {
       args: ["info", "--json", ...configArgs, entryForDeno],
       cwd: workDir,
+      stdin: "null",
       stdout: "piped",
       stderr: "piped",
     });
@@ -171,6 +173,7 @@ export async function buildModuleCache(
             spec,
           ],
           cwd: workDir,
+          stdin: "null",
           stdout: "piped",
           stderr: "piped",
         });
