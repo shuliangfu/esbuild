@@ -7,6 +7,22 @@
 
 ---
 
+## [1.1.0] - 2026-03-20
+
+### 新增
+
+- **解析器（Deno）**：`ResolverOptions` 新增可选
+  `transformTsx?: (path: string, source: string) => string`。设置后，解析器
+  onLoad 返回的 `.tsx` 内容会先经该函数转换再交给 esbuild（例如供 @dreamer/view
+  的 compileSource 使用，使动态 import 的 layout/页面也走编译）。
+- **ClientConfig**：新增可选
+  `transformTsx?: (path: string, source: string) => string`。当
+  `engine === "view"` 时，`BuilderClient` 会将其传给 `denoResolverPlugin`，使
+  view 的 JSX 编译对所有经解析器加载的 `.tsx`（含代码分割的 _layout.tsx
+  等）生效。
+
+---
+
 ## [1.0.40] - 2026-02-25
 
 ### 修复

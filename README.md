@@ -17,11 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.0.40] - 2026-02-25
+### [1.1.0] - 2026-03-20
 
-- **Fixed**: Resolver (Deno) — `buildModuleCache` now passes `stdin: "null"` to
-  `deno info` / `deno eval` subprocesses to avoid blocking in CI without TTY
-  (fixes view build timeout on Deno Mac CI).
+- **Added**: Resolver (Deno) — optional `transformTsx` in `ResolverOptions` and
+  `ClientConfig`; when `engine === "view"`, `.tsx` files loaded via the resolver
+  (e.g. dynamic import chunks like `_layout.tsx`) are transformed before
+  bundling so @dreamer/view’s compileSource applies to all views.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
