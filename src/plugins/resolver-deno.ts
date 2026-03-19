@@ -228,6 +228,11 @@ export interface ResolverOptions {
   logger?: BuildLogger;
   forceRuntimeExternal?: boolean;
   resolveOverrides?: Record<string, string>;
+  /**
+   * 当 engine 为 view 时，对 .tsx 内容做编译态转换（如 compileSource），
+   * 使 deno-protocol 下加载的 .tsx（如动态 import 的 _layout）也走编译。
+   */
+  transformTsx?: (path: string, source: string) => string;
 }
 
 interface DenoConfig {
@@ -577,6 +582,7 @@ export function denoResolverPlugin(
     logger: optionsLogger,
     forceRuntimeExternal: _forceRuntimeExternal = false,
     resolveOverrides = {},
+    transformTsx,
   } = options;
 
   const log = optionsLogger ?? NOOP_LOGGER;
@@ -980,10 +986,17 @@ export function denoResolverPlugin(
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
           if (!result) return undefined;
           const { path: localPath, key } = result;
-          const contents = await readTextFile(localPath);
+          let contents = await readTextFile(localPath);
           const loader = /\.(tsx?|jsx?|mts|mjs)$/i.test(key)
             ? getLoaderFromPath(key)
             : getLoaderFromPath(localPath);
+          if (
+            loader === "tsx" &&
+            transformTsx &&
+            typeof transformTsx === "function"
+          ) {
+            contents = transformTsx(localPath, contents);
+          }
           const resolveDir = dirname(localPath);
           debugLog(
             $tr("log.esbuild.resolverDeno.onLoadFromCache", {

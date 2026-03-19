@@ -8,6 +8,23 @@ and this project adheres to
 
 ---
 
+## [1.1.0] - 2026-03-20
+
+### Added
+
+- **Resolver (Deno)**: New optional
+  `transformTsx?: (path: string, source: string) => string` in
+  `ResolverOptions`. When set, `.tsx` content returned from the resolver’s
+  onLoad is transformed before being passed to esbuild (e.g. for @dreamer/view’s
+  compileSource so that dynamically imported layouts and pages are compiled).
+- **ClientConfig**: New optional
+  `transformTsx?: (path: string, source: string) => string`. When
+  `engine === "view"`, `BuilderClient` passes it to `denoResolverPlugin` so that
+  view’s JSX compile step runs on all `.tsx` files loaded via the resolver
+  (including code-split chunks like `_layout.tsx`).
+
+---
+
 ## [1.0.40] - 2026-02-25
 
 ### Fixed

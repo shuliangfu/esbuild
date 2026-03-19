@@ -1059,10 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.0.40**（2026-02-25）
+**v1.1.0**（2026-03-20）
 
-- **修复**：解析器（Deno）— `buildModuleCache` 为 `deno info` / `deno eval`
-  子进程传入 `stdin: "null"`，避免无 TTY 的 CI 下阻塞。
+- **新增**：解析器（Deno）与 ClientConfig 支持可选 `transformTsx`；当
+  `engine === "view"` 时，经解析器加载的 `.tsx`（含动态 import 的 _layout
+  等）会在打包前做转换，使 @dreamer/view 的 compileSource 对所有视图生效。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
