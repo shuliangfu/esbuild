@@ -8,6 +8,23 @@ and this project adheres to
 
 ---
 
+## [1.1.1] - 2026-03-20
+
+### Removed
+
+- **Resolver / client**: Removed optional `transformTsx` from `ResolverOptions`,
+  `ClientConfig`, and `BuilderClient` wiring to `denoResolverPlugin`.
+- **deno.json**: Dropped unused `esbuild-plugin-solid` import map entry (align
+  with `package.json`).
+
+### Fixed
+
+- **Resolver (Deno)**: Relative imports (`./`, `../`) are now resolved for any
+  esbuild `namespace`, not only `file`. Fixes incorrect skips for paths like
+  `import("../views/_layout.tsx")` from non-file namespaces.
+
+---
+
 ## [1.1.0] - 2026-03-20
 
 ### Added

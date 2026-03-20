@@ -17,12 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.0] - 2026-03-20
+### [1.1.1] - 2026-03-20
 
-- **Added**: Resolver (Deno) — optional `transformTsx` in `ResolverOptions` and
-  `ClientConfig`; when `engine === "view"`, `.tsx` files loaded via the resolver
-  (e.g. dynamic import chunks like `_layout.tsx`) are transformed before
-  bundling so @dreamer/view’s compileSource applies to all views.
+- **Removed**: `transformTsx` on resolver / `ClientConfig` / client builder;
+  removed unused `esbuild-plugin-solid` from `deno.json` imports.
+- **Fixed**: Deno resolver resolves `./` / `../` under any esbuild namespace so
+  imports like `../views/_layout.tsx` are not skipped incorrectly.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---

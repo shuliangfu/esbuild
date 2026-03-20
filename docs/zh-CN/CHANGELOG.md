@@ -7,6 +7,23 @@
 
 ---
 
+## [1.1.1] - 2026-03-20
+
+### 移除
+
+- **解析器 / 客户端**：移除 `ResolverOptions`、`ClientConfig` 及 `BuilderClient`
+  传入 `denoResolverPlugin` 的可选 `transformTsx`。
+- **deno.json**：删除未使用的 `esbuild-plugin-solid` import 映射（与
+  `package.json` 对齐）。
+
+### 修复
+
+- **解析器（Deno）**：`./`、`../` 相对路径在**任意** esbuild `namespace` 下均按
+  importer 目录解析，不再仅限 `file`，避免如 `import("../views/_layout.tsx")`
+  在非 file 命名空间下被错误跳过。
+
+---
+
 ## [1.1.0] - 2026-03-20
 
 ### 新增
