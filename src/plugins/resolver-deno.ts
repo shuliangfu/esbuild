@@ -19,8 +19,8 @@ import {
   resolve,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
-import type { BuildLogger } from "../types.ts";
 import { $tr } from "../i18n.ts";
+import type { BuildLogger } from "../types.ts";
 
 const PREFIX = "[resolver-deno]";
 
@@ -228,11 +228,6 @@ export interface ResolverOptions {
   logger?: BuildLogger;
   forceRuntimeExternal?: boolean;
   resolveOverrides?: Record<string, string>;
-  /**
-   * 当 engine 为 view 时，对 .tsx 内容做编译态转换（如 compileSource），
-   * 使 deno-protocol 下加载的 .tsx（如动态 import 的 _layout）也走编译。
-   */
-  transformTsx?: (path: string, source: string) => string;
 }
 
 interface DenoConfig {
@@ -582,7 +577,6 @@ export function denoResolverPlugin(
     logger: optionsLogger,
     forceRuntimeExternal: _forceRuntimeExternal = false,
     resolveOverrides = {},
-    transformTsx,
   } = options;
 
   const log = optionsLogger ?? NOOP_LOGGER;
@@ -614,7 +608,7 @@ export function denoResolverPlugin(
         },
       );
 
-      // 1. 路径别名 @/、~/ 与 file 命名空间下的相对路径（./、../，含 .css 等）写在一起
+      // 1. 路径别名 @/、~/ 与相对路径（./、../）写在一起。相对路径不限制 namespace，否则从某 .tsx 里 import("../views/_layout.tsx") 可能被错误跳过
       build.onResolve(
         { filter: /^(@\/|~\/|@[^/]+\/|~[^/]+\/)|^\.\.?\/.*/ },
         (args): esbuild.OnResolveResult | undefined => {
@@ -622,9 +616,8 @@ export function denoResolverPlugin(
             ? dirname(args.importer)
             : (args.resolveDir ?? cwd());
 
-          // file 命名空间下的相对路径：显式按 importer 目录解析，支持 .css 等（deno-protocol 的 ./ ../ 由后面单独 onResolve 处理）
-          const isFileNs = !args.namespace || args.namespace === "file";
-          if (isFileNs && /^\.\.?\/.*/.test(args.path)) {
+          // 相对路径：任意 namespace 都按 importer 目录解析（deno-protocol 的 ./ ../ 由后面单独 onResolve 处理）
+          if (/^\.\.?\/.*/.test(args.path)) {
             const resolved = resolve(join(startDir, args.path));
             if (existsSync(resolved)) {
               debugLog(
@@ -986,17 +979,10 @@ export function denoResolverPlugin(
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
           if (!result) return undefined;
           const { path: localPath, key } = result;
-          let contents = await readTextFile(localPath);
+          const contents = await readTextFile(localPath);
           const loader = /\.(tsx?|jsx?|mts|mjs)$/i.test(key)
             ? getLoaderFromPath(key)
             : getLoaderFromPath(localPath);
-          if (
-            loader === "tsx" &&
-            transformTsx &&
-            typeof transformTsx === "function"
-          ) {
-            contents = transformTsx(localPath, contents);
-          }
           const resolveDir = dirname(localPath);
           debugLog(
             $tr("log.esbuild.resolverDeno.onLoadFromCache", {

@@ -268,9 +268,6 @@ export class BuilderClient {
         logger: log,
         forceRuntimeExternal: hasRuntimeExternal,
         resolveOverrides: bundleOptions.alias,
-        transformTsx: this.config.engine === "view"
-          ? this.config.transformTsx
-          : undefined,
       }));
     }
     buildOptions.plugins = plugins;
@@ -445,9 +442,6 @@ export class BuilderClient {
         logger: log,
         forceRuntimeExternal: hasRuntimeExternalCtx,
         resolveOverrides: bundleOptions.alias,
-        transformTsx: this.config.engine === "view"
-          ? this.config.transformTsx
-          : undefined,
       }));
     }
     buildOptions.plugins = plugins;

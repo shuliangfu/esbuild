@@ -253,11 +253,6 @@ export interface ClientConfig {
   logger?: BuildLogger;
   /** 语言（未传时由环境变量检测），用于错误信息、日志等 */
   lang?: "en-US" | "zh-CN";
-  /**
-   * 当 engine 为 view 时，对 resolver 加载的 .tsx 做编译态转换（如 compileSource），
-   * 使 deno-protocol 下动态 import 的 .tsx（如 _layout.tsx）也走编译。
-   */
-  transformTsx?: (path: string, source: string) => string;
 }
 
 /**

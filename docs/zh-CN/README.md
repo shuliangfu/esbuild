@@ -1059,11 +1059,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.0**（2026-03-20）
+**v1.1.1**（2026-03-20）
 
-- **新增**：解析器（Deno）与 ClientConfig 支持可选 `transformTsx`；当
-  `engine === "view"` 时，经解析器加载的 `.tsx`（含动态 import 的 _layout
-  等）会在打包前做转换，使 @dreamer/view 的 compileSource 对所有视图生效。
+- **移除**：解析器 / ClientConfig / 客户端构建中的可选
+  `transformTsx`；`deno.json` 删除未使用的 `esbuild-plugin-solid`。
+- **修复**：Deno 解析器在任意 esbuild namespace 下解析 `./`、`../`，避免
+  `../views/_layout.tsx` 等被错误跳过。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
