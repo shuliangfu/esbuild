@@ -14,7 +14,7 @@ import {
   writeTextFile,
   writeTextFileSync,
 } from "@dreamer/runtime-adapter";
-import { describe, expect, it } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { BuilderClient } from "../src/builder-client.ts";
 import type { ClientConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
@@ -28,8 +28,11 @@ describe("客户端构建器路径解析", () => {
   let entryFileRelative: string = "";
   let entryFileAlias: string = "";
 
-  // 测试前创建测试目录和测试文件
-  it("应该创建测试目录和测试文件", async () => {
+  /**
+   * 使用 beforeAll 而非独立 it，避免与 Deno/Bun 并行跑测时其它用例先于本块执行，
+   * 导致 outputDir / testDataDir 仍为空并触发「Client config missing output」。
+   */
+  beforeAll(async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("client-resolver");
 
@@ -167,6 +170,7 @@ export { msg, config };
     );
 
     expect(testDataDir).toBeTruthy();
+    expect(outputDir).toBeTruthy();
   });
 
   if (IS_DENO) {
@@ -390,8 +394,7 @@ export { msg, loadHelper };
     });
   }
 
-  // 清理测试输出目录
-  it("应该清理测试输出目录", async () => {
-    await cleanupDir(outputDir);
+  afterAll(async () => {
+    if (outputDir) await cleanupDir(outputDir);
   });
 });
