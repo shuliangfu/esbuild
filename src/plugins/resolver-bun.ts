@@ -11,6 +11,9 @@
  *   - 例如：package.json 中配置 "@dreamer/logger": "jsr:@scope/package@^1.0.0-beta.1"
  *   - 然后代码中使用：import { x } from "@dreamer/logger/client"
  * - 支持 npm: 协议的模块引用（如 npm:esbuild@^0.27.2）
+ * - 将依赖图里的规范名 `@jsr/scope__name` 重定向到 package.json 中映射的 `@scope/name`
+ *   （Bun 可能把 `npm:@jsr/dreamer__render` 内对 view 的引用写成 `@jsr/dreamer__view`，而应用只声明
+ *   `"@dreamer/view": "npm:@jsr/dreamer__view@^x"`，node_modules 下无 `@jsr/dreamer__view` 目录）
  *
  * 重要：Bun 不支持直接使用 jsr: 协议导入，必须通过 package.json 的 imports 字段映射
  */
@@ -389,11 +392,13 @@ function findImportKeyForNpmBase(
     const config = JSON.parse(raw) as {
       imports?: Record<string, string>;
       dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
     };
     const targetId = npmBaseToPackageIdentity(npmBase);
     const sources = [
       config.imports as Record<string, string> | undefined,
       config.dependencies as Record<string, string> | undefined,
+      config.devDependencies as Record<string, string> | undefined,
     ].filter(Boolean) as Record<string, string>[];
     for (const map of sources) {
       for (const [key, value] of Object.entries(map)) {
@@ -407,6 +412,56 @@ function findImportKeyForNpmBase(
     }
   } catch {
     /* ignore */
+  }
+  return undefined;
+}
+
+/**
+ * 解析 `@jsr/…` 形式的 npm 规范包 specifier（JSR 在 npm 上为 `@jsr/scope__name`），拆出包名与子路径。
+ *
+ * @param importPath - 如 `@jsr/dreamer__view` 或 `@jsr/dreamer__view/csr`
+ * @returns 包名（`@jsr` + `/` + 首段）与剩余子路径；非法或含 `..` 时返回 `undefined`
+ */
+function parseJsrNpmCanonicalImport(
+  importPath: string,
+): { jsrPackage: string; subpath: string } | undefined {
+  if (!importPath.startsWith("@jsr/")) return undefined;
+  const rest = importPath.slice(5);
+  if (!rest || rest.startsWith("/")) return undefined;
+  const slash = rest.indexOf("/");
+  if (slash === -1) {
+    return { jsrPackage: `@jsr/${rest}`, subpath: "" };
+  }
+  const name = rest.slice(0, slash);
+  const subpath = rest.slice(slash + 1);
+  if (!name || subpath.includes("..")) return undefined;
+  return { jsrPackage: `@jsr/${name}`, subpath };
+}
+
+/**
+ * 从 `startDir` 向上查找 `package.json`，若其中某依赖键映射到与 `jsrPackage` 相同的 `npm:@jsr/...` 身份，则返回该键（如 `@dreamer/view`）。
+ *
+ * @param startDir - 自 importer 所在目录或 resolveDir 起算
+ * @param jsrPackage - 规范名，如 `@jsr/dreamer__view`
+ * @returns 项目中的 import 键；未找到返回 `undefined`
+ */
+function findProjectKeyForNpmJsrIdentity(
+  startDir: string,
+  jsrPackage: string,
+): string | undefined {
+  let currentDir = startDir;
+  for (let depth = 0; depth < 20; depth++) {
+    const pkgJsonPath = join(currentDir, "package.json");
+    if (existsSync(pkgJsonPath)) {
+      const key = findImportKeyForNpmBase(
+        currentDir,
+        `npm:${jsrPackage}@^0.0.0`,
+      );
+      if (key) return key;
+    }
+    const parent = dirname(currentDir);
+    if (parent === currentDir) break;
+    currentDir = parent;
   }
   return undefined;
 }
@@ -1162,6 +1217,49 @@ export function bunResolverPlugin(
           }
 
           return undefined;
+        },
+      );
+
+      // 4.5. 将 `@jsr/scope__name` 重定向到 package.json 中映射的 `@scope/name`（与 `findImportKeyForNpmBase` 一致）
+      // Bun / 预编译依赖可能产生字面 `import … from "@jsr/dreamer__view"`，而应用只安装 `node_modules/@dreamer/view`。
+      // 注册顺序靠后，优先于默认解析；若映射键与规范名相同则返回 undefined，避免循环。
+      build.onResolve(
+        { filter: /^@jsr\// },
+        (args): esbuild.OnResolveResult | undefined => {
+          const path = args.path;
+          const parsed = parseJsrNpmCanonicalImport(path);
+          if (!parsed) return undefined;
+          const { jsrPackage, subpath } = parsed;
+          // importer 可能是 bun-protocol: 虚拟路径，dirname 非文件系统目录；优先 resolveDir（esbuild 提供的解析上下文）
+          const startDir = (() => {
+            if (args.resolveDir) return args.resolveDir;
+            const imp = args.importer ?? "";
+            if (
+              imp.startsWith("/") ||
+              imp.startsWith(".") ||
+              /^[A-Za-z]:[\\/]/.test(imp)
+            ) {
+              return dirname(imp);
+            }
+            return cwd();
+          })();
+          const projectKey = findProjectKeyForNpmJsrIdentity(
+            startDir,
+            jsrPackage,
+          );
+          if (!projectKey || projectKey === jsrPackage) {
+            return undefined;
+          }
+          const rewritten = subpath.length > 0
+            ? `${projectKey}/${subpath}`
+            : projectKey;
+          debugLog(
+            $tr("log.esbuild.resolverBun.jsrCanonicalRedirect", {
+              from: path,
+              to: rewritten,
+            }),
+          );
+          return { path: rewritten };
         },
       );
 
