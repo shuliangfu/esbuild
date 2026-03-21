@@ -17,11 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.4] - 2026-03-21
+### [1.1.5] - 2026-03-21
 
-- **Fixed**: After `@jsr/scope__name` → `@dreamer/view` redirect, resolver now
-  returns an absolute file path (`import.meta.resolve` + `namespace: "file"`),
-  fixing esbuild “non-absolute path” errors from the Bun plugin.
+- **Added**: Optional `ClientConfig.serverSideRouteBundle` for `BuilderClient`:
+  uses `platform: "node"` and marks `jsr:`/`npm:` external (Deno/Bun server-side
+  dynamic import), e.g. dweb View SSR route bundles—avoids browser bundling
+  failures on `node:*` and JSON.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---

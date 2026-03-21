@@ -8,6 +8,18 @@ and this project adheres to
 
 ---
 
+## [1.1.5] - 2026-03-21
+
+### Added
+
+- **BuilderClient / ClientConfig**: Optional `serverSideRouteBundle`. When true,
+  esbuild uses `platform: "node"` and the Deno resolver marks `jsr:`/`npm:` as
+  external for server-side dynamic `import` (e.g. dweb View SSR route bundles),
+  avoiding browser-targeted bundling errors on `node:*` built-ins and JSON
+  assets.
+
+---
+
 ## [1.1.4] - 2026-03-21
 
 ### Fixed

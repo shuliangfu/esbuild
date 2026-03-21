@@ -1059,10 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.4**（2026-03-21）
+**v1.1.5**（2026-03-21）
 
-- **修复**：`@jsr/scope__name` 重定向后通过 `import.meta.resolve` 返回绝对路径与
-  `namespace: "file"`，修复 esbuild 报错「non-absolute path」。
+- **新增**：`ClientConfig.serverSideRouteBundle`（`BuilderClient`）：为 true
+  时使用 `platform: "node"`，并将 `jsr:`/`npm:` 标为 external，供 dweb View SSR
+  路由单包等 服务端动态 `import`，避免按浏览器包解析 `node:*`、JSON 导致失败。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
