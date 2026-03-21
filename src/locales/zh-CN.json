@@ -168,7 +168,8 @@
         "onLoadSubpathPackageNotFound": "onLoad 子路径: 未在 node_modules 中找到包 base={base}",
         "onLoadSubpathError": "onLoad 子路径异常: {protocolPath} -> {message}",
         "onLoadFromFile": "onLoad 从文件读取: {protocolPath} -> {pathToUse} ({count} chars)",
-        "resolving": "resolving: {path}"
+        "resolving": "resolving: {path}",
+        "jsrCanonicalRedirect": "JSR npm 规范名重定向到项目依赖键: {from} -> {to}"
       },
       "bundle": {
         "noOutputFiles": "esbuild 打包失败：没有生成输出文件。入口文件: {entryPoint}",

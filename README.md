@@ -17,11 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.2] - 2026-03-21
+### [1.1.3] - 2026-03-21
 
-- **Fixed**: JSR subpath cache lookup no longer matches a shorter segment as a
-  prefix of a longer basename (e.g. `router` vs `router-mount.ts`), fixing “No
-  matching export” when bundling `jsr:@dreamer/view/router`.
+- **Fixed**: Bun resolver rewrites `@jsr/scope__name` imports to the matching
+  `package.json` key for the same npm JSR package (e.g. `@dreamer/view`), fixing
+  unresolved `@jsr/dreamer__view` in client bundles; `findImportKeyForNpmBase`
+  also scans `devDependencies`.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---

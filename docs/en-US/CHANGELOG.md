@@ -8,6 +8,20 @@ and this project adheres to
 
 ---
 
+## [1.1.3] - 2026-03-21
+
+### Fixed
+
+- **Resolver (Bun)**: Bare imports like `@jsr/dreamer__view` (npm-canonical JSR
+  names) are rewritten to the matching `package.json` dependency key that points
+  at the same `npm:@jsr/...` package (e.g. `@dreamer/view`), so client bundles
+  resolve correctly when `node_modules` only contains `@dreamer/view` and not
+  `@jsr/dreamer__view`.
+- **Resolver (Bun)**: `findImportKeyForNpmBase` now also considers
+  `devDependencies` when matching npm package identity.
+
+---
+
 ## [1.1.2] - 2026-03-21
 
 ### Fixed

@@ -7,6 +7,20 @@
 
 ---
 
+## [1.1.3] - 2026-03-21
+
+### 修复
+
+- **解析器（Bun）**：对字面量 `@jsr/scope__name`（npm 上的 JSR
+  规范名）的导入，若 `package.json` 中已有映射到同一 `npm:@jsr/...` 的依赖键（如
+  `@dreamer/view`），则 重定向到该键，使 esbuild 能解析
+  `node_modules/@dreamer/view`，避免仅安装友好键时出现
+  `Could not resolve "@jsr/dreamer__view"`。
+- **解析器（Bun）**：`findImportKeyForNpmBase` 在匹配 npm 包身份时同时扫描
+  `devDependencies`。
+
+---
+
 ## [1.1.2] - 2026-03-21
 
 ### 修复

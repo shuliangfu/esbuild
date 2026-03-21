@@ -1059,11 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.2**（2026-03-21）
+**v1.1.3**（2026-03-21）
 
-- **修复**：JSR 子路径在 moduleCache 中的匹配不再把短名当前缀（如 `router` 与
-  `router-mount.ts`），避免打包 `jsr:@dreamer/view/router` 时出现 “No matching
-  export”。
+- **修复**：Bun 解析器将 `@jsr/scope__name` 重定向到 `package.json` 中指向同一
+  npm JSR 包的依赖键（如 `@dreamer/view`），修复客户端打包时无法解析
+  `@jsr/dreamer__view`；`findImportKeyForNpmBase` 同时扫描 `devDependencies`。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
