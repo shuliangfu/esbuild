@@ -194,6 +194,9 @@ export class BuilderClient {
         ext.startsWith("react-dom/"),
     );
 
+    /** 服务端路由单包（View SSR 等）：与浏览器客户端构建区分平台与 Deno external 策略 */
+    const serverSideRouteBundle = this.config.serverSideRouteBundle === true;
+
     // 根据渲染引擎配置 JSX（Preact/React/View 使用自动模式）
     const jsxConfig: Partial<esbuild.BuildOptions> = {};
     if (this.config.engine === "preact") {
@@ -212,7 +215,7 @@ export class BuilderClient {
       entryPoints: [entryPoint],
       bundle: true,
       format: bundleOptions.format || "esm",
-      platform: "browser",
+      platform: serverSideRouteBundle ? "node" : "browser",
       target: "es2020",
       minify: bundleOptions.minify,
       sourcemap: sourcemapOption,
@@ -250,6 +253,7 @@ export class BuilderClient {
         bunResolverPlugin({
           debug: this.config.debug,
           logger: log,
+          isServerBuild: serverSideRouteBundle,
         }),
       );
     } else {
@@ -261,7 +265,7 @@ export class BuilderClient {
         log,
       );
       plugins.unshift(denoResolverPlugin({
-        isServerBuild: false,
+        isServerBuild: serverSideRouteBundle,
         moduleCache,
         projectDir: dirname(entryPoint),
         debug: this.config.debug,
@@ -385,6 +389,8 @@ export class BuilderClient {
       jsxConfig.jsxImportSource = "@dreamer/view";
     }
 
+    const serverSideRouteBundleCtx = this.config.serverSideRouteBundle === true;
+
     const writeToDisk = options?.write !== false;
 
     // esbuild 构建上下文选项
@@ -393,7 +399,7 @@ export class BuilderClient {
       bundle: true,
       outdir: this.config.output,
       format: bundleOptions.format || "esm",
-      platform: "browser",
+      platform: serverSideRouteBundleCtx ? "node" : "browser",
       target: "es2020",
       minify: bundleOptions.minify,
       sourcemap: bundleOptions.sourcemap,
@@ -425,6 +431,7 @@ export class BuilderClient {
         bunResolverPlugin({
           debug: this.config.debug,
           logger: log,
+          isServerBuild: serverSideRouteBundleCtx,
         }),
       );
     } else {
@@ -435,7 +442,7 @@ export class BuilderClient {
         log,
       );
       plugins.unshift(denoResolverPlugin({
-        isServerBuild: false,
+        isServerBuild: serverSideRouteBundleCtx,
         moduleCache,
         projectDir: dirname(entryPoint),
         debug: this.config.debug,

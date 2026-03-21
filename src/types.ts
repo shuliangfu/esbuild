@@ -230,6 +230,11 @@ export interface ClientConfig {
   output: string;
   /** 模板引擎类型（react、preact） */
   engine: Engine;
+  /**
+   * 为 true 时表示产物在 Deno/Bun 服务端执行（如 dweb View SSR 单路由 bundle），而非浏览器。
+   * esbuild 使用 `platform: "node"`；Deno 解析器将 jsr:/npm: 标为 external，避免把 `node:*`、JSON 等按浏览器包解析失败。
+   */
+  serverSideRouteBundle?: boolean;
   /** 打包选项 */
   bundle?: ClientBundleOptions;
   /** HTML 配置 */

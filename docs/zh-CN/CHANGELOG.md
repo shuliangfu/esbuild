@@ -7,6 +7,17 @@
 
 ---
 
+## [1.1.5] - 2026-03-21
+
+### 新增
+
+- **BuilderClient / ClientConfig**：可选 `serverSideRouteBundle`。为 true 时
+  esbuild 使用 `platform: "node"`，Deno 解析器将 `jsr:`/`npm:` 标为 external，供
+  dweb View SSR 路由单包等在服务端动态 `import`，避免误按浏览器包解析
+  `node:*`、JSON 等导致打包失败。
+
+---
+
 ## [1.1.4] - 2026-03-21
 
 ### 修复
