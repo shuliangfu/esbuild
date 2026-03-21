@@ -1222,10 +1222,13 @@ export function bunResolverPlugin(
 
       // 4.5. 将 `@jsr/scope__name` 重定向到 package.json 中映射的 `@scope/name`（与 `findImportKeyForNpmBase` 一致）
       // Bun / 预编译依赖可能产生字面 `import … from "@jsr/dreamer__view"`，而应用只安装 `node_modules/@dreamer/view`。
-      // 注册顺序靠后，优先于默认解析；若映射键与规范名相同则返回 undefined，避免循环。
+      // esbuild 要求 onResolve 返回**绝对路径**并配合 `namespace: "file"`，不能只返回裸 specifier `@dreamer/view`。
+      // 注册顺序靠后；若映射键与规范名相同则返回 undefined，避免循环。
       build.onResolve(
         { filter: /^@jsr\// },
-        (args): esbuild.OnResolveResult | undefined => {
+        async (
+          args,
+        ): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
           const parsed = parseJsrNpmCanonicalImport(path);
           if (!parsed) return undefined;
@@ -1259,7 +1262,32 @@ export function bunResolverPlugin(
               to: rewritten,
             }),
           );
-          return { path: rewritten };
+          try {
+            const resolvedUrl = await import.meta.resolve(rewritten);
+            if (resolvedUrl && resolvedUrl.startsWith("file://")) {
+              let filePath = resolvedUrl.slice(7);
+              try {
+                filePath = decodeURIComponent(filePath);
+              } catch {
+                // 忽略解码错误
+              }
+              if (filePath && existsSync(filePath)) {
+                debugLog(
+                  $tr("log.esbuild.resolverBun.cachePath", {
+                    from: path,
+                    to: filePath,
+                  }),
+                );
+                return {
+                  path: filePath,
+                  namespace: "file",
+                };
+              }
+            }
+          } catch {
+            /* Bun 无法解析时交回默认逻辑 */
+          }
+          return undefined;
         },
       );
 

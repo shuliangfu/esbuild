@@ -17,12 +17,11 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.3] - 2026-03-21
+### [1.1.4] - 2026-03-21
 
-- **Fixed**: Bun resolver rewrites `@jsr/scope__name` imports to the matching
-  `package.json` key for the same npm JSR package (e.g. `@dreamer/view`), fixing
-  unresolved `@jsr/dreamer__view` in client bundles; `findImportKeyForNpmBase`
-  also scans `devDependencies`.
+- **Fixed**: After `@jsr/scope__name` → `@dreamer/view` redirect, resolver now
+  returns an absolute file path (`import.meta.resolve` + `namespace: "file"`),
+  fixing esbuild “non-absolute path” errors from the Bun plugin.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---

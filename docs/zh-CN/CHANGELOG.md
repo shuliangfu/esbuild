@@ -7,6 +7,17 @@
 
 ---
 
+## [1.1.4] - 2026-03-21
+
+### 修复
+
+- **解析器（Bun）**：将 `@jsr/scope__name` 重定向到友好键（如
+  `@dreamer/view`）后，通过 `import.meta.resolve` 得到**绝对路径**并以
+  `namespace: "file"` 返回。此前仅返回裸 specifier，esbuild
+  报错：`Plugin "bun-resolver" returned a non-absolute path`。
+
+---
+
 ## [1.1.3] - 2026-03-21
 
 ### 修复
