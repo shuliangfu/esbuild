@@ -7,6 +7,17 @@
 
 ---
 
+## [1.1.2] - 2026-03-21
+
+### 修复
+
+- **解析器（Deno / JSR）**：子路径在 moduleCache
+  中的正则匹配不再把短名当前缀（例如 `router` 不再命中
+  `router-mount.ts`）。修复从 `jsr:@dreamer/view/router` 导入时出现 “No matching
+  export”（实际加载错文件）的问题。
+
+---
+
 ## [1.1.1] - 2026-03-20
 
 ### 移除
