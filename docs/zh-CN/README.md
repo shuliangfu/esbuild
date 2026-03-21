@@ -1059,12 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.1**（2026-03-20）
+**v1.1.2**（2026-03-21）
 
-- **移除**：解析器 / ClientConfig / 客户端构建中的可选
-  `transformTsx`；`deno.json` 删除未使用的 `esbuild-plugin-solid`。
-- **修复**：Deno 解析器在任意 esbuild namespace 下解析 `./`、`../`，避免
-  `../views/_layout.tsx` 等被错误跳过。
+- **修复**：JSR 子路径在 moduleCache 中的匹配不再把短名当前缀（如 `router` 与
+  `router-mount.ts`），避免打包 `jsr:@dreamer/view/router` 时出现 “No matching
+  export”。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

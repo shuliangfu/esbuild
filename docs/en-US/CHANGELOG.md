@@ -8,6 +8,18 @@ and this project adheres to
 
 ---
 
+## [1.1.2] - 2026-03-21
+
+### Fixed
+
+- **Resolver (Deno / JSR)**: Subpath cache key matching no longer treats a
+  segment as a prefix of a longer basename (e.g. `router` no longer matches
+  `router-mount.ts`). This fixes esbuild errors like “No matching export” when
+  importing from `jsr:@dreamer/view/router` while the package also ships
+  `router-mount.ts`.
+
+---
+
 ## [1.1.1] - 2026-03-20
 
 ### Removed

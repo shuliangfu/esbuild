@@ -443,7 +443,8 @@ function cacheLookup(
       : ["mod"];
     // 无子路径（包根）：匹配主入口 mod、index 及 src 下对应文件（mod.ts、index.ts），不匹配 mod-hybrid
     const pathPart = subpath === "" ? "(src/)?(mod|index)(/mod)?" : (() => {
-      const first = `(src/)?([a-z]*-)?${segments[0]}(-[a-z]*)?`;
+      // 首段后必须为「路径结束 / 子目录 / 扩展名」，禁止 router 匹配到 router-mount、foo 匹配到 foobar
+      const first = `(src/)?([a-z]*-)?${segments[0]}(?=[./]|$)`;
       const rest = segments.length > 1
         ? `(\\/[^/]+)*\\/${segments.slice(1).join("(\\/[^/]+)*\\/")}`
         : "";
@@ -996,4 +997,20 @@ export function denoResolverPlugin(
       );
     },
   };
+}
+
+/**
+ * 供单测断言：JSR 子路径在 moduleCache 中的解析结果。
+ * 回归：`router` 不得因正则前缀匹配到 `router-mount.ts`。
+ *
+ * @param specifier - 如 `jsr:@dreamer/view@1.3.0/router`
+ * @param moduleCache - Deno 缓存模块映射
+ * @param existsCheck - 本地路径是否存在
+ */
+export function cacheLookupForTests(
+  specifier: string,
+  moduleCache: ModuleCache,
+  existsCheck: (p: string) => boolean,
+): CacheLookupResult | undefined {
+  return cacheLookup(specifier, moduleCache, existsCheck);
 }

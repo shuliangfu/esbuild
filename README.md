@@ -17,12 +17,11 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.1] - 2026-03-20
+### [1.1.2] - 2026-03-21
 
-- **Removed**: `transformTsx` on resolver / `ClientConfig` / client builder;
-  removed unused `esbuild-plugin-solid` from `deno.json` imports.
-- **Fixed**: Deno resolver resolves `./` / `../` under any esbuild namespace so
-  imports like `../views/_layout.tsx` are not skipped incorrectly.
+- **Fixed**: JSR subpath cache lookup no longer matches a shorter segment as a
+  prefix of a longer basename (e.g. `router` vs `router-mount.ts`), fixing “No
+  matching export” when bundling `jsr:@dreamer/view/router`.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
