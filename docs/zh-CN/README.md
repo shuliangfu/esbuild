@@ -1059,11 +1059,10 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.3**（2026-03-21）
+**v1.1.4**（2026-03-21）
 
-- **修复**：Bun 解析器将 `@jsr/scope__name` 重定向到 `package.json` 中指向同一
-  npm JSR 包的依赖键（如 `@dreamer/view`），修复客户端打包时无法解析
-  `@jsr/dreamer__view`；`findImportKeyForNpmBase` 同时扫描 `devDependencies`。
+- **修复**：`@jsr/scope__name` 重定向后通过 `import.meta.resolve` 返回绝对路径与
+  `namespace: "file"`，修复 esbuild 报错「non-absolute path」。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

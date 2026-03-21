@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.1.4] - 2026-03-21
+
+### Fixed
+
+- **Resolver (Bun)**: After redirecting `@jsr/scope__name` to the friendly key
+  (e.g. `@dreamer/view`), resolve it with `import.meta.resolve` and return an
+  **absolute** `path` with `namespace: "file"`. Returning a bare specifier
+  caused esbuild to error: `Plugin "bun-resolver" returned a non-absolute path`.
+
+---
+
 ## [1.1.3] - 2026-03-21
 
 ### Fixed
