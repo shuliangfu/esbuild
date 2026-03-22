@@ -8,6 +8,25 @@ and this project adheres to
 
 ---
 
+## [1.1.6] - 2026-03-22
+
+### Changed
+
+- **Deno disk module cache** (`deno-module-cache-disk`): Fingerprint now hashes
+  `deno.json` and `deno.lock` together so config/import-map changes invalidate
+  the cache even when the lock file is unchanged.
+- **Deno disk module cache**: Persisted JSON is written via a temp file and
+  `rename` for safer replacement; an optional directory lock plus re-read merge
+  before save reduces lost `deno info` entries when multiple builds run in
+  parallel.
+
+### Added
+
+- Unit tests for disk cache fingerprinting and save/load merge behavior
+  (`tests/deno-module-cache-disk.test.ts`).
+
+---
+
 ## [1.1.5] - 2026-03-21
 
 ### Added

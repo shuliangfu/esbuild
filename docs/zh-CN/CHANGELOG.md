@@ -7,6 +7,23 @@
 
 ---
 
+## [1.1.6] - 2026-03-22
+
+### 变更
+
+- **Deno 磁盘模块缓存**（`deno-module-cache-disk`）：指纹改为对 `deno.json` 与
+  `deno.lock` 联合哈希，配置或 import 映射变更即可失效缓存，无需 lock 必变。
+- **Deno 磁盘模块缓存**：落盘先写临时文件再
+  `rename`；可选目录锁并在写前再读合并， 减轻并行构建时覆盖丢失 `deno info`
+  条目的概率。
+
+### 新增
+
+- 磁盘缓存指纹与 save/load
+  合并行为的单元测试（`tests/deno-module-cache-disk.test.ts`）。
+
+---
+
 ## [1.1.5] - 2026-03-21
 
 ### 新增

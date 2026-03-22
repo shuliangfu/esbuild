@@ -17,12 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.5] - 2026-03-21
+### [1.1.6] - 2026-03-22
 
-- **Added**: Optional `ClientConfig.serverSideRouteBundle` for `BuilderClient`:
-  uses `platform: "node"` and marks `jsr:`/`npm:` external (Deno/Bun server-side
-  dynamic import), e.g. dweb View SSR route bundles—avoids browser bundling
-  failures on `node:*` and JSON.
+- **Changed**: Deno `deno info` disk module cache—fingerprint uses `deno.json` +
+  `deno.lock`; atomic temp+rename writes; directory lock and re-read merge
+  before save to reduce concurrent-build overwrites.
+- **Added**: Unit tests for disk cache (`tests/deno-module-cache-disk.test.ts`).
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
