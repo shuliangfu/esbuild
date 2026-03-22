@@ -21,6 +21,12 @@ import {
 import * as esbuild from "esbuild";
 import { $tr } from "../i18n.ts";
 import type { BuildLogger } from "../types.ts";
+import {
+  computeDenoLockFingerprint,
+  resolveDreamerProjectRootForCache,
+  saveDenoModuleCacheToDisk,
+  tryLoadDenoModuleCacheFromDisk,
+} from "./deno-module-cache-disk.ts";
 
 const PREFIX = "[resolver-deno]";
 
@@ -73,6 +79,9 @@ interface DenoInfoOutput {
 /**
  * 在项目目录、项目 deno.json 下执行 deno info，仅将本依赖图内的模块写入 cache。
  * 不扫全局缓存；npm 无 local 时仅在此时用子进程 import.meta.resolve 补全。
+ *
+ * **性能**：按 `deno.json`+`deno.lock` 联合指纹从 `~/.dreamer/<项目名>/esbuild-deno-cache/deno-module-map-<指纹>.json`
+ * 预载后对本入口执行 `deno info` 合并，再写回**单文件整表**（多入口共享、写前再读合并减轻并发丢条目）。
  */
 export async function buildModuleCache(
   entryPoint: string,
@@ -102,6 +111,22 @@ export async function buildModuleCache(
   const entryForDeno = entryRelative.startsWith("..")
     ? toForwardSlash(entryPoint)
     : toForwardSlash(entryRelative);
+
+  const projectRootForCache = resolveDreamerProjectRootForCache(
+    workDir,
+    projectDenoJson,
+  );
+  const lockFingerprint = await computeDenoLockFingerprint(projectDenoJson);
+  const diskPreload = await tryLoadDenoModuleCacheFromDisk(
+    projectRootForCache,
+    lockFingerprint,
+  );
+  if (diskPreload) {
+    for (const [k, v] of diskPreload) cache.set(k, v);
+    debugLog(
+      `deno module cache disk preload (${String(diskPreload.size)} entries)`,
+    );
+  }
 
   try {
     // stdin: "null" 避免 CI 无 TTY 时 deno info 子进程阻塞（见 view 仓库 Deno Mac CI build 超时）
@@ -207,6 +232,13 @@ export async function buildModuleCache(
         count: String(cache.size),
       }),
     );
+    if (cache.size > 0) {
+      await saveDenoModuleCacheToDisk(
+        projectRootForCache,
+        lockFingerprint,
+        cache,
+      );
+    }
   } catch (e) {
     debugLog(
       $tr("log.esbuild.resolverDeno.buildModuleCacheError", {

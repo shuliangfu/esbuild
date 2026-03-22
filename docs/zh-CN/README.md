@@ -1059,11 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.5**（2026-03-21）
+**v1.1.6**（2026-03-22）
 
-- **新增**：`ClientConfig.serverSideRouteBundle`（`BuilderClient`）：为 true
-  时使用 `platform: "node"`，并将 `jsr:`/`npm:` 标为 external，供 dweb View SSR
-  路由单包等 服务端动态 `import`，避免按浏览器包解析 `node:*`、JSON 导致失败。
+- **变更**：Deno `deno info` 磁盘模块缓存——指纹合并 `deno.json` 与 `deno.lock`；
+  临时文件 + `rename` 原子落盘；目录锁与写前再读合并，减轻并行构建覆盖丢条目。
+- **新增**：磁盘缓存相关单元测试（`tests/deno-module-cache-disk.test.ts`）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
