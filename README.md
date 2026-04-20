@@ -17,12 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.6] - 2026-03-22
+### [1.1.8] - 2026-04-20
 
-- **Changed**: Deno `deno info` disk module cache—fingerprint uses `deno.json` +
-  `deno.lock`; atomic temp+rename writes; directory lock and re-read merge
-  before save to reduce concurrent-build overwrites.
-- **Added**: Unit tests for disk cache (`tests/deno-module-cache-disk.test.ts`).
+- **Fixed** (Bun): **`bun-resolver`** resolves unscoped bare npm specifiers
+  (e.g. **`react-dom`**, **`react-dom/client`**, **`scheduler`**) via
+  **`createRequire`** when **`nodePaths`** is empty, fixing client bundles that
+  pull **`@dreamer/render/client/react`** through **`bun-protocol`** paths.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---

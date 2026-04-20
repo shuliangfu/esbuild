@@ -169,7 +169,8 @@
         "onLoadSubpathError": "onLoad 子路径异常: {protocolPath} -> {message}",
         "onLoadFromFile": "onLoad 从文件读取: {protocolPath} -> {pathToUse} ({count} chars)",
         "resolving": "resolving: {path}",
-        "jsrCanonicalRedirect": "JSR npm 规范名重定向到项目依赖键: {from} -> {to}"
+        "jsrCanonicalRedirect": "JSR npm 规范名重定向到项目依赖键: {from} -> {to}",
+        "unscopedBareResolved": "非 scoped 裸 specifier（createRequire）：{specifier} -> {resolvedPath}"
       },
       "bundle": {
         "noOutputFiles": "esbuild 打包失败：没有生成输出文件。入口文件: {entryPoint}",

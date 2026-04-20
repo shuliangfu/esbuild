@@ -18,6 +18,7 @@
  * 重要：Bun 不支持直接使用 jsr: 协议导入，必须通过 package.json 的 imports 字段映射
  */
 
+import { createRequire, isBuiltin as nodeIsBuiltin } from "node:module";
 import {
   cwd,
   dirname,
@@ -34,6 +35,117 @@ import { $tr } from "../i18n.ts";
 import { logger } from "../utils/logger.ts";
 
 const PREFIX = "[resolver-bun]";
+
+/**
+ * 收集用于 `createRequire` 解析裸 specifier 的候选 `package.json` 路径。
+ * 从 resolveDir、真实文件系统 importer、cwd() 各自向上遍历父目录。
+ *
+ * @param resolveDir - esbuild 传入的解析目录（常为应用根或 bun-protocol 加载时设置的 cwd）
+ * @param importer - 导入方路径（虚拟协议路径会被跳过）
+ * @returns 候选 package.json 绝对路径列表（按优先级去重）
+ */
+function collectPackageJsonAnchorPaths(
+  resolveDir: string | undefined,
+  importer: string | undefined,
+): string[] {
+  const anchors: string[] = [];
+  const seen = new Set<string>();
+
+  /**
+   * 将路径加入候选列表（去重）
+   * @param pj - package.json 绝对路径
+   */
+  const pushUnique = (pj: string): void => {
+    if (!seen.has(pj)) {
+      seen.add(pj);
+      anchors.push(pj);
+    }
+  };
+
+  /**
+   * 从种子目录向上查找每一层级的 package.json
+   * @param seed - 起始目录（文件路径会先取其 dirname）
+   */
+  const walkUpPackageJson = (seed: string | undefined): void => {
+    if (!seed || seed.includes("bun-protocol")) return;
+    let dir = resolve(seed);
+    for (let depth = 0; depth < 28; depth++) {
+      const pj = join(dir, "package.json");
+      if (existsSync(pj)) pushUnique(pj);
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  };
+
+  if (resolveDir && !resolveDir.includes("bun-protocol")) {
+    walkUpPackageJson(resolveDir);
+  }
+
+  if (
+    importer &&
+    !importer.includes("bun-protocol") &&
+    (/^(\/|[A-Za-z]:[\\/])/.test(importer))
+  ) {
+    walkUpPackageJson(dirname(resolve(importer)));
+  }
+
+  walkUpPackageJson(cwd());
+
+  return anchors;
+}
+
+/**
+ * 判断是否应跳过对裸 specifier 的 createRequire 解析（Node 内置模块等）。
+ *
+ * @param specifier - import 路径
+ * @returns 为 true 时不解析，交给后续插件或 esbuild 默认逻辑
+ */
+function shouldSkipBareSpecifierForCreateRequire(specifier: string): boolean {
+  if (typeof nodeIsBuiltin !== "function") return false;
+  try {
+    const root =
+      (specifier.startsWith("node:") ? specifier.slice(5) : specifier).split(
+        "/",
+      )[0] ?? "";
+    return (
+      nodeIsBuiltin(specifier) ||
+      (root.length > 0 && nodeIsBuiltin(root)) ||
+      (root.length > 0 && nodeIsBuiltin(`node:${root}`))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 使用 Node `createRequire`，从候选 workspace 根的 package.json 解析非 scoped 裸 specifier，
+ * 修复客户端构建将 `nodePaths` 置空后无法解析 `react-dom/client`、`scheduler` 等问题。
+ *
+ * @param specifier - 模块说明符（非 npm:/jsr:，且非 @scope/pkg）
+ * @param resolveDir - esbuild.resolveDir
+ * @param importer - esbuild.importer
+ * @returns 解析得到的绝对路径，失败返回 undefined
+ */
+function resolveUnscopedBareSpecifierWithCreateRequire(
+  specifier: string,
+  resolveDir: string | undefined,
+  importer: string | undefined,
+): string | undefined {
+  if (shouldSkipBareSpecifierForCreateRequire(specifier)) return undefined;
+
+  const anchors = collectPackageJsonAnchorPaths(resolveDir, importer);
+  for (const pjPath of anchors) {
+    try {
+      const req = createRequire(pjPath);
+      const abs = req.resolve(specifier) as string;
+      if (abs && existsSync(abs)) return abs;
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
 
 /**
  * 解析器选项
@@ -886,6 +998,47 @@ export function bunResolverPlugin(
             }),
           );
           // 返回 undefined，让 esbuild 使用默认解析（会失败，但至少不会崩溃）
+          return undefined;
+        },
+      );
+
+      // 2.55. 非 scoped 裸包及子路径（如 react-dom/client、scheduler）
+      // 与 @scope/pkg 不同，这类 specifier 不会命中 3. 的 onResolve；而 client 构建将 nodePaths 置空，默认无法从 node_modules 解析
+      // 从 resolveDir / cwd 等向上用 createRequire 解析，供 @dreamer/render/client/react 等依赖使用
+      // 注意：esbuild 的 filter 使用 Go 正则，不支持 (?!) 等 Perl 断言；宽泛匹配后在回调内排除协议与别名前缀
+      build.onResolve(
+        { filter: /^[a-zA-Z0-9_$]/ },
+        (args): esbuild.OnResolveResult | undefined => {
+          const pathSpec = args.path;
+          if (
+            pathSpec.startsWith("@") ||
+            pathSpec.startsWith(".") ||
+            pathSpec.startsWith("/") ||
+            /^[A-Za-z]:\\/.test(pathSpec) ||
+            pathSpec.startsWith("npm:") ||
+            pathSpec.startsWith("jsr:") ||
+            pathSpec.startsWith("node:") ||
+            pathSpec.startsWith("bun:") ||
+            pathSpec.startsWith("data:") ||
+            pathSpec.startsWith("http:") ||
+            pathSpec.startsWith("https:")
+          ) {
+            return undefined;
+          }
+          const resolvedPath = resolveUnscopedBareSpecifierWithCreateRequire(
+            pathSpec,
+            args.resolveDir,
+            args.importer,
+          );
+          if (resolvedPath) {
+            debugLog(
+              $tr("log.esbuild.resolverBun.unscopedBareResolved", {
+                specifier: pathSpec,
+                resolvedPath,
+              }),
+            );
+            return { path: resolvedPath, namespace: "file" };
+          }
           return undefined;
         },
       );

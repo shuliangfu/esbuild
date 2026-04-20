@@ -1059,11 +1059,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.7**（2026-04-20）
+**v1.1.8**（2026-04-20）
 
-- **修复**：`BuilderBundle` — Bun 下 `platform: "node"` 改为与 Deno 一致走
-  esbuild + 解析插件，不再依赖子进程 `bun build`，减轻 Linux CI
-  上临时入口路径导致的偶发失败。
+- **修复**（Bun）：**`bun-resolver`** 在 **`nodePaths`** 置空时通过
+  **`createRequire`** 解析裸 npm 模块（如
+  **`react-dom`**、**`react-dom/client`**）， 修复 **`bun-protocol`** 路径加载
+  **`@dreamer/render/client/react`** 时的客户端打包失败。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

@@ -6,7 +6,15 @@
  * 使用 esbuild 进行客户端代码打包
  */
 
-import { dirname, IS_BUN, mkdir, resolve } from "@dreamer/runtime-adapter";
+import {
+  cwd,
+  dirname,
+  existsSync,
+  IS_BUN,
+  join,
+  mkdir,
+  resolve,
+} from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { PluginManager } from "./plugin.ts";
 import { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
@@ -27,6 +35,30 @@ import type {
 } from "./types.ts";
 import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
+
+/**
+ * 从入口所在目录与当前工作目录向上查找 `deno.json`，返回其所在目录作为应用根。
+ * 仅把 `dirname(entry)` 当作 projectDir 时，在少数环境下对传递依赖的 `npm:` 回退解析不稳定；
+ * 与 `deno info` / `import.meta.resolve` 一致，应以包含 `deno.json` 的目录为工作区根。
+ *
+ * @param entryPointAbs - 客户端入口绝对路径
+ * @returns 含 `deno.json` 的目录，找不到则回退为 `dirname(entryPointAbs)`
+ */
+function resolveDenoApplicationRoot(entryPointAbs: string): string {
+  const tryStarts = [dirname(entryPointAbs), cwd()];
+  for (const start of tryStarts) {
+    let current = resolve(start);
+    for (let i = 0; i < 16; i++) {
+      if (existsSync(join(current, "deno.json"))) {
+        return current;
+      }
+      const parent = dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+  return dirname(entryPointAbs);
+}
 
 /**
  * 客户端构建选项
@@ -124,6 +156,8 @@ export class BuilderClient {
       throw new Error($tr("log.esbuild.builder.clientMissingEntry"));
     }
     const entryPoint = await resolve(this.config.entry);
+    /** Deno 下 moduleCache / npm 回退解析均以含 deno.json 的应用根为准 */
+    const denoAppRoot = resolveDenoApplicationRoot(entryPoint);
 
     // 构建选项
     const bundleOptions: ClientBundleOptions = {
@@ -260,14 +294,14 @@ export class BuilderClient {
       // Deno 环境：构建模块缓存 + denoResolverPlugin
       const moduleCache = await buildModuleCache(
         entryPoint,
-        dirname(entryPoint),
+        denoAppRoot,
         this.config.debug,
         log,
       );
       plugins.unshift(denoResolverPlugin({
         isServerBuild: serverSideRouteBundle,
         moduleCache,
-        projectDir: dirname(entryPoint),
+        projectDir: denoAppRoot,
         debug: this.config.debug,
         logger: log,
         forceRuntimeExternal: hasRuntimeExternal,
@@ -340,6 +374,7 @@ export class BuilderClient {
       throw new Error($tr("log.esbuild.builder.clientMissingEntry"));
     }
     const entryPoint = await resolve(this.config.entry);
+    const denoAppRoot = resolveDenoApplicationRoot(entryPoint);
 
     // 根据模式设置默认值：dev 模式禁用压缩启用 sourcemap，prod 模式反之
     const isProd = mode === "prod";
@@ -437,14 +472,14 @@ export class BuilderClient {
     } else {
       const moduleCache = await buildModuleCache(
         entryPoint,
-        dirname(entryPoint),
+        denoAppRoot,
         this.config.debug,
         log,
       );
       plugins.unshift(denoResolverPlugin({
         isServerBuild: serverSideRouteBundleCtx,
         moduleCache,
-        projectDir: dirname(entryPoint),
+        projectDir: denoAppRoot,
         debug: this.config.debug,
         logger: log,
         forceRuntimeExternal: hasRuntimeExternalCtx,

@@ -169,7 +169,8 @@
         "onLoadSubpathError": "onLoad subpath error: {protocolPath} -> {message}",
         "onLoadFromFile": "onLoad read from file: {protocolPath} -> {pathToUse} ({count} chars)",
         "resolving": "resolving: {path}",
-        "jsrCanonicalRedirect": "JSR npm canonical -> project dependency key: {from} -> {to}"
+        "jsrCanonicalRedirect": "JSR npm canonical -> project dependency key: {from} -> {to}",
+        "unscopedBareResolved": "Unscoped bare specifier (createRequire): {specifier} -> {resolvedPath}"
       },
       "bundle": {
         "noOutputFiles": "esbuild bundle failed: no output files. Entry: {entryPoint}",
