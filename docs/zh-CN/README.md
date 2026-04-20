@@ -1059,11 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.6**（2026-03-22）
+**v1.1.7**（2026-04-20）
 
-- **变更**：Deno `deno info` 磁盘模块缓存——指纹合并 `deno.json` 与 `deno.lock`；
-  临时文件 + `rename` 原子落盘；目录锁与写前再读合并，减轻并行构建覆盖丢条目。
-- **新增**：磁盘缓存相关单元测试（`tests/deno-module-cache-disk.test.ts`）。
+- **修复**：`BuilderBundle` — Bun 下 `platform: "node"` 改为与 Deno 一致走
+  esbuild + 解析插件，不再依赖子进程 `bun build`，减轻 Linux CI
+  上临时入口路径导致的偶发失败。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
