@@ -1097,10 +1097,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.0.40** (2026-02-25)
+**v1.1.7** (2026-04-20)
 
-- **Fixed**: Resolver (Deno) — `buildModuleCache` passes `stdin: "null"` to
-  `deno info` / `deno eval` subprocesses to avoid blocking in CI without TTY.
+- **Fixed**: `BuilderBundle` — on Bun, `platform: "node"` now uses esbuild +
+  resolver plugins (same as Deno) instead of a subprocess `bun build`, fixing
+  flaky failures on Linux CI with temporary entry paths.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
