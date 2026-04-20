@@ -7,6 +7,18 @@
 
 ---
 
+## [1.1.7] - 2026-04-20
+
+### 修复
+
+- **BuilderBundle / Bun / `platform: "node"`**：此前 Bun
+  将非浏览器平台交给子进程 `bun build`；在 Linux
+  CI（临时入口、cwd）等环境下易失败，而 `browser` 仍走 esbuild。**`node` 现与
+  Deno 一致改为 esbuild + 解析插件**；`neutral`
+  等非浏览器目标在适用场景下仍可使用 `bun build`。
+
+---
+
 ## [1.1.6] - 2026-03-22
 
 ### 变更
