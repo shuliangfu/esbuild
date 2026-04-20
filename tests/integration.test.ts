@@ -1,6 +1,10 @@
 /**
  * @fileoverview 集成测试
  * 测试多个模块协同工作的场景
+ *
+ * 使用 `beforeAll` / `afterAll` 准备与清理目录：Bun / Deno 会对 `describe` 内 `it`
+ * 并行调度，若用单独 `it` 做 setup，其它用例可能先于 setup 执行，导致 `entryFile`
+ * 等为 `undefined`（与 `builder-client-resolver.test.ts` 说明一致）。
  */
 
 import {
@@ -8,35 +12,45 @@ import {
   join,
   mkdir,
   readTextFile,
-  remove,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
-import { describe, expect, it } from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { Builder } from "../src/builder.ts";
 import type { BuilderConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
 
 describe("集成测试", () => {
-  let entryFile: string;
-  let outputDir: string;
-  let testDataDir: string;
+  let entryFile = "";
+  let outputDir = "";
+  let testDataDir = "";
 
-  // 测试前创建测试目录和测试文件
-  it("应该创建测试目录和测试文件", async () => {
+  /**
+   * 在所有集成用例之前创建临时目录与入口文件，保证并行跑测时路径已就绪。
+   */
+  beforeAll(async () => {
     testDataDir = getTestDataDir();
     outputDir = getTestOutputDir("integration");
     entryFile = join(testDataDir, "src", "index.ts");
 
-    // 确保目录存在
     await mkdir(join(testDataDir, "src"), { recursive: true });
 
-    // 创建入口文件
     await writeTextFile(
       entryFile,
       `console.log('Integration Test');`,
     );
+  });
 
-    expect(testDataDir).toBeTruthy();
+  /**
+   * 集成用例结束后清理输出目录（失败时不阻断其它包的测试收尾）。
+   */
+  afterAll(async () => {
+    if (outputDir) {
+      try {
+        await cleanupDir(outputDir);
+      } catch {
+        // 忽略清理错误
+      }
+    }
   });
 
   describe("完整构建流程", () => {
@@ -208,6 +222,7 @@ describe("集成测试", () => {
       const builder = new Builder(config);
 
       const result = await builder.buildClient();
+      expect(result.outputFiles?.length).toBeGreaterThan(0);
 
       // 验证资源文件已复制
       const assetExists = await exists(join(outputDir, "assets", "test.txt"))
@@ -215,16 +230,5 @@ describe("集成测试", () => {
         .catch(() => false);
       expect(assetExists).toBe(true);
     }, { sanitizeOps: false, sanitizeResources: false });
-  });
-
-  // 清理测试输出目录
-  it("应该清理测试输出目录", async () => {
-    if (outputDir) {
-      try {
-        await cleanupDir(outputDir);
-      } catch {
-        // 忽略错误
-      }
-    }
   });
 });
