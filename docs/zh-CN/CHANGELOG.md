@@ -7,6 +7,21 @@
 
 ---
 
+## [1.1.8] - 2026-04-20
+
+### 修复
+
+- **Bun 解析器（`resolver-bun.ts`）**：客户端构建将 **`nodePaths`** 置空时，此前
+  无法解析非 scoped 裸 npm 说明符（如来自 **`bun-protocol`** 下
+  **`@dreamer/render/client/react`** 的
+  **`react-dom`**、**`react-dom/client`**、 **`scheduler`**）。现通过 Node
+  **`createRequire`**，自候选 **`package.json`**
+  锚点（**`resolveDir`**、真实导入方、**`cwd()`** 等向上）解析，并以
+  **`isBuiltin`** 跳过 Node 内置模块；**`onResolve`** 的 **filter** 使用与 **Go
+  正则** 兼容的写法（不使用 PCRE 前瞻）。
+
+---
+
 ## [1.1.7] - 2026-04-20
 
 ### 修复

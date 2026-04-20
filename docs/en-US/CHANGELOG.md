@@ -8,6 +8,21 @@ and this project adheres to
 
 ---
 
+## [1.1.8] - 2026-04-20
+
+### Fixed
+
+- **Bun resolver (`resolver-bun.ts`)**: When the client build clears
+  **`nodePaths`**, esbuild no longer failed to resolve **unscoped bare npm
+  specifiers** (e.g. **`react-dom`**, **`react-dom/client`**, **`scheduler`**
+  from **`@dreamer/render/client/react`** under **`bun-protocol`**). The plugin
+  now resolves them with Node **`createRequire`** from candidate
+  **`package.json`** anchors (walking from **`resolveDir`**, importers, and
+  **`cwd()`**), and skips Node built-ins via **`isBuiltin`**. The **onResolve**
+  filter uses a **Go regexp–compatible** pattern (no PCRE lookaheads).
+
+---
+
 ## [1.1.7] - 2026-04-20
 
 ### Fixed

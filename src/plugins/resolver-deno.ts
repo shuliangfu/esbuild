@@ -4,6 +4,7 @@
  * 统一模块解析插件（Deno）：仅用本项目 deno.json 依赖图 + 本地缓存，不走网络。
  * - 路径别名、bare specifier 从项目 deno.json 解析
  * - jsr:/npm 从预构建 moduleCache 查找（先精确 get，未命中则正则匹配 key）
+ * - npm: 在 cache 未收录时（常见于 JSR 传递依赖内的 `npm:包@版本`）回退为 `deno eval` + import.meta.resolve 解析到磁盘路径再交给 esbuild
  * - 相对路径：importer 在 cache 则 base = dirname(pathWithinPackage)，再 cacheLookup 目标
  */
 
@@ -74,6 +75,47 @@ interface DenoInfoOutput {
   version: number;
   roots: string[];
   modules: DenoInfoModule[];
+}
+
+/**
+ * 使用项目 deno.json 通过 Deno 将 `npm:` 说明符解析为本地文件绝对路径。
+ * 与 `buildModuleCache` 内对 npm 的补全逻辑一致；供 cache 未收录传递依赖时使用。
+ *
+ * @param spec - 完整 npm 说明符，例如 `npm:tailwind-merge@^2.6.1`
+ * @param denoJsonPath - 项目 `deno.json` 的绝对路径
+ * @returns 存在的本地文件路径，失败则 `undefined`
+ */
+async function resolveNpmSpecifierToFilePath(
+  spec: string,
+  denoJsonPath: string,
+): Promise<string | undefined> {
+  const normalized = spec.replace(/^npm:\/+/, "npm:");
+  if (!normalized.startsWith("npm:")) return undefined;
+  const workDir = dirname(denoJsonPath);
+  try {
+    const proc = createCommand("deno", {
+      args: [
+        "eval",
+        "--config",
+        toForwardSlash(denoJsonPath),
+        "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
+        normalized,
+      ],
+      cwd: workDir,
+      stdin: "null",
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const out = await proc.output();
+    if (!out.success || !out.stdout) return undefined;
+    const line = new TextDecoder().decode(out.stdout).trim();
+    if (!line.startsWith("file://")) return undefined;
+    const localPath = fileUrlToPath(line);
+    if (existsSync(localPath)) return localPath;
+  } catch {
+    /* 与 buildModuleCache 一致：解析失败则忽略 */
+  }
+  return undefined;
 }
 
 /**
@@ -187,38 +229,27 @@ export async function buildModuleCache(
 
     for (const spec of npmToResolve) {
       if (cache.has(spec)) continue;
-      try {
-        const procNpm = createCommand("deno", {
-          args: [
-            "eval",
-            ...(projectDenoJson
-              ? ["--config", toForwardSlash(projectDenoJson)]
-              : []),
-            "const u=await import.meta.resolve(Deno.args[0]);console.log(u);",
+      if (!projectDenoJson) {
+        debugLog(
+          $tr("log.esbuild.resolverDeno.buildModuleCacheNpmResolveFailed", {
             spec,
-          ],
-          cwd: workDir,
-          stdin: "null",
-          stdout: "piped",
-          stderr: "piped",
-        });
-        const out = await procNpm.output();
-        if (out.success && out.stdout) {
-          const line = new TextDecoder().decode(out.stdout).trim();
-          if (line.startsWith("file://")) {
-            const localPath = fileUrlToPath(line);
-            if (existsSync(localPath)) {
-              cache.set(spec, localPath);
-              debugLog(
-                $tr("log.esbuild.resolverDeno.buildModuleCacheNpm", {
-                  spec,
-                  localPath,
-                }),
-              );
-            }
-          }
-        }
-      } catch {
+          }),
+        );
+        continue;
+      }
+      const localPath = await resolveNpmSpecifierToFilePath(
+        spec,
+        projectDenoJson,
+      );
+      if (localPath) {
+        cache.set(spec, localPath);
+        debugLog(
+          $tr("log.esbuild.resolverDeno.buildModuleCacheNpm", {
+            spec,
+            localPath,
+          }),
+        );
+      } else {
         debugLog(
           $tr("log.esbuild.resolverDeno.buildModuleCacheNpmResolveFailed", {
             spec,
@@ -595,7 +626,7 @@ function resolveRelative(
 }
 
 /**
- * Deno 解析插件：仅用预构建 moduleCache，不走网络、不运行时 subprocess。
+ * Deno 解析插件：以预构建 moduleCache 为主；对未收录的 `npm:` 说明符可回退执行一次 `deno eval`（与 buildModuleCache 一致），不访问网络。
  */
 export function denoResolverPlugin(
   options: ResolverOptions = {},
@@ -713,7 +744,9 @@ export function denoResolverPlugin(
       // 以项目 deno.json 的 imports 为准：若项目声明了某包版本，则优先用该版本解析，避免依赖包（如 render）内锁定的旧版本覆盖项目版本
       build.onResolve(
         { filter: /^(jsr|npm):/ },
-        (args): esbuild.OnResolveResult | undefined => {
+        async (
+          args,
+        ): Promise<esbuild.OnResolveResult | undefined> => {
           const specifier = normalizeProtocolSpecifier(args.path);
           if (isServerBuild && !browserMode) {
             debugLog(
@@ -791,6 +824,28 @@ export function denoResolverPlugin(
               return { path: specifier, namespace: NAMESPACE_DENO_PROTOCOL };
             }
           }
+          // npm: 未进 moduleCache 时（如 JSR 依赖内字面量 `npm:tailwind-merge@^2.6.1`），用 Deno 解析到真实路径并走 file namespace 打包
+          const denoJsonPathForFallback =
+            (projectDir ? findDenoJson(projectDir) : undefined) ??
+              findDenoJson(cwd());
+          if (specifier.startsWith("npm:") && denoJsonPathForFallback) {
+            let filePath = await resolveNpmSpecifierToFilePath(
+              tryPath,
+              denoJsonPathForFallback,
+            );
+            if (!filePath && tryPath !== specifier) {
+              filePath = await resolveNpmSpecifierToFilePath(
+                specifier,
+                denoJsonPathForFallback,
+              );
+            }
+            if (filePath) {
+              debugLog(
+                `npm cache miss fallback to file: ${tryPath} -> ${filePath}`,
+              );
+              return { path: filePath, namespace: "file" };
+            }
+          }
           debugLog(
             $tr("log.esbuild.resolverDeno.cacheLookupMiss", { tryPath }),
           );
@@ -802,7 +857,9 @@ export function denoResolverPlugin(
       // 优先用 projectDir 查 deno.json，保证 @dreamer/router/client、@dreamer/render/client/react 等子路径能命中项目 imports
       build.onResolve(
         { filter: /^@[^/]+\/[^/]+(\/.*)?$/ },
-        (args): esbuild.OnResolveResult | undefined => {
+        async (
+          args,
+        ): Promise<esbuild.OnResolveResult | undefined> => {
           const startDir = projectDir ??
             (args.importer
               ? dirname(args.importer)
@@ -822,6 +879,15 @@ export function denoResolverPlugin(
             if (moduleCache && cacheLookupWithCheck(pkgImport)) {
               return { path: pkgImport, namespace: NAMESPACE_DENO_PROTOCOL };
             }
+            if (pkgImport.startsWith("npm:")) {
+              const filePath = await resolveNpmSpecifierToFilePath(
+                pkgImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
           }
           return undefined;
         },
@@ -830,7 +896,9 @@ export function denoResolverPlugin(
       // 2.6 裸包名（无 @scope）：preact、react、lodash 等，与 resolver-deno.bak 一致，客户端用 projectDir 查 deno.json
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*$/ },
-        (args): esbuild.OnResolveResult | undefined => {
+        async (
+          args,
+        ): Promise<esbuild.OnResolveResult | undefined> => {
           const packageName = args.path;
           const inNodeModules = args.importer?.includes("node_modules") ??
             false;
@@ -871,6 +939,15 @@ export function denoResolverPlugin(
             if (url) return { path: url, external: true };
           }
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
+            if (packageImport.startsWith("npm:")) {
+              const filePath = await resolveNpmSpecifierToFilePath(
+                packageImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
             return undefined;
           }
           debugLog(
@@ -886,7 +963,9 @@ export function denoResolverPlugin(
       // 2.7 裸包子路径：preact/jsx-runtime、react/jsx-runtime 等，与 resolver-deno.bak 一致；优先 resolveOverrides
       build.onResolve(
         { filter: /^[a-zA-Z][a-zA-Z0-9_-]*\/.+$/ },
-        (args): esbuild.OnResolveResult | undefined => {
+        async (
+          args,
+        ): Promise<esbuild.OnResolveResult | undefined> => {
           const path = args.path;
           const override = resolveOverrides[path];
           if (override && existsSync(override)) {
@@ -944,6 +1023,15 @@ export function denoResolverPlugin(
             if (url) return { path: url, external: true };
           }
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
+            if (packageImport.startsWith("npm:")) {
+              const filePath = await resolveNpmSpecifierToFilePath(
+                packageImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
             return undefined;
           }
           debugLog(
