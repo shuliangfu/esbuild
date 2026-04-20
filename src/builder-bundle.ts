@@ -149,15 +149,16 @@ export class BuilderBundle {
     // 根据运行时环境选择打包方式
     // 注意：在浏览器模式下，Bun 也使用 esbuild + bunResolverPlugin
     // 因为 bun build 无法解析 JSR 包的子路径导入（如 @dreamer/socket-io/client）
-    const isBrowserPlatform = (options.platform || "browser") === "browser";
+    const resolvedPlatform = options.platform || "browser";
+    const isBrowserPlatform = resolvedPlatform === "browser";
 
-    if (IS_BUN && !isBrowserPlatform) {
-      // Bun 环境且非浏览器平台，使用 bun build（更快）
+    // Bun + `platform: "node"` 若走子进程 `bun build`，在 Linux CI（临时入口、cwd）
+    // 等环境下易失败；与 Deno 一致改走 esbuild + 解析插件。
+    // `neutral` 等仍可用 bun build（更快）。
+    if (IS_BUN && !isBrowserPlatform && resolvedPlatform !== "node") {
       return this.buildWithBun(options);
-    } else {
-      // Deno 环境或浏览器模式使用 esbuild + resolver plugin
-      return this.buildWithEsbuild(options);
     }
+    return this.buildWithEsbuild(options);
   }
 
   /**

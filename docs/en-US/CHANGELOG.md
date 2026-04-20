@@ -8,6 +8,19 @@ and this project adheres to
 
 ---
 
+## [1.1.7] - 2026-04-20
+
+### Fixed
+
+- **BuilderBundle / Bun / `platform: "node"`**: Previously Bun routed
+  non-browser builds to a subprocess `bun build`. On Linux CI (temporary entry
+  paths, cwd), that path could fail while `platform: "browser"` still worked.
+  **`node` now uses the same esbuild + resolver plugin path as Deno**, matching
+  stability; `neutral` and other non-browser targets still use `bun build` where
+  applicable.
+
+---
+
 ## [1.1.6] - 2026-03-22
 
 ### Changed
