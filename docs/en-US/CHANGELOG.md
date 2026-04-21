@@ -8,6 +8,23 @@ and this project adheres to
 
 ---
 
+## [1.1.9] - 2026-04-21
+
+### Changed
+
+- **npm / CSS toolchain (`deno.json` imports)**: **`postcss@^8.5.10`** satisfies
+  **cssnano** peer **`postcss@^8.5.10`** (avoids **`8.4.x`** peer mismatches
+  when this package is nested under **`@dreamer/test`**).
+- **`esbuild`**, **`autoprefixer`**, **`cssnano`** use semver **`^`** ranges
+  aligned with current stacks (**esbuild** **0.27.x**, **autoprefixer**
+  **10.5.x**, **cssnano** **7.1.x**).
+- **`@dreamer/test`**: **`^1.1.7`** (test runner / devDependency).
+- **`package.json`**: NPM dependency pins updated for Bun/npm consumers
+  (**esbuild** **0.27.7**, **autoprefixer** **10.5.0**, **cssnano** **7.1.7**,
+  **postcss** **8.5.10**).
+
+---
+
 ## [1.1.8] - 2026-04-20
 
 ### Fixed

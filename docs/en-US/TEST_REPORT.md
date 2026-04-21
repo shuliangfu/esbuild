@@ -2,14 +2,14 @@
 
 ## Test Overview
 
-- **Test library version**: @dreamer/test@^1.0.0
-- **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.3
+- **Test library version**: @dreamer/test@^1.1.7
+- **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.18
 - **Test framework**: @dreamer/test (compatible with Deno and Bun)
-- **Test date**: 2026-02-16
+- **Test date**: 2026-04-21
 - **Test environment**:
   - Deno >= 2.0.0
   - Bun >= 1.0.0
-  - esbuild >= 0.27.2
+  - esbuild >= 0.27.7
 
 ## Test Results
 

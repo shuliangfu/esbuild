@@ -7,6 +7,22 @@
 
 ---
 
+## [1.1.9] - 2026-04-21
+
+### 变更
+
+- **npm / CSS 工具链（`deno.json` imports）**：**`postcss@^8.5.10`**，满足
+  **cssnano** 对 **`postcss@^8.5.10`** 的 peer（避免与本包嵌套在
+  **`@dreamer/test`** 下时出现 **`8.4.x`** 不匹配）。
+- **`esbuild`**、**`autoprefixer`**、**`cssnano`** 使用 semver
+  **`^`**，与当前栈（esbuild **0.27.x**、autoprefixer **10.5.x**、cssnano
+  **7.1.x**）对齐。
+- **`@dreamer/test`**：**`^1.1.7`**（测试运行器 / devDependency）。
+- **`package.json`**：同步 npm 依赖版本为 **esbuild 0.27.7**、**autoprefixer
+  10.5.0**、**cssnano 7.1.7**、**postcss 8.5.10**。
+
+---
+
 ## [1.1.8] - 2026-04-20
 
 ### 修复

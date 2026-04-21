@@ -17,12 +17,12 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.8] - 2026-04-20
+### [1.1.9] - 2026-04-21
 
-- **Fixed** (Bun): **`bun-resolver`** resolves unscoped bare npm specifiers
-  (e.g. **`react-dom`**, **`react-dom/client`**, **`scheduler`**) via
-  **`createRequire`** when **`nodePaths`** is empty, fixing client bundles that
-  pull **`@dreamer/render/client/react`** through **`bun-protocol`** paths.
+- **Changed**: **`postcss@^8.5.10`** and semver **`^`** alignment for
+  **`esbuild`** / **autoprefixer** / **cssnano**; **`package.json`** pins
+  updated — removes **cssnano** peer mismatch with **`8.4.x`** when nested under
+  **`@dreamer/test`**.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
@@ -1097,11 +1097,11 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.1.7** (2026-04-20)
+**v1.1.9** (2026-04-21)
 
-- **Fixed**: `BuilderBundle` — on Bun, `platform: "node"` now uses esbuild +
-  resolver plugins (same as Deno) instead of a subprocess `bun build`, fixing
-  flaky failures on Linux CI with temporary entry paths.
+- **Changed**: CSS/npm toolchain — **`postcss@^8.5.10`**, **`^`** ranges for
+  **esbuild** / **autoprefixer** / **cssnano**, **`@dreamer/test@^1.1.7`**;
+  **`package.json`** dependency pins aligned.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 
