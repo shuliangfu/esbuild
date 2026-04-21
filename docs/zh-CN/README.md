@@ -1059,12 +1059,11 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.8**（2026-04-20）
+**v1.1.9**（2026-04-21）
 
-- **修复**（Bun）：**`bun-resolver`** 在 **`nodePaths`** 置空时通过
-  **`createRequire`** 解析裸 npm 模块（如
-  **`react-dom`**、**`react-dom/client`**）， 修复 **`bun-protocol`** 路径加载
-  **`@dreamer/render/client/react`** 时的客户端打包失败。
+- **变更**：**`postcss@^8.5.10`**，**`esbuild`** / **autoprefixer** /
+  **cssnano** 使用 semver **`^`**；**`package.json`** 钉版本与 **`deno.json`**
+  对齐，消除 **cssnano** 与 **`postcss@8.4.x`** 的 peer 告警链。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

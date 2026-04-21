@@ -2,14 +2,14 @@
 
 ## 测试概览
 
-- **测试库版本**：@dreamer/test@^1.0.0
-- **运行时适配器版本**：@dreamer/runtime-adapter@^1.0.3
+- **测试库版本**：@dreamer/test@^1.1.7
+- **运行时适配器版本**：@dreamer/runtime-adapter@^1.0.18
 - **测试框架**：@dreamer/test（兼容 Deno 与 Bun）
-- **测试日期**：2026-02-16
+- **测试日期**：2026-04-21
 - **测试环境**：
   - Deno >= 2.0.0
   - Bun >= 1.0.0
-  - esbuild >= 0.27.2
+  - esbuild >= 0.27.7
 
 ## 测试结果
 
