@@ -9,15 +9,21 @@
  */
 
 import {
+  basename,
   createCommand,
   cwd,
   dirname,
+  ensureDir,
   existsSync,
+  getEnv,
   join,
   readTextFile,
   readTextFileSync,
   relative,
+  remove,
   resolve,
+  walk,
+  writeTextFile,
 } from "@dreamer/runtime-adapter";
 import * as esbuild from "esbuild";
 import { $tr } from "../i18n.ts";
@@ -119,11 +125,219 @@ async function resolveNpmSpecifierToFilePath(
 }
 
 /**
+ * 使用项目 deno.json 通过 Deno 将 `jsr:` 说明符解析为本地文件绝对路径。
+ * 与 `resolveNpmSpecifierToFilePath` 对称；供 moduleCache 未收录（常见于动态 import 的传递依赖）时回退解析。
+ *
+ * **Why**：`buildModuleCache` 以入口做 `deno info`，动态 `import()` 的传递依赖可能不进 cache；
+ * jsr: 说明符在 cache miss 时无回退会直接报错，与 npm: 行为不对称。
+ *
+ * **注意**：`deno eval` + `import.meta.resolve` 对 `jsr:` 说明符只返回说明符自身（不解析到 file://），
+ * 因此改用 `deno info` 解析 `local:` 字段获取本地路径。
+ *
+ * @param spec - 完整 jsr 说明符，例如 `jsr:@dreamer/web3@^1.1.1/client`
+ * @param denoJsonPath - 项目 `deno.json` 的绝对路径
+ * @returns 存在的本地文件路径，失败则 `undefined`
+ */
+async function resolveJsrSpecifierToFilePath(
+  spec: string,
+  denoJsonPath: string,
+): Promise<string | undefined> {
+  const normalized = spec.replace(/^jsr:\/+/, "jsr:");
+  if (!normalized.startsWith("jsr:")) return undefined;
+  const workDir = dirname(denoJsonPath);
+  try {
+    const proc = createCommand("deno", {
+      args: [
+        "info",
+        "--config",
+        toForwardSlash(denoJsonPath),
+        normalized,
+      ],
+      cwd: workDir,
+      stdin: "null",
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const out = await proc.output();
+    if (!out.success || !out.stdout) return undefined;
+    const text = new TextDecoder().decode(out.stdout);
+    // deno info 输出第一行为 `local: /path/to/file`
+    const match = text.match(/^local:\s+(.+)$/m);
+    if (!match) return undefined;
+    const localPath = match[1].trim();
+    if (!existsSync(localPath)) return undefined;
+    return localPath;
+  } catch {
+    /* 与 resolveNpmSpecifierToFilePath 一致：解析失败则忽略 */
+  }
+  return undefined;
+}
+
+/**
+ * 扫描项目 src 目录下所有 .ts/.tsx 文件（用于补全动态 import 的传递依赖）。
+ *
+ * **Why**：`deno info` 以单入口为起点时，动态 `import()` 的目标文件内的静态导入可能因无扩展名等原因解析失败，
+ * 导致传递依赖（如 jsr: 包）不进 moduleCache。扫描所有源文件作为额外 roots 补全。
+ *
+ * @param projectDir - 项目根目录（含 deno.json）
+ * @returns 源文件绝对路径数组（可能为空）
+ */
+async function collectProjectSourceFiles(
+  projectDir: string,
+): Promise<string[]> {
+  const srcDir = join(projectDir, "src");
+  if (!existsSync(srcDir)) return [];
+  const files: string[] = [];
+  try {
+    for await (
+      const path of walk(srcDir, { includeFiles: true, includeDirs: false })
+    ) {
+      if (/\.(tsx?|jsx?)$/i.test(path)) {
+        files.push(path);
+      }
+    }
+  } catch {
+    /* 扫描失败则忽略，回退为仅入口 deno info */
+  }
+  return files;
+}
+
+/**
+ * 将模块解析结果合并到 cache（jsr: 转为 jsr:key，npm: 收集待补全）。
+ * 与 buildModuleCache 主循环逻辑一致，抽出来供聚合入口复用。
+ *
+ * @param info - deno info --json 输出
+ * @param cache - 目标 cache（原地修改）
+ * @param npmToResolve - npm: 说明符收集集合（原地修改）
+ * @param debugLog - 调试日志函数
+ */
+function mergeDenoInfoModules(
+  info: DenoInfoOutput,
+  cache: ModuleCache,
+  npmToResolve: Set<string>,
+  debugLog: (msg: string) => void,
+): void {
+  for (const mod of info.modules) {
+    if (!mod.specifier) continue;
+    const localPath = mod.local
+      ? (mod.local.startsWith("file://") ? fileUrlToPath(mod.local) : mod.local)
+      : undefined;
+    if (localPath) cache.set(mod.specifier, localPath);
+
+    const jsrMatch = mod.specifier.match(
+      /^https:\/\/jsr\.io\/(@[^/]+\/[^/]+)\/([^/]+)\/(.+)$/,
+    );
+    if (jsrMatch) {
+      const [, scopeAndName, version, path] = jsrMatch;
+      const jsrKey = `jsr:${scopeAndName}@${version}/${path}`;
+      if (localPath) {
+        cache.set(jsrKey, localPath);
+        debugLog(
+          $tr("log.esbuild.resolverDeno.buildModuleCacheAdd", {
+            jsrKey,
+            localPath,
+          }),
+        );
+      }
+    } else if (mod.specifier.startsWith("npm:")) {
+      const spec = mod.specifier.replace(/^npm:\/+/, "npm:");
+      npmToResolve.add(spec);
+      if (localPath) cache.set(spec, localPath);
+    }
+  }
+}
+
+/**
+ * 生成临时聚合入口文件，对所有源文件做一次 `deno info`，将传递依赖补入 cache。
+ *
+ * **Why**：`deno info` 以单入口为起点时，动态 `import()` 的目标文件（如路由组件）内的静态导入
+ * 可能因无扩展名等原因解析失败，导致传递依赖（如 jsr: 包）不进 moduleCache。
+ * 生成一个临时 `.ts` 文件，静态 import 所有源文件作为 roots，一次性补全。
+ *
+ * **Invariant**：临时文件写入 `~/.dreamer/<项目名>/esbuild-deno-cache/` 下，不污染用户项目；
+ * 用完即删；任何阶段失败均忽略（回退为主入口 deno info 结果 + 方向 A 运行时回退）。
+ *
+ * @param sourceFiles - 项目 src 下所有 .ts/.tsx 文件绝对路径
+ * @param projectRootAbs - 项目根绝对路径
+ * @param workDir - deno info 子进程工作目录
+ * @param configArgs - deno info 的 --config 参数（可能为空数组）
+ * @param cache - 目标 cache（原地修改）
+ * @param npmToResolve - npm: 说明符收集集合（原地修改）
+ * @param debugLog - 调试日志函数
+ */
+async function runDenoInfoOnAggregate(
+  sourceFiles: string[],
+  projectRootAbs: string,
+  workDir: string,
+  configArgs: string[],
+  cache: ModuleCache,
+  npmToResolve: Set<string>,
+  debugLog: (msg: string) => void,
+): Promise<void> {
+  // 临时聚合入口写入 ~/.dreamer/<项目名>/esbuild-deno-cache/
+  const home = getEnv("HOME") ?? getEnv("USERPROFILE") ??
+    getEnv("LOCALAPPDATA");
+  if (!home) return;
+  const segment = basename(resolve(projectRootAbs)).replace(/[/:*?"<>|]/g, "-")
+    .slice(0, 120) || "project";
+  const cacheDir = join(home, ".dreamer", segment, "esbuild-deno-cache");
+  const tmpFile = join(cacheDir, `_aggregate-roots-${Date.now()}.ts`);
+  // 生成聚合入口：静态 import 所有源文件，让 deno info 一次性覆盖全部依赖图
+  const importLines = sourceFiles.map((f) =>
+    `import ${JSON.stringify(toForwardSlash(f))};`
+  ).join("\n");
+  const content =
+    `// @ts-nocheck\n// 自动生成的聚合入口，用于 deno info 补全动态 import 的传递依赖\n${importLines}\n`;
+  try {
+    await ensureDir(cacheDir);
+    await writeTextFile(tmpFile, content);
+    const proc = createCommand("deno", {
+      args: ["info", "--json", ...configArgs, toForwardSlash(tmpFile)],
+      cwd: workDir,
+      stdin: "null",
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const out = await proc.output();
+    if (!out.success || !out.stdout) {
+      debugLog(
+        `aggregate deno info failed: ${
+          new TextDecoder().decode(out.stderr).slice(0, 200)
+        }`,
+      );
+      return;
+    }
+    const stdout = new TextDecoder().decode(out.stdout);
+    if (!stdout.trim()) return;
+    const aggInfo = JSON.parse(stdout) as DenoInfoOutput;
+    const before = cache.size;
+    mergeDenoInfoModules(aggInfo, cache, npmToResolve, () => {});
+    debugLog(
+      `aggregate deno info merged: ${
+        String(cache.size - before)
+      } new entries from ${String(sourceFiles.length)} source files`,
+    );
+  } catch (e) {
+    debugLog(`aggregate deno info error: ${String(e)}`);
+  } finally {
+    try {
+      if (existsSync(tmpFile)) await remove(tmpFile);
+    } catch {
+      /* 删除失败不阻断 */
+    }
+  }
+}
+
+/**
  * 在项目目录、项目 deno.json 下执行 deno info，仅将本依赖图内的模块写入 cache。
  * 不扫全局缓存；npm 无 local 时仅在此时用子进程 import.meta.resolve 补全。
  *
  * **性能**：按 `deno.json`+`deno.lock` 联合指纹从 `~/.dreamer/<项目名>/esbuild-deno-cache/deno-module-map-<指纹>.json`
  * 预载后对本入口执行 `deno info` 合并，再写回**单文件整表**（多入口共享、写前再读合并减轻并发丢条目）。
+ *
+ * **动态 import 补全**：主入口 `deno info` 后，扫描 `src/` 下所有 `.ts/.tsx` 文件，生成临时聚合入口再做一次
+ * `deno info`，将动态 import 的传递依赖（如路由文件内的 jsr: 包）补入 cache。临时文件写入
+ * `~/.dreamer/<项目名>/esbuild-deno-cache/` 下，不污染用户项目目录。
  */
 export async function buildModuleCache(
   entryPoint: string,
@@ -195,36 +409,24 @@ export async function buildModuleCache(
     const info = JSON.parse(stdout) as DenoInfoOutput;
     const npmToResolve = new Set<string>();
 
-    for (const mod of info.modules) {
-      if (!mod.specifier) continue;
-      // 统一转为本地文件系统路径（Windows 上 deno info 可能返回 file:// URL）
-      const localPath = mod.local
-        ? (mod.local.startsWith("file://")
-          ? fileUrlToPath(mod.local)
-          : mod.local)
-        : undefined;
-      if (localPath) cache.set(mod.specifier, localPath);
+    mergeDenoInfoModules(info, cache, npmToResolve, debugLog);
 
-      const jsrMatch = mod.specifier.match(
-        /^https:\/\/jsr\.io\/(@[^/]+\/[^/]+)\/([^/]+)\/(.+)$/,
+    // 方向 B：扫描 src/ 下所有 .ts/.tsx 文件，生成临时聚合入口做第二次 deno info，
+    // 补全动态 import 的传递依赖（如路由文件内的 jsr: 包）。
+    // deno info 以单入口为起点时，动态 import() 目标内的静态导入可能解析失败（无扩展名等），
+    // 导致传递依赖不进 cache；聚合入口让所有源文件成为 roots，一次性补全。
+    const projectRootAbs = projectDenoJson ? dirname(projectDenoJson) : workDir;
+    const sourceFiles = await collectProjectSourceFiles(projectRootAbs);
+    if (sourceFiles.length > 0) {
+      await runDenoInfoOnAggregate(
+        sourceFiles,
+        projectRootAbs,
+        workDir,
+        configArgs,
+        cache,
+        npmToResolve,
+        debugLog,
       );
-      if (jsrMatch) {
-        const [, scopeAndName, version, path] = jsrMatch;
-        const jsrKey = `jsr:${scopeAndName}@${version}/${path}`;
-        if (localPath) {
-          cache.set(jsrKey, localPath);
-          debugLog(
-            $tr("log.esbuild.resolverDeno.buildModuleCacheAdd", {
-              jsrKey,
-              localPath,
-            }),
-          );
-        }
-      } else if (mod.specifier.startsWith("npm:")) {
-        const spec = mod.specifier.replace(/^npm:\/+/, "npm:");
-        npmToResolve.add(spec);
-        if (localPath) cache.set(spec, localPath);
-      }
     }
 
     for (const spec of npmToResolve) {
@@ -846,6 +1048,25 @@ export function denoResolverPlugin(
               return { path: filePath, namespace: "file" };
             }
           }
+          // jsr: 未进 moduleCache 时（常见于动态 import 的传递依赖未被 deno info 收录），用 Deno 解析到真实路径并走 file namespace 打包
+          if (specifier.startsWith("jsr:") && denoJsonPathForFallback) {
+            let filePath = await resolveJsrSpecifierToFilePath(
+              tryPath,
+              denoJsonPathForFallback,
+            );
+            if (!filePath && tryPath !== specifier) {
+              filePath = await resolveJsrSpecifierToFilePath(
+                specifier,
+                denoJsonPathForFallback,
+              );
+            }
+            if (filePath) {
+              debugLog(
+                `jsr cache miss fallback to file: ${tryPath} -> ${filePath}`,
+              );
+              return { path: filePath, namespace: "file" };
+            }
+          }
           debugLog(
             $tr("log.esbuild.resolverDeno.cacheLookupMiss", { tryPath }),
           );
@@ -881,6 +1102,15 @@ export function denoResolverPlugin(
             }
             if (pkgImport.startsWith("npm:")) {
               const filePath = await resolveNpmSpecifierToFilePath(
+                pkgImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
+            if (pkgImport.startsWith("jsr:")) {
+              const filePath = await resolveJsrSpecifierToFilePath(
                 pkgImport,
                 denoJsonPath,
               );
@@ -941,6 +1171,15 @@ export function denoResolverPlugin(
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
             if (packageImport.startsWith("npm:")) {
               const filePath = await resolveNpmSpecifierToFilePath(
+                packageImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
+            if (packageImport.startsWith("jsr:")) {
+              const filePath = await resolveJsrSpecifierToFilePath(
                 packageImport,
                 denoJsonPath,
               );
@@ -1025,6 +1264,15 @@ export function denoResolverPlugin(
           if (!moduleCache || !cacheLookupWithCheck(packageImport)) {
             if (packageImport.startsWith("npm:")) {
               const filePath = await resolveNpmSpecifierToFilePath(
+                packageImport,
+                denoJsonPath,
+              );
+              if (filePath) {
+                return { path: filePath, namespace: "file" };
+              }
+            }
+            if (packageImport.startsWith("jsr:")) {
+              const filePath = await resolveJsrSpecifierToFilePath(
                 packageImport,
                 denoJsonPath,
               );

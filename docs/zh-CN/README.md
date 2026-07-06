@@ -1059,11 +1059,14 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.1.9**（2026-04-21）
+**v1.2.0**（2026-07-06）
 
-- **变更**：**`postcss@^8.5.10`**，**`esbuild`** / **autoprefixer** /
-  **cssnano** 使用 semver **`^`**；**`package.json`** 钉版本与 **`deno.json`**
-  对齐，消除 **cssnano** 与 **`postcss@8.4.x`** 的 peer 告警链。
+- **新增**：Deno 解析器 **jsr: 运行时回退** —— 通过 `deno info` 解析未命中
+  缓存的 `jsr:` 说明符，与 `npm:` 回退对称。
+- **新增**：**`buildModuleCache` 覆盖动态 `import()` 传递依赖** —— 扫描 `src/`
+  下 `.ts/.tsx` 文件并执行聚合 `deno info --json` 补全缓存。
+- **修复**：`watchRebuildTimer` 类型改为 `number`，修复 Deno 2.9 下 TS2322
+  类型错误。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

@@ -20,11 +20,12 @@ import {
 } from "@dreamer/runtime-adapter";
 import { AssetsProcessor } from "./assets-processor.ts";
 import { BuildAnalyzer } from "./build-analyzer.ts";
-import { CacheManager } from "./cache-manager.ts";
 import { BuilderClient } from "./builder-client.ts";
+import { BuilderServer } from "./builder-server.ts";
+import { CacheManager } from "./cache-manager.ts";
 import { CSSOptimizer } from "./css-optimizer.ts";
 import { HTMLGenerator } from "./html-generator.ts";
-import { BuilderServer } from "./builder-server.ts";
+import { $tr, setEsbuildLocale } from "./i18n.ts";
 import type {
   Builder as IBuilder,
   BuilderConfig,
@@ -37,7 +38,6 @@ import type {
   LogLevel,
   OptimizationSuggestion,
 } from "./types.ts";
-import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -54,7 +54,7 @@ export class Builder implements IBuilder {
   private watcher?: FileWatcher;
   private isWatching: boolean = false;
   /** Watch 模式下防抖重建的定时器 ID，stopWatch 时需清除以防泄漏 */
-  private watchRebuildTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchRebuildTimer: number | null = null;
   private logLevel: LogLevel = "info";
   private errorStats: ErrorStats = {
     total: 0,

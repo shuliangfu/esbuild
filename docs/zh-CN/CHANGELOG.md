@@ -7,6 +7,29 @@
 
 ---
 
+## [1.2.0] - 2026-07-06
+
+### 新增
+
+- **Deno 解析器（`resolver-deno.ts`）**：**jsr: 运行时回退** —— 当 `jsr:`
+  说明符未命中模块缓存（如仅通过动态 `import()` 触达）时，解析器现通过
+  `deno info` 将其解析为本地文件路径，与既有 `npm:` 回退对称。此前 jsr:
+  缓存未命中直接返回 `undefined`，导致 esbuild 报 `Could not resolve`。
+- **Deno 解析器（`resolver-deno.ts`）**：**`buildModuleCache` 现覆盖动态
+  `import()` 的传递依赖** —— 扫描项目 `src/` 下 `.ts/.tsx` 文件，构建聚合
+  入口并执行单次 `deno info --json` 补全缓存。修复仅通过动态导入触达的模块
+  （如路由级 `() => import("../views/...")`）缺失于缓存的问题。
+
+### 修复
+
+- **构建器（`builder.ts`）**：`watchRebuildTimer` 类型由
+  `ReturnType<typeof setTimeout>` 改为 `number`，修复 Deno 2.9 下的 TS2322
+  类型错误（Deno 的 `setTimeout` 返回 `number`，而非 Node 的 `Timeout`）。
+- **测试（`builder-server-advanced.test.ts`）**：`useNativeCompile` 测试增加
+  `timeout: 180_000`，以容纳 `deno compile` 首次运行下载 `denort` 二进制的时间。
+
+---
+
 ## [1.1.9] - 2026-04-21
 
 ### 变更

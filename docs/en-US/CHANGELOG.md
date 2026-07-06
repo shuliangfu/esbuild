@@ -8,6 +8,33 @@ and this project adheres to
 
 ---
 
+## [1.2.0] - 2026-07-06
+
+### Added
+
+- **Deno resolver (`resolver-deno.ts`)**: **jsr: runtime fallback** — when a
+  `jsr:` specifier misses the module cache (e.g. reached only via dynamic
+  `import()`), the resolver now resolves it to a local file path via
+  `deno info`, mirroring the existing `npm:` fallback. Previously jsr: cache
+  misses returned `undefined`, causing esbuild `Could not resolve` errors.
+- **Deno resolver (`resolver-deno.ts`)**: **`buildModuleCache` now covers
+  dynamic `import()` transitive dependencies** — scans project `src/` for
+  `.ts/.tsx` files, builds an aggregate entry, and runs a single
+  `deno info --json` to populate the cache. Fixes modules only reachable through
+  dynamic imports (e.g. route-level `() => import("../views/...")`) being absent
+  from the cache.
+
+### Fixed
+
+- **Builder (`builder.ts`)**: `watchRebuildTimer` type changed from
+  `ReturnType<typeof setTimeout>` to `number`, resolving the TS2322 type error
+  under Deno 2.9 (where `setTimeout` returns `number`, not Node's `Timeout`).
+- **Test (`builder-server-advanced.test.ts`)**: `useNativeCompile` test now sets
+  `timeout: 180_000` to accommodate `deno compile` downloading the `denort`
+  binary on first run.
+
+---
+
 ## [1.1.9] - 2026-04-21
 
 ### Changed

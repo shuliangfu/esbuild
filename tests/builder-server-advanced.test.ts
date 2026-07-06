@@ -286,7 +286,7 @@ console.log("External test:", something);
         expect(builder).toBeTruthy();
         expect(builder.getConfig().useNativeCompile).toBe(true);
       }
-    }, { sanitizeOps: false, sanitizeResources: false });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 180_000 });
 
     it("应该在 useNativeCompile 模式下支持 external 配置", () => {
       const config: ServerConfig = {

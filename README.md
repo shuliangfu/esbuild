@@ -17,12 +17,16 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.1.9] - 2026-04-21
+### [1.2.0] - 2026-07-06
 
-- **Changed**: **`postcss@^8.5.10`** and semver **`^`** alignment for
-  **`esbuild`** / **autoprefixer** / **cssnano**; **`package.json`** pins
-  updated — removes **cssnano** peer mismatch with **`8.4.x`** when nested under
-  **`@dreamer/test`**.
+- **Added**: **jsr: runtime fallback** in the Deno resolver — resolves `jsr:`
+  specifiers that miss the module cache (e.g. reached only via dynamic
+  `import()`) via `deno info`, mirroring the existing `npm:` fallback.
+- **Added**: **`buildModuleCache` now covers dynamic `import()` transitive
+  dependencies** — scans `src/` for `.ts/.tsx` files and runs an aggregate
+  `deno info --json` to populate the cache.
+- **Fixed**: `watchRebuildTimer` type changed to `number`, resolving the TS2322
+  error under Deno 2.9.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
