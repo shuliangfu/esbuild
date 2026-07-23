@@ -2,14 +2,17 @@
 
 ## Test Overview
 
-- **Test library version**: @dreamer/test@^1.1.7
-- **Runtime adapter version**: @dreamer/runtime-adapter@^1.0.18
-- **Test framework**: @dreamer/test (compatible with Deno and Bun)
-- **Test date**: 2026-04-21
+- **Package version**: 1.3.0
+- **Test library version**: @dreamer/test@^1.2.3
+- **Runtime adapter version**: @dreamer/runtime-adapter@^1.2.2
+- **Test framework**: @dreamer/test (compatible with Deno, Bun, and Node.js)
+- **Test date**: 2026-07-23
 - **Test environment**:
-  - Deno >= 2.0.0
-  - Bun >= 1.0.0
-  - esbuild >= 0.27.7
+  - Deno 2.9+
+  - Bun 1.3+
+  - Node.js 22+
+  - esbuild 0.27.7
+- **CI**: 9 jobs (3 runtimes × 3 operating systems)
 
 ## Test Results
 
@@ -17,14 +20,17 @@
 
 | Environment | Total Tests | Passed | Failed | Pass Rate |
 | ----------- | ----------- | ------ | ------ | --------- |
-| **Deno**    | 571         | 571 ✅ | 0      | 100% ✅   |
-| **Bun**     | 509         | 509 ✅ | 0      | 100% ✅   |
+| **Deno**    | 576         | 576 ✅ | 0      | 100% ✅   |
+| **Bun**     | 503         | 503 ✅ | 0      | 100% ✅   |
+| **Node.js** | 477         | 477 ✅ | 0      | 100% ✅   |
 
-- **Test execution time**: ~28s (Deno `deno test -A`), ~4s (Bun `bun test`)
+- **Test execution time**: ~17s (Deno `deno test -A`), ~3s (Bun `bun test`),
+  ~17s (Node `npm run test:node`)
 
-> **Note**: Bun has fewer tests because builder-server-bun.test.ts (2 tests)
-> runs only in Bun; some tests use Deno-specific features (jsr:, deno.json) and
-> run only in Deno.
+> **Note**: Test counts differ across runtimes because `IS_DENO`/`IS_BUN`-gated
+> resolver integration tests (e.g. `jsr:`/`npm:` specifier resolution via
+> `deno eval` or `bun build`) only register on their respective runtime.
+> Node.js (neither Deno nor Bun) skips these gated test blocks.
 
 ### Test File Statistics
 
@@ -958,12 +964,13 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
 
 **Test execution environment**:
 
-- Deno 2.x
-- Bun 1.3.5
-- esbuild 0.27.2
-- PostCSS 8.4.39
-- Autoprefixer 10.4.19
-- cssnano 7.0.3
+- Deno 2.9+
+- Bun 1.3+
+- Node.js 22+
+- esbuild 0.27.7
+- PostCSS 8.5.10
+- Autoprefixer 10.5.0
+- cssnano 7.1.7
 
 **Test coverage**:
 
@@ -972,7 +979,7 @@ The @dreamer/esbuild library has been thoroughly tested, all tests passed, with
   relative path, .tsx loader)
 - ✅ Server builder path resolution tests (Deno and Bun environments)
 - ✅ Client builder path resolution tests (Deno and Bun environments)
-- ✅ Simple bundler (BuilderBundle) tests (Deno and Bun environments)
+- ✅ Simple bundler (BuilderBundle) tests (Deno, Bun, and Node.js environments)
 - ✅ Global variable setting tests (window/global/globalThis)
 - ✅ ESM and IIFE format tests
 - ✅ Server external dependency configuration tests

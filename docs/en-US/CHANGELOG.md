@@ -8,6 +8,57 @@ and this project adheres to
 
 ---
 
+## [1.3.0] - 2026-07-23
+
+### Added
+
+- **Node.js 22+ compatibility**: The package now runs on Node.js 22+ via `tsx`
+  for TypeScript transpilation. `package.json` declares `engines.node >= 22`,
+  a `test:node` script, and `npm:@jsr/dreamer__*` dependencies.
+- **9-job CI matrix**: Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows
+  (was 6-job: Deno + Bun only).
+- **Locale locking for 5 test files**: `builder-error-handling.test.ts`,
+  `builder-internal-methods.test.ts`, `build-analyzer-internal.test.ts`,
+  `build-analyzer.test.ts`, and `builder-server-advanced.test.ts` now call
+  `setEsbuildLocale("zh-CN")` at module level to deterministically pass `$tr`
+  Chinese-string assertions regardless of CI/development-machine locale.
+- **`tsconfig.json`**: Bundler moduleResolution + `node` types, following the
+  proven pattern from `@dreamer/auth`/`@dreamer/session`/`@dreamer/plugin`.
+
+### Changed
+
+- Dependencies bumped: `@dreamer/i18n` ^1.0.1 → ^1.1.2,
+  `@dreamer/console` ^1.0.12 → ^1.1.0, `@dreamer/logger` ^1.0.3 → ^1.1.0,
+  `@dreamer/runtime-adapter` ^1.0.18 → ^1.2.2, `@dreamer/image` ^1.0.2 → ^1.1.0,
+  `@dreamer/test` ^1.1.7 → ^1.2.3.
+- `deno.json` description updated to mention Node.js 22+; `minimumDependencyAge`
+  set to `0`.
+- `.gitignore` now ignores `package-lock.json`.
+- `publish.yml` unchanged (tags-only trigger, `npx jsr publish`).
+
+### Fixed
+
+- **`browser-compile-socket-io.test.ts` and `resolver.test.ts`**: The
+  `if (IS_DENO) { ... } else { ... }` pattern caused the Bun-branch tests to
+  run on Node (where `IS_DENO` is `false`), leading to
+  `Could not resolve "@dreamer/socket-io/client"` errors. Changed to
+  `else if (IS_BUN)` so Node (neither Deno nor Bun) skips the
+  runtime-specific resolver tests. `IS_BUN` import added to both files.
+- **Node test runner parallel race condition**: Node's native test runner
+  executes test files in parallel, but this package's 47 test files share a
+  `tests/data/` directory for fixtures. Parallel execution caused file-creation
+  / cleanup races (`Could not resolve` for files not yet created by another
+  file's `beforeAll`). Fixed by adding `--test-concurrency=1` to the
+  `test:node` script, ensuring serial file execution.
+
+### Compatibility
+
+- Deno 2.9+ / Bun 1.3+ / Node.js 22+
+- 576 tests pass on Deno, 503 on Bun, 477 on Node.js (Node has fewer because
+  `IS_DENO`/`IS_BUN`-gated resolver integration tests are skipped).
+
+---
+
 ## [1.2.0] - 2026-07-06
 
 ### Added

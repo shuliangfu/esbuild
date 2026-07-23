@@ -2,28 +2,34 @@
 
 ## 测试概览
 
-- **测试库版本**：@dreamer/test@^1.1.7
-- **运行时适配器版本**：@dreamer/runtime-adapter@^1.0.18
-- **测试框架**：@dreamer/test（兼容 Deno 与 Bun）
-- **测试日期**：2026-04-21
+- **包版本**：1.3.0
+- **测试库版本**：@dreamer/test@^1.2.3
+- **运行时适配器版本**：@dreamer/runtime-adapter@^1.2.2
+- **测试框架**：@dreamer/test（兼容 Deno、Bun、Node.js）
+- **测试日期**：2026-07-23
 - **测试环境**：
-  - Deno >= 2.0.0
-  - Bun >= 1.0.0
-  - esbuild >= 0.27.7
+  - Deno 2.9+
+  - Bun 1.3+
+  - Node.js 22+
+  - esbuild 0.27.7
+- **CI**：9 作业（3 运行时 × 3 操作系统）
 
 ## 测试结果
 
 ### 总体统计
 
-| 环境     | 总用例数 | 通过   | 失败 | 通过率  |
-| -------- | -------- | ------ | ---- | ------- |
-| **Deno** | 571      | 571 ✅ | 0    | 100% ✅ |
-| **Bun**  | 509      | 509 ✅ | 0    | 100% ✅ |
+| 环境        | 总用例数 | 通过   | 失败 | 通过率  |
+| ----------- | -------- | ------ | ---- | ------- |
+| **Deno**    | 576      | 576 ✅ | 0    | 100% ✅ |
+| **Bun**     | 503      | 503 ✅ | 0    | 100% ✅ |
+| **Node.js** | 477      | 477 ✅ | 0    | 100% ✅ |
 
-- **执行时间**：约 28s（Deno `deno test -A`），约 4s（Bun `bun test`）
+- **执行时间**：约 17s（Deno `deno test -A`），约 3s（Bun `bun test`），
+  约 17s（Node `npm run test:node`）
 
-> **说明**：Bun 用例数较少，因 builder-server-bun.test.ts（2 个用例）仅在 Bun
-> 下运行；部分测试使用 Deno 特性（jsr:、deno.json）仅在 Deno 下运行。
+> **说明**：各运行时用例数不同，因 `IS_DENO`/`IS_BUN` 门控的解析器集成测试
+>（如通过 `deno eval` 或 `bun build` 解析 `jsr:`/`npm:` 说明符）仅在对应运行时
+> 注册。Node.js（既非 Deno 也非 Bun）跳过这些门控测试块。
 
 ### 测试文件统计
 
@@ -127,12 +133,13 @@
 
 **总用例数**：
 
-- **571** 个用例（Deno `deno test -A`，全部通过，约 28s）
-- **509** 个用例（Bun `bun test`，全部通过）
+- **576** 个用例（Deno `deno test -A`，全部通过，约 17s）
+- **503** 个用例（Bun `bun test`，全部通过，约 3s）
+- **477** 个用例（Node `npm run test:node`，全部通过，约 17s）
 
 **测试类型**：单元测试、集成测试、边界与错误处理。
 
-**执行环境**：Deno 2.x、Bun 1.x、esbuild 0.27.x、PostCSS / Autoprefixer /
-cssnano。
+**执行环境**：Deno 2.9+、Bun 1.3+、Node.js 22+、esbuild 0.27.7、PostCSS /
+Autoprefixer / cssnano。
 
 **可用于生产环境。**

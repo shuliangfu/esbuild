@@ -7,6 +7,53 @@
 
 ---
 
+## [1.3.0] - 2026-07-23
+
+### 新增
+
+- **Node.js 22+ 兼容**：通过 `tsx` 进行 TypeScript 转译，包现可在 Node.js 22+
+  上运行。`package.json` 声明 `engines.node >= 22`、`test:node` 脚本和
+  `npm:@jsr/dreamer__*` 依赖。
+- **9 作业 CI 矩阵**：Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows
+  （原为 6 作业：仅 Deno + Bun）。
+- **5 个测试文件 locale 锁定**：`builder-error-handling.test.ts`、
+  `builder-internal-methods.test.ts`、`build-analyzer-internal.test.ts`、
+  `build-analyzer.test.ts`、`builder-server-advanced.test.ts` 在模块级调用
+  `setEsbuildLocale("zh-CN")`，确保 `$tr` 中文文案断言在任何 CI/开发机 locale
+  下确定性通过。
+- **`tsconfig.json`**：Bundler moduleResolution + `node` types，沿用
+  `@dreamer/auth`/`@dreamer/session`/`@dreamer/plugin` 验证过的模式。
+
+### 变更
+
+- 依赖升级：`@dreamer/i18n` ^1.0.1 → ^1.1.2、`@dreamer/console` ^1.0.12 →
+  ^1.1.0、`@dreamer/logger` ^1.0.3 → ^1.1.0、`@dreamer/runtime-adapter`
+  ^1.0.18 → ^1.2.2、`@dreamer/image` ^1.0.2 → ^1.1.0、`@dreamer/test`
+  ^1.1.7 → ^1.2.3。
+- `deno.json` 描述更新以提及 Node.js 22+；`minimumDependencyAge` 设为 `0`。
+- `.gitignore` 新增忽略 `package-lock.json`。
+- `publish.yml` 不变（tags 触发，`npx jsr publish`）。
+
+### 修复
+
+- **`browser-compile-socket-io.test.ts` 和 `resolver.test.ts`**：
+  `if (IS_DENO) { ... } else { ... }` 模式导致 Bun 分支测试在 Node 上运行
+  （`IS_DENO` 为 `false`），产生 `Could not resolve "@dreamer/socket-io/client"`
+  错误。改为 `else if (IS_BUN)` 使 Node（既非 Deno 也非 Bun）跳过运行时专用
+  解析器测试。两文件均补充 `IS_BUN` 导入。
+- **Node 测试运行器并行竞争**：Node 原生测试运行器并行执行测试文件，但本包
+  47 个测试文件共享 `tests/data/` 目录存放 fixture。并行执行导致文件创建/清理
+  竞争（`Could not resolve` 因另一文件的 `beforeAll` 尚未创建文件）。通过在
+  `test:node` 脚本中添加 `--test-concurrency=1` 修复，确保文件串行执行。
+
+### 兼容性
+
+- Deno 2.9+ / Bun 1.3+ / Node.js 22+
+- Deno 576 / Bun 503 / Node.js 477 测试通过（Node 较少因为
+  `IS_DENO`/`IS_BUN` 门控的解析器集成测试被跳过）。
+
+---
+
 ## [1.2.0] - 2026-07-06
 
 ### 新增

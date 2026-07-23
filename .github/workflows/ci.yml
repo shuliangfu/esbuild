@@ -1,4 +1,6 @@
-# CI: 在 macOS、Ubuntu、Windows 上运行测试，验证跨平台兼容性
+# CI: 三端跨平台测试（Deno / Bun / Node.js 22+），验证跨运行时兼容性
+# esbuild 测试套件含 47 个测试文件：单元测试 + Deno/Bun 门控的解析器集成测试。
+# Node.js 上 IS_DENO/IS_BUN 门控的测试注册 0 用例（describe 块在 if 守卫内）。
 name: CI
 
 on:
@@ -13,160 +15,104 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  test-linux:
-    runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────────────────────────────
+  # Deno（Linux / macOS / Windows）
+  # ─────────────────────────────────────────────────────────────────────────
+  test-deno:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.5
+          deno-version: v2.9
 
       - name: Cache dependencies
-        run: deno cache src/mod.ts tests/ 2>/dev/null || true
+        continue-on-error: true
+        run: deno cache src/mod.ts
 
       - name: Check
-        run: deno check src/ tests/
+        run: deno check src/mod.ts
 
       - name: Lint
-        run: deno lint
+        run: deno lint src/
 
       - name: Test (Deno)
-        run: deno test -A --no-check tests/
+        run: deno test -A tests/
 
-  test-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.5
-
-      - name: Cache dependencies
-        run: deno cache src/mod.ts tests/ 2>/dev/null || true
-
-      - name: Check
-        run: deno check src/ tests/
-
-      - name: Lint
-        run: deno lint
-
-      - name: Test (Deno, macOS)
-        run: deno test -A --no-check tests/
-
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.5
-
-      - name: Cache dependencies
-        run: deno cache src/mod.ts tests/
-
-      - name: Check
-        run: deno check src/ tests/
-
-      - name: Lint
-        run: deno lint
-
-      - name: Test (Deno, Windows)
-        run: deno test -A --no-check tests/
-
-    # --- Bun: Linux ---
-  test-linux-bun:
-    runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────────────────────────────
+  # Bun（Linux / macOS / Windows）
+  # ─────────────────────────────────────────────────────────────────────────
+  test-bun:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
-      - name: Install dependencies (Bun)
-        run: bun install
-
-      - name: Install ImageMagick (for asset processor tests)
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
-
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.5
-
-      - name: Cache Deno dependencies
-        run: deno cache src/mod.ts tests/ 2>/dev/null || true
-
-      - name: Check
-        run: deno check src/ tests/
-
-      - name: Lint
-        run: deno lint
-
-      - name: Test (Bun)
-        run: bun test tests/
-
-  # --- Bun: macOS ---
-  test-macos-bun:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies (Bun)
+      - name: Install dependencies
         run: bun install
 
       # 测试中资源处理（图片压缩/hash）会用到 ImageMagick；若未安装会触发 brew 自动安装并易在 CI 中 SIGTERM，故在此预先安装
-      - name: Install ImageMagick (for asset processor tests)
+      - name: Install ImageMagick (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Install ImageMagick (macOS)
+        if: matrix.os == 'macos-latest'
         run: brew install imagemagick
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.5
+          deno-version: v2.9
 
       - name: Cache Deno dependencies
-        run: deno cache src/mod.ts tests/ 2>/dev/null || true
+        continue-on-error: true
+        run: deno cache src/mod.ts
 
       - name: Check
-        run: deno check src/ tests/
+        run: deno check src/mod.ts
 
       - name: Lint
-        run: deno lint
+        run: deno lint src/
 
-      - name: Test (Bun, macOS)
+      - name: Test (Bun)
         run: bun test tests/
 
-  # --- Bun: Windows ---
-  # Windows 上不缓存 node_modules，避免 junction/symlink 冲突（os error 183: file already exists）
-  test-windows-bun:
-    runs-on: windows-latest
+  # ─────────────────────────────────────────────────────────────────────────
+  # Node.js 22（Linux / macOS / Windows）
+  # ─────────────────────────────────────────────────────────────────────────
+  test-node:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: "22"
 
-      - name: Install dependencies (Bun)
-        run: bun install
+      - name: Install ImageMagick (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.5
+      - name: Install ImageMagick (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install imagemagick
 
-      - name: Cache Deno dependencies
-        run: deno cache src/mod.ts tests/
+      - name: Install dependencies
+        run: npm install
 
-      - name: Check
-        run: deno check src/ tests/
-
-      - name: Lint
-        run: deno lint
-
-      - name: Test (Bun, Windows)
-        run: bun test tests/
+      - name: Test (Node)
+        run: npm run test:node

@@ -5,6 +5,7 @@
 
 import {
   createCommand,
+  IS_BUN,
   IS_DENO,
   join,
   mkdir,
@@ -507,7 +508,7 @@ export function testLoggerFunctions() {
       });
     });
   }, { sanitizeOps: false, sanitizeResources: false });
-} else {
+} else if (IS_BUN) {
   // Bun 环境下的测试
   // 在浏览器模式下，Bun 使用 esbuild + bunResolverPlugin（类似 Deno）
   // 这样可以正确解析 JSR 包的子路径导入（如 @dreamer/socket-io/client）

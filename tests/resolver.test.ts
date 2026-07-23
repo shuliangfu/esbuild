@@ -17,6 +17,7 @@
  */
 
 import {
+  IS_BUN,
   IS_DENO,
   join,
   mkdir,
@@ -790,7 +791,7 @@ export { result };
       }
     });
   });
-} else {
+} else if (IS_BUN) {
   // Bun 环境测试：使用 bunResolverPlugin
   // 重要：Bun 不支持直接使用 jsr: 协议导入
   // JSR 包必须通过 package.json 的 imports 字段映射，然后使用不带 jsr: 前缀的导入

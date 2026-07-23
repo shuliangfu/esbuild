@@ -5,6 +5,11 @@
 import { describe, expect, it } from "@dreamer/test";
 import type * as esbuild from "esbuild";
 import { BuildAnalyzer } from "../src/build-analyzer.ts";
+import { setEsbuildLocale } from "../src/i18n.ts";
+
+// 锁定中文 locale：本测试断言 $tr 返回中文文案（"构建产物分析报告"、"总文件大小"、"重复代码"），
+// 显式锁定 zh-CN 确保在任何 CI/开发机 locale 下确定性通过（不依赖测试执行顺序）。
+setEsbuildLocale("zh-CN");
 
 describe("BuildAnalyzer", () => {
   describe("构造函数", () => {

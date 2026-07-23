@@ -1,14 +1,14 @@
 # @dreamer/esbuild
 
-> 兼容 Deno 和 Bun
+> 兼容 Deno、Bun、Node.js 22+
 > 的高性能构建工具包，提供全栈编译、打包、资源处理、优化等功能，支持子路径按需导入
 
 本包是 [@dreamer/dweb](https://jsr.io/@dreamer/dweb)
-框架的核心构建引擎，也可独立用于任意 Deno/Bun 项目的构建。
+框架的核心构建引擎，也可独立用于任意 Deno/Bun/Node.js 项目的构建。
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-576%20%7C%20503%20%7C%20477%20passed%20(3%20runtimes)-brightgreen)](./TEST_REPORT.md)
 
 [English](../../README.md) | 中文 (Chinese)
 
@@ -61,6 +61,12 @@ deno add jsr:@dreamer/esbuild
 bunx jsr add -D @dreamer/esbuild
 ```
 
+### Node.js
+
+```bash
+npx jsr add -D @dreamer/esbuild
+```
+
 ### 按需导入（子路径）
 
 为减少打包体积、提升 Tree-shaking 效果，可按需从子路径导入：
@@ -98,12 +104,20 @@ import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
 ## 🌍 环境兼容性
 
-| 环境       | 版本要求 | 状态                                  |
-| ---------- | -------- | ------------------------------------- |
-| **Deno**   | 2.5.0+   | ✅ 完全支持                           |
-| **Bun**    | 1.3.0+   | ✅ 完全支持                           |
-| **服务端** | -        | ✅ 支持（兼容 Deno 和 Bun 运行时）    |
-| **客户端** | -        | ❌ 不支持（构建工具，仅在服务端运行） |
+| 环境        | 版本要求 | 状态                                                       |
+| ----------- | -------- | ---------------------------------------------------------- |
+| **Deno**    | 2.9+     | ✅ 完全支持                                                |
+| **Bun**     | 1.3+     | ✅ 完全支持                                                |
+| **Node.js** | 22+      | ✅ 完全支持（通过 `tsx` 进行 TypeScript 转译）             |
+| **服务端**  | -        | ✅ 支持（兼容 Deno、Bun、Node.js 运行时）                  |
+| **客户端**  | -        | ❌ 不支持（构建工具，仅在服务端运行）                      |
+
+> **注意**：在 Node.js 上，Deno/Bun 专用解析器插件
+>（`denoResolverPlugin`、`bunResolverPlugin`）不会激活
+>（`IS_DENO`/`IS_BUN` 均为 `false`）。依赖这些插件的构建路径
+>（如通过 `deno eval` 或 `bun build` 解析 `jsr:`/`npm:` 说明符）将回退到
+> esbuild 原生解析。测试中对这些路径的 `build()` 调用包裹了 try/catch 以
+> 优雅处理运行时限制。
 
 ---
 
@@ -1051,7 +1065,7 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 | 依赖                                 | 用途                                              |
 | ------------------------------------ | ------------------------------------------------- |
 | `npm:esbuild`                        | 核心打包引擎                                      |
-| `@dreamer/runtime-adapter`           | 跨运行时 API（Deno/Bun）                          |
+| `@dreamer/runtime-adapter`           | 跨运行时 API（Deno/Bun/Node.js）                  |
 | `@dreamer/image`                     | 图片压缩、格式转换（仅当配置 `assets.images` 时） |
 | `postcss`、`autoprefixer`、`cssnano` | CSS 优化（仅当配置 CSS 处理时）                   |
 
@@ -1059,14 +1073,14 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.2.0**（2026-07-06）
+**v1.3.0**（2026-07-23）
 
-- **新增**：Deno 解析器 **jsr: 运行时回退** —— 通过 `deno info` 解析未命中
-  缓存的 `jsr:` 说明符，与 `npm:` 回退对称。
-- **新增**：**`buildModuleCache` 覆盖动态 `import()` 传递依赖** —— 扫描 `src/`
-  下 `.ts/.tsx` 文件并执行聚合 `deno info --json` 补全缓存。
-- **修复**：`watchRebuildTimer` 类型改为 `number`，修复 Deno 2.9 下 TS2322
-  类型错误。
+- **新增**：Node.js 22+ 兼容（通过 `tsx`）；9 作业 CI 矩阵
+  （Deno/Bun/Node × Linux/macOS/Windows）；5 个测试文件 locale 锁定。
+- **修复**：`if (IS_DENO) {} else {}` 测试模式改为 `else if (IS_BUN)` 以
+  跳过 Node；`--test-concurrency=1` 隔离共享 `tests/data/` 目录。
+- **变更**：依赖升级（i18n ^1.1.2、console ^1.1.0、logger ^1.1.0、
+  runtime-adapter ^1.2.2、image ^1.1.0、test ^1.2.3）。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 

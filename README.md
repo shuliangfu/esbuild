@@ -1,32 +1,34 @@
 # @dreamer/esbuild
 
-> High-performance build tool library compatible with Deno and Bun, providing
-> full-stack compilation, bundling, resource processing, optimization, and more,
-> with subpath on-demand imports
+> High-performance build tool library compatible with Deno, Bun, and Node.js 22+,
+> providing full-stack compilation, bundling, resource processing, optimization,
+> and more, with subpath on-demand imports
 
 This library is the core build engine of the
 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) framework, and can also be used
-independently for any Deno/Bun project builds.
+independently for any Deno/Bun/Node.js project builds.
 
 English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-Deno%20571%20%7C%20Bun%20509%20passed-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-576%20%7C%20503%20%7C%20477%20passed%20(3%20runtimes)-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.2.0] - 2026-07-06
+### [1.3.0] - 2026-07-23
 
-- **Added**: **jsr: runtime fallback** in the Deno resolver — resolves `jsr:`
-  specifiers that miss the module cache (e.g. reached only via dynamic
-  `import()`) via `deno info`, mirroring the existing `npm:` fallback.
-- **Added**: **`buildModuleCache` now covers dynamic `import()` transitive
-  dependencies** — scans `src/` for `.ts/.tsx` files and runs an aggregate
-  `deno info --json` to populate the cache.
-- **Fixed**: `watchRebuildTimer` type changed to `number`, resolving the TS2322
-  error under Deno 2.9.
+- **Added**: **Node.js 22+ compatibility** (via `tsx` for TypeScript transpilation);
+  9-job CI matrix (Deno/Bun/Node × Linux/macOS/Windows); `setEsbuildLocale` used
+  for deterministic locale locking in 5 test files with `$tr` assertions.
+- **Fixed**: `browser-compile-socket-io.test.ts` and `resolver.test.ts`
+  `if (IS_DENO) {} else {}` pattern changed to `else if (IS_BUN)` so Node
+  (neither Deno nor Bun) skips the runtime-specific resolver tests instead of
+  falling into the Bun branch; Node test runner uses `--test-concurrency=1` to
+  avoid `tests/data/` shared-directory race conditions across parallel files.
+- **Changed**: Dependencies bumped (i18n ^1.1.2, console ^1.1.0, logger ^1.1.0,
+  runtime-adapter ^1.2.2, image ^1.1.0, test ^1.2.3).
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
@@ -79,6 +81,12 @@ deno add jsr:@dreamer/esbuild
 bunx jsr add -D @dreamer/esbuild
 ```
 
+### Node.js
+
+```bash
+npx jsr add -D @dreamer/esbuild
+```
+
 ### On-Demand Import (Subpaths)
 
 To reduce bundle size and improve Tree-shaking, import from subpaths as needed:
@@ -116,12 +124,20 @@ import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
 ## 🌍 Environment Compatibility
 
-| Environment | Version Requirement | Status                                               |
-| ----------- | ------------------- | ---------------------------------------------------- |
-| **Deno**    | 2.5.0+              | ✅ Fully supported                                   |
-| **Bun**     | 1.3.0+              | ✅ Fully supported                                   |
-| **Server**  | -                   | ✅ Supported (compatible with Deno and Bun runtimes) |
-| **Client**  | -                   | ❌ Not supported (build tool, runs on server only)   |
+| Environment | Version Requirement | Status                                                          |
+| ----------- | ------------------- | --------------------------------------------------------------- |
+| **Deno**    | 2.9+                | ✅ Fully supported                                              |
+| **Bun**     | 1.3+                | ✅ Fully supported                                              |
+| **Node.js** | 22+                 | ✅ Fully supported (via `tsx` for TypeScript transpilation)     |
+| **Server**  | -                   | ✅ Supported (compatible with Deno, Bun, Node.js runtimes)      |
+| **Client**  | -                   | ❌ Not supported (build tool, runs on server only)              |
+
+> **Note**: On Node.js, the Deno/Bun-specific resolver plugins
+> (`denoResolverPlugin`, `bunResolverPlugin`) are not activated
+> (`IS_DENO`/`IS_BUN` both `false`). Build paths that depend on these plugins
+> (e.g. resolving `jsr:`/`npm:` specifiers via `deno eval` or `bun build`) will
+> fall back to esbuild's native resolution. Tests that exercise these paths
+> wrap `build()` in try/catch to gracefully handle runtime limitations.
 
 ---
 
@@ -1093,7 +1109,7 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 | Dependency                           | Purpose                                                                     |
 | ------------------------------------ | --------------------------------------------------------------------------- |
 | `npm:esbuild`                        | Core bundling engine                                                        |
-| `@dreamer/runtime-adapter`           | Cross-runtime API (Deno/Bun)                                                |
+| `@dreamer/runtime-adapter`           | Cross-runtime API (Deno/Bun/Node.js)                                        |
 | `@dreamer/image`                     | Image compression, format conversion (only when `assets.images` configured) |
 | `postcss`, `autoprefixer`, `cssnano` | CSS optimization (only when CSS processing configured)                      |
 
@@ -1101,11 +1117,15 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.1.9** (2026-04-21)
+**v1.3.0** (2026-07-23)
 
-- **Changed**: CSS/npm toolchain — **`postcss@^8.5.10`**, **`^`** ranges for
-  **esbuild** / **autoprefixer** / **cssnano**, **`@dreamer/test@^1.1.7`**;
-  **`package.json`** dependency pins aligned.
+- **Added**: Node.js 22+ compatibility (via `tsx`); 9-job CI matrix
+  (Deno/Bun/Node × Linux/macOS/Windows); locale locking for 5 test files.
+- **Fixed**: `if (IS_DENO) {} else {}` test pattern changed to
+  `else if (IS_BUN)` to skip Node; `--test-concurrency=1` for shared
+  `tests/data/` isolation.
+- **Changed**: Dependencies bumped (i18n ^1.1.2, console ^1.1.0, logger ^1.1.0,
+  runtime-adapter ^1.2.2, image ^1.1.0, test ^1.2.3).
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

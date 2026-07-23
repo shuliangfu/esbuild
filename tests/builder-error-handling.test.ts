@@ -5,8 +5,13 @@
 import { join, mkdir, writeTextFile } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { Builder } from "../src/builder.ts";
+import { setEsbuildLocale } from "../src/i18n.ts";
 import type { BuilderConfig } from "../src/types.ts";
 import { cleanupDir, getTestDataDir, getTestOutputDir } from "./test-utils.ts";
+
+// 锁定中文 locale：本测试断言 $tr 返回中文文案（"构建错误统计报告"），
+// 显式锁定 zh-CN 确保在任何 CI/开发机 locale 下确定性通过。
+setEsbuildLocale("zh-CN");
 
 describe("Builder 错误处理", () => {
   let entryFile: string;
