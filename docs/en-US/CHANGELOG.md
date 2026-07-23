@@ -50,6 +50,15 @@ and this project adheres to
   / cleanup races (`Could not resolve` for files not yet created by another
   file's `beforeAll`). Fixed by adding `--test-concurrency=1` to the
   `test:node` script, ensuring serial file execution.
+- **Builder (`builder.ts`) missing `await` on `validateBuildResult`**:
+  `buildClient()` invoked the async `validateBuildResult()` (which throws on
+  invalid output) without `await`, making validation fire-and-forget. The
+  build returned "success" while the validation rejection floated and later
+  crashed an unrelated concurrent test (Bun/Linux CI failure attributed to
+  `应该清理客户端输出目录`). Added `await` so validation completes within the
+  build's async chain and errors attribute to the correct caller. This also
+  shrinks the validation window to immediately-after-build, eliminating the
+  race with concurrent `tests/data/` cleanup.
 
 ### Compatibility
 

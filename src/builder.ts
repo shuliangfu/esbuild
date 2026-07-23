@@ -496,7 +496,11 @@ export class Builder implements IBuilder {
     };
 
     // 验证构建产物
-    this.validateBuildResult(finalResult, buildOptions);
+    // 【Why 必须 await】validateBuildResult 是 async 且在产物校验失败时 throw。
+    // 若不 await，验证会 fire-and-forget：buildClient 立即返回成功，而 rejection
+    // 漂浮到后续测试才爆发（曾导致 Bun 并行测试下 "应该清理客户端输出目录" 误背锅）。
+    // await 确保校验在构建同一异步链内完成，错误正确归因到构建调用方。
+    await this.validateBuildResult(finalResult, buildOptions);
 
     // 在开发模式下输出性能报告
     if (

@@ -45,6 +45,13 @@
   47 个测试文件共享 `tests/data/` 目录存放 fixture。并行执行导致文件创建/清理
   竞争（`Could not resolve` 因另一文件的 `beforeAll` 尚未创建文件）。通过在
   `test:node` 脚本中添加 `--test-concurrency=1` 修复，确保文件串行执行。
+- **构建器（`builder.ts`）`validateBuildResult` 缺少 `await`**：
+  `buildClient()` 调用 async 的 `validateBuildResult()`（产物校验失败时 throw）
+  时未 `await`，使校验变为 fire-and-forget。构建立即返回"成功"，而校验的
+  rejection 漂浮到后续才爆发，误使一个无关的并发测试崩溃（Bun/Linux CI 上
+  `应该清理客户端输出目录` 背锅）。补 `await` 使校验在构建同一异步链内完成，
+  错误正确归因到构建调用方；同时将校验窗口缩小到"构建后立即"，消除与并发
+  `tests/data/` 清理的竞争。
 
 ### 兼容性
 
