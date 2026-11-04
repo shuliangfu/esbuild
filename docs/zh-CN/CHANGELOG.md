@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **真 `SplittingStrategy` 入口提升**：`byRoute`／`byComponent`／`bySize`／
+  `custom` 现从入口走本地相对导入图，将匹配模块升为额外 esbuild
+  `entryPoints`，从而真正拆 chunk（不只改 `chunkNames`）。新增
+  `splitting-strategy.ts` 辅助函数，接入 `BuilderClient.build` 与 context。
+  布尔 `splitting: true` 保持兼容（不扫描额外入口）。
+
+
 ### 变更
 
 - **包卫生（`sideEffects`）**：`package.json` 声明

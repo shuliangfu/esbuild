@@ -34,6 +34,7 @@ import type {
   SplittingStrategy,
 } from "./types.ts";
 import { $tr, setEsbuildLocale } from "./i18n.ts";
+import { resolveClientEntryPoints } from "./splitting-strategy.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -244,9 +245,16 @@ export class BuilderClient {
       jsxConfig.jsxImportSource = "@dreamer/view";
     }
 
+    // 策略对象含 byRoute/byComponent/bySize/custom 时，收集额外入口以真拆 chunk
+    const entryPoints = await resolveClientEntryPoints(
+      entryPoint,
+      bundleOptions.splitting,
+      splittingEnabled,
+    );
+
     // esbuild 构建选项
     const buildOptions: esbuild.BuildOptions = {
-      entryPoints: [entryPoint],
+      entryPoints,
       bundle: true,
       format: bundleOptions.format || "esm",
       platform: serverSideRouteBundle ? "node" : "browser",
@@ -428,9 +436,15 @@ export class BuilderClient {
 
     const writeToDisk = options?.write !== false;
 
+    const entryPoints = await resolveClientEntryPoints(
+      entryPoint,
+      bundleOptions.splitting,
+      splittingEnabled,
+    );
+
     // esbuild 构建上下文选项
     const buildOptions: esbuild.BuildOptions = {
-      entryPoints: [entryPoint],
+      entryPoints,
       bundle: true,
       outdir: this.config.output,
       format: bundleOptions.format || "esm",
@@ -561,9 +575,8 @@ export class BuilderClient {
   /**
    * 获取 chunk 名称模式。
    *
-   * 注意：`SplittingStrategy.byRoute|byComponent|bySize` 只影响这里返回的
-   * chunkNames 字符串；真正的拆包仍由 esbuild `splitting: true` 决定，
-   * 不会按路由／组件／大小阈值额外分割。
+   * 与 `resolveClientEntryPoints` 配合：策略字段既影响命名，也通过额外
+   * entryPoints 驱动真拆包；此处只负责 chunkNames 字符串。
    */
   private getChunkNames(
     splitting?: boolean | SplittingStrategy,
@@ -576,7 +589,6 @@ export class BuilderClient {
       return "[name]-[hash]";
     }
 
-    // 命名提示 only（非真 byRoute／byComponent／bySize 分割）
     if (splitting.byRoute) {
       return "[name]-route-[hash]";
     }

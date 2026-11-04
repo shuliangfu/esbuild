@@ -115,35 +115,38 @@ export interface ServerConfig {
 }
 
 /**
- * 代码分割策略（命名提示，非真分割实现）
+ * 代码分割策略
  *
- * 当 `ClientBundleOptions.splitting` 为该对象时，底层仍走 esbuild 的
- * `splitting: true`（按静态 `import()` / 多入口自动拆 chunk）。
- * `byRoute` / `byComponent` / `bySize` **仅改变 chunk 文件名模式**
- * （见 `BuilderClient.getChunkNames`），**不会**按路由图、组件边界或字节
- * 阈值做额外拆包。`custom` 目前未接入命名或拆包逻辑。真路由／按组件分割
- * 为后续能力，本字段保留为扩展点。
+ * 当 `ClientBundleOptions.splitting` 为该对象且开启了 `byRoute` /
+ * `byComponent` / `bySize` / `custom` 时：
+ * 1) 仍设置 esbuild `splitting: true`；
+ * 2) 从入口出发走本地相对导入图，把匹配模块升为**额外 entryPoints**，
+ *    从而把对应模块拆到独立 chunk（esbuild 无 manualChunks，这是支持的杠杆）；
+ * 3) 同步调整 `chunkNames` 命名模式。
+ *
+ * `splitting: true`（布尔）或未设 by*／custom 的对象：行为与历史兼容——仅原生
+ * 分割（动态 import／多入口共享）+ 默认命名，不扫描额外入口。
  */
 export interface SplittingStrategy {
   /** 是否启用代码分割（映射为 esbuild `splitting`；默认视为启用） */
   enabled?: boolean;
   /**
-   * 命名提示：chunk 名使用 `[name]-route-[hash]`。
-   * 不实现按路由图拆包。
+   * 将路径匹配 routes／pages／route／+page 等约定的模块升为额外入口；
+   * chunk 名使用 `[name]-route-[hash]`。
    */
   byRoute?: boolean;
   /**
-   * 命名提示：chunk 名使用 `[name]-component-[hash]`。
-   * 不实现按组件边界拆包。
+   * 将路径含 `/components/` 的模块升为额外入口；
+   * chunk 名使用 `[name]-component-[hash]`。
    */
   byComponent?: boolean;
   /**
-   * 命名提示：chunk 名使用 `[name]-chunk-[hash]`。
-   * 数值本身不参与拆包阈值；不实现按大小拆包。
+   * 将图中源文件字节数 ≥ 该阈值的模块升为额外入口；
+   * chunk 名使用 `[name]-chunk-[hash]`。
    */
   bySize?: number;
   /**
-   * 预留自定义规则。当前未接线，传入无效。
+   * 自定义谓词：对图中每个绝对路径返回 true 则升为额外入口。
    */
   custom?: (path: string) => boolean;
 }

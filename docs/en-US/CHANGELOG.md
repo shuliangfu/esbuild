@@ -10,6 +10,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- **Real `SplittingStrategy` entry promotion**: `byRoute` / `byComponent` /
+  `bySize` / `custom` now walk the local relative-import graph and add matching
+  modules as extra esbuild `entryPoints`, so chunks actually split (not only
+  `chunkNames`). New helpers in `splitting-strategy.ts`; wired into
+  `BuilderClient.build` and context creation. Boolean `splitting: true` stays
+  backward-compatible (no extra scan).
+
+
 ### Changed
 
 - **Package hygiene (`sideEffects`)**: `package.json` now declares

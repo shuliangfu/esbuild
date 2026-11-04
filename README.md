@@ -853,14 +853,25 @@ const result = await buildBundle({
 
 ### Code Splitting Strategy
 
-`splitting: true` (or `{ enabled: true, ... }`) turns on esbuild's native
-code splitting (static `import()` / multi-entry chunks).
+`splitting: true` turns on esbuild's native code splitting (dynamic `import()`
+and shared chunks across multiple entry points).
 
-`byRoute` / `byComponent` / `bySize` today **only change chunk file-name
-patterns** (`[name]-route-[hash]`, `[name]-component-[hash]`,
-`[name]-chunk-[hash]`). They do **not** split by a route graph, component
-boundaries, or a byte threshold. `custom` is reserved and currently unused.
-Real route/component splitting is planned separately.
+When `splitting` is an object with `byRoute` / `byComponent` / `bySize` /
+`custom`, `@dreamer/esbuild` walks the local relative-import graph from the
+client entry and promotes matching modules to **additional entry points**.
+With `splitting: true`, esbuild then emits separate chunks for those modules
+(esbuild has no `manualChunks`; extra entries are the supported lever).
+Chunk name patterns still follow the strategy (`[name]-route-[hash]`, etc.).
+
+Conventions:
+- `byRoute`: paths under `/routes/` or `/pages/`, or `route` / `+page` /
+  `_layout`-style filenames
+- `byComponent`: paths under `/components/`
+- `bySize`: source file byte size ≥ threshold
+- `custom(absPath)`: predicate for extra entries
+
+Boolean `splitting: true` (or an object without those fields) stays
+backward-compatible: no extra entry scan.
 
 ```typescript
 const builder = new BuilderClient({
@@ -870,9 +881,9 @@ const builder = new BuilderClient({
   bundle: {
     splitting: {
       enabled: true,
-      byRoute: true, // naming hint only → [name]-route-[hash]
-      byComponent: true, // naming hint only → [name]-component-[hash]
-      bySize: 50000, // naming hint only → [name]-chunk-[hash] (value unused)
+      byRoute: true, // promote route modules + [name]-route-[hash]
+      byComponent: true, // promote /components/ + [name]-component-[hash]
+      bySize: 50000, // promote files ≥ 50KB + [name]-chunk-[hash]
     },
   },
 });

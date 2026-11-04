@@ -22,6 +22,13 @@ export { CacheManager } from "./cache-manager.ts";
 export type { CacheStats } from "./cache-manager.ts";
 export { CSSOptimizer } from "./css-optimizer.ts";
 export { HTMLGenerator } from "./html-generator.ts";
+export {
+  collectSplitEntryPoints,
+  isComponentSplitPath,
+  isRouteSplitPath,
+  resolveClientEntryPoints,
+  strategyRequestsSplitEntries,
+} from "./splitting-strategy.ts";
 export { PluginManager } from "./plugin.ts";
 export { createConditionalCompilePlugin } from "./plugins/conditional-compile.ts";
 export type { ConditionalCompileOptions } from "./plugins/conditional-compile.ts";

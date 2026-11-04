@@ -823,13 +823,20 @@ const result = await buildBundle({
 
 ### 代码分割策略
 
-`splitting: true`（或 `{ enabled: true, ... }`）开启的是 esbuild 原生代码分割
-（静态 `import()`／多入口自动拆 chunk）。
+`splitting: true` 开启 esbuild 原生代码分割（动态 `import()`／多入口共享 chunk）。
 
-`byRoute`／`byComponent`／`bySize` **当前只改变 chunk 文件名模式**
-（`[name]-route-[hash]`、`[name]-component-[hash]`、`[name]-chunk-[hash]`），
-**不会**按路由图、组件边界或字节阈值做额外拆包。`custom` 为预留字段，尚未接线。
-真路由／按组件分割属后续能力，本刀不实现。
+当 `splitting` 为对象且设置了 `byRoute`／`byComponent`／`bySize`／`custom` 时，
+本库从客户端入口走本地相对导入图，把匹配模块升为**额外 entryPoints**；配合
+`splitting: true`，esbuild 会为这些模块产出独立 chunk（esbuild 无
+`manualChunks`，额外入口是支持的杠杆）。chunk 命名模式仍随策略变化。
+
+约定：
+- `byRoute`：路径含 `/routes/`／`/pages/`，或 `route`／`+page`／`_layout` 等文件名
+- `byComponent`：路径含 `/components/`
+- `bySize`：源文件字节数 ≥ 阈值
+- `custom(absPath)`：自定义谓词
+
+布尔 `splitting: true`（或未设上述字段的对象）保持兼容：不扫描额外入口。
 
 ```typescript
 const builder = new BuilderClient({
@@ -839,9 +846,9 @@ const builder = new BuilderClient({
   bundle: {
     splitting: {
       enabled: true,
-      byRoute: true, // 仅命名提示 → [name]-route-[hash]
-      byComponent: true, // 仅命名提示 → [name]-component-[hash]
-      bySize: 50000, // 仅命名提示 → [name]-chunk-[hash]（数值未参与阈值）
+      byRoute: true, // 路由模块升入口 + [name]-route-[hash]
+      byComponent: true, // /components/ 升入口 + [name]-component-[hash]
+      bySize: 50000, // ≥50KB 升入口 + [name]-chunk-[hash]
     },
   },
 });
