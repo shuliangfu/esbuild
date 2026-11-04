@@ -18,13 +18,8 @@ import {
   stat,
   watchFs,
 } from "@dreamer/runtime-adapter";
-import { AssetsProcessor } from "./assets-processor.ts";
-import { BuildAnalyzer } from "./build-analyzer.ts";
 import { BuilderClient } from "./builder-client.ts";
 import { BuilderServer } from "./builder-server.ts";
-import { CacheManager } from "./cache-manager.ts";
-import { CSSOptimizer } from "./css-optimizer.ts";
-import { HTMLGenerator } from "./html-generator.ts";
 import { $tr, setEsbuildLocale } from "./i18n.ts";
 import type {
   Builder as IBuilder,
@@ -38,6 +33,8 @@ import type {
   LogLevel,
   OptimizationSuggestion,
 } from "./types.ts";
+import type { BuildAnalyzer } from "./build-analyzer.ts";
+import type { CacheManager } from "./cache-manager.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -47,9 +44,9 @@ export class Builder implements IBuilder {
   private config: BuilderConfig;
   private clientBuilder?: BuilderClient;
   private serverBuilder?: BuilderServer;
-  /** 延迟初始化：首次 build 时再创建实例（静态导入，无动态加载） */
+  /** 延迟初始化：首次 build 时动态 import 再创建实例 */
   private _cacheManager?: CacheManager | null;
-  /** 延迟初始化：首次 build 时再创建实例（静态导入，无动态加载） */
+  /** 延迟初始化：首次 build 时动态 import 再创建实例 */
   private _buildAnalyzer?: BuildAnalyzer;
   private watcher?: FileWatcher;
   private isWatching: boolean = false;
@@ -85,7 +82,8 @@ export class Builder implements IBuilder {
       });
     }
 
-    // BuildAnalyzer、CacheManager 延迟加载，首次 build() 时再初始化
+    // BuildAnalyzer、CacheManager、HTMLGenerator、CSSOptimizer、AssetsProcessor
+    // 均走动态 import，冷路径（仅构造 Builder）不拉取这些次要模块
 
     // 初始化客户端构建器（透传 lang）
     if (config.client) {
@@ -105,9 +103,9 @@ export class Builder implements IBuilder {
   }
 
   /**
-   * 延迟获取缓存管理器（首次 build 时再创建，静态导入无动态加载）
+   * 延迟获取缓存管理器（首次需要时动态 import 再创建）
    */
-  private getCacheManager(): CacheManager | undefined {
+  private async getCacheManager(): Promise<CacheManager | undefined> {
     if (this._cacheManager !== undefined) {
       return this._cacheManager ?? undefined;
     }
@@ -120,15 +118,17 @@ export class Builder implements IBuilder {
     const cacheDir = typeof this.config.build?.cache === "string"
       ? this.config.build.cache
       : undefined;
+    const { CacheManager } = await import("./cache-manager.ts");
     this._cacheManager = new CacheManager(cacheDir, true);
     return this._cacheManager;
   }
 
   /**
-   * 延迟获取构建分析器（首次 build 时再创建，静态导入无动态加载）
+   * 延迟获取构建分析器（首次需要时动态 import 再创建）
    */
-  private getBuildAnalyzer(): BuildAnalyzer {
+  private async getBuildAnalyzer(): Promise<BuildAnalyzer> {
     if (!this._buildAnalyzer) {
+      const { BuildAnalyzer } = await import("./build-analyzer.ts");
       this._buildAnalyzer = new BuildAnalyzer(this.config.lang);
     }
     return this._buildAnalyzer;
@@ -175,7 +175,7 @@ export class Builder implements IBuilder {
 
     // 检查缓存（如果启用了缓存）
     let cacheCheckTime = 0;
-    const cacheManager = this.getCacheManager();
+    const cacheManager = await this.getCacheManager();
     if (cacheManager && buildOptions.cache !== false) {
       this.reportProgress(
         buildOptions,
@@ -302,7 +302,7 @@ export class Builder implements IBuilder {
     }
 
     // 检查缓存（如果启用了缓存）
-    const cacheManager = this.getCacheManager();
+    const cacheManager = await this.getCacheManager();
     if (
       cacheManager && buildOptions.cache !== false &&
       this.config.client!.entry
@@ -366,7 +366,7 @@ export class Builder implements IBuilder {
     // 分析构建结果（如果生成了 metafile）
     if (result.metafile && typeof result.metafile === "object") {
       try {
-        const buildAnalyzer = this.getBuildAnalyzer();
+        const buildAnalyzer = await this.getBuildAnalyzer();
         const analysis = buildAnalyzer.analyze(
           result.metafile as any,
         );
@@ -427,6 +427,7 @@ export class Builder implements IBuilder {
         70,
       );
       const htmlStart = Date.now();
+      const { HTMLGenerator } = await import("./html-generator.ts");
       const htmlGenerator = new HTMLGenerator(
         this.config.client.html,
         this.config.client.output,
@@ -448,6 +449,7 @@ export class Builder implements IBuilder {
           cssFiles.length,
         );
         const cssStart = Date.now();
+        const { CSSOptimizer } = await import("./css-optimizer.ts");
         const cssOptimizer = new CSSOptimizer(this.config.assets.css);
         // 并行优化所有 CSS 文件
         await Promise.all(
@@ -476,6 +478,7 @@ export class Builder implements IBuilder {
             : resolve(this.config.server.output),
         ]
         : [];
+      const { AssetsProcessor } = await import("./assets-processor.ts");
       const assetsProcessor = new AssetsProcessor(
         this.config.assets,
         this.config.client.output,
@@ -1544,7 +1547,7 @@ export class Builder implements IBuilder {
     // 分析所有构建结果
     if (allMetafiles.length > 0 && mode === "dev") {
       try {
-        const buildAnalyzer = this.getBuildAnalyzer();
+        const buildAnalyzer = await this.getBuildAnalyzer();
         // 合并所有 metafile（简化版：只分析第一个）
         const combinedAnalysis = buildAnalyzer.analyze(
           allMetafiles[0] as any,
@@ -1597,6 +1600,7 @@ export class Builder implements IBuilder {
         70,
       );
       const htmlStart = Date.now();
+      const { HTMLGenerator } = await import("./html-generator.ts");
       const htmlGenerator = new HTMLGenerator(
         this.config.client.html,
         this.config.client.output,

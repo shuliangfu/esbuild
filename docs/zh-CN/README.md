@@ -823,6 +823,14 @@ const result = await buildBundle({
 
 ### 代码分割策略
 
+`splitting: true`（或 `{ enabled: true, ... }`）开启的是 esbuild 原生代码分割
+（静态 `import()`／多入口自动拆 chunk）。
+
+`byRoute`／`byComponent`／`bySize` **当前只改变 chunk 文件名模式**
+（`[name]-route-[hash]`、`[name]-component-[hash]`、`[name]-chunk-[hash]`），
+**不会**按路由图、组件边界或字节阈值做额外拆包。`custom` 为预留字段，尚未接线。
+真路由／按组件分割属后续能力，本刀不实现。
+
 ```typescript
 const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
@@ -831,9 +839,9 @@ const builder = new BuilderClient({
   bundle: {
     splitting: {
       enabled: true,
-      byRoute: true, // 按路由分割
-      byComponent: true, // 按组件分割
-      bySize: 50000, // 按大小分割（50KB）
+      byRoute: true, // 仅命名提示 → [name]-route-[hash]
+      byComponent: true, // 仅命名提示 → [name]-component-[hash]
+      bySize: 50000, // 仅命名提示 → [name]-chunk-[hash]（数值未参与阈值）
     },
   },
 });

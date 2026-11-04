@@ -7,6 +7,22 @@
 
 ---
 
+## [Unreleased]
+
+### 变更
+
+- **包卫生（`sideEffects`）**：`package.json` 声明
+  `"sideEffects": ["./src/i18n.ts", "./src/utils/logger.ts"]`，便于打包器对其余
+  模块做 tree-shake。`css-injector` 无顶层副作用（不列入）。保留 `i18n`／
+  `logger` 的顶层初始化。
+- **Builder 冷路径动态 import**：`Builder` 不再静态导入 `BuildAnalyzer`、
+  `CacheManager`、`HTMLGenerator`、`CSSOptimizer`、`AssetsProcessor`；首次使用时
+  再 `import()`，构造 `Builder`（或只导入 client／server／bundle 子路径）更瘦。
+  行为不变。
+- **`SplittingStrategy` 文档澄清**：标明 `byRoute`／`byComponent`／`bySize`
+  当前只改 chunk **文件名**模式，不实现真路由／组件／按大小分割。已更新类型、
+  README（中／英）与 `BuilderClient.getChunkNames` 注释。无运行时行为变化。
+
 ## [1.3.0] - 2026-07-23
 
 ### 新增

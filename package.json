@@ -52,5 +52,9 @@
     "postcss",
     "css",
     "compiler"
+  ],
+  "sideEffects": [
+    "./src/i18n.ts",
+    "./src/utils/logger.ts"
   ]
 }

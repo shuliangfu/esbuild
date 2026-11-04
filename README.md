@@ -853,6 +853,15 @@ const result = await buildBundle({
 
 ### Code Splitting Strategy
 
+`splitting: true` (or `{ enabled: true, ... }`) turns on esbuild's native
+code splitting (static `import()` / multi-entry chunks).
+
+`byRoute` / `byComponent` / `bySize` today **only change chunk file-name
+patterns** (`[name]-route-[hash]`, `[name]-component-[hash]`,
+`[name]-chunk-[hash]`). They do **not** split by a route graph, component
+boundaries, or a byte threshold. `custom` is reserved and currently unused.
+Real route/component splitting is planned separately.
+
 ```typescript
 const builder = new BuilderClient({
   entry: "./src/client/index.tsx",
@@ -861,9 +870,9 @@ const builder = new BuilderClient({
   bundle: {
     splitting: {
       enabled: true,
-      byRoute: true, // Split by route
-      byComponent: true, // Split by component
-      bySize: 50000, // Split by size (50KB)
+      byRoute: true, // naming hint only → [name]-route-[hash]
+      byComponent: true, // naming hint only → [name]-component-[hash]
+      bySize: 50000, // naming hint only → [name]-chunk-[hash] (value unused)
     },
   },
 });

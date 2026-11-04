@@ -559,8 +559,11 @@ export class BuilderClient {
   }
 
   /**
-   * 获取 chunk 名称模式
-   * 根据代码分割策略生成不同的 chunk 名称模式
+   * 获取 chunk 名称模式。
+   *
+   * 注意：`SplittingStrategy.byRoute|byComponent|bySize` 只影响这里返回的
+   * chunkNames 字符串；真正的拆包仍由 esbuild `splitting: true` 决定，
+   * 不会按路由／组件／大小阈值额外分割。
    */
   private getChunkNames(
     splitting?: boolean | SplittingStrategy,
@@ -573,7 +576,7 @@ export class BuilderClient {
       return "[name]-[hash]";
     }
 
-    // 根据不同的分割策略生成不同的命名模式
+    // 命名提示 only（非真 byRoute／byComponent／bySize 分割）
     if (splitting.byRoute) {
       return "[name]-route-[hash]";
     }

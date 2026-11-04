@@ -115,18 +115,36 @@ export interface ServerConfig {
 }
 
 /**
- * 代码分割策略
+ * 代码分割策略（命名提示，非真分割实现）
+ *
+ * 当 `ClientBundleOptions.splitting` 为该对象时，底层仍走 esbuild 的
+ * `splitting: true`（按静态 `import()` / 多入口自动拆 chunk）。
+ * `byRoute` / `byComponent` / `bySize` **仅改变 chunk 文件名模式**
+ * （见 `BuilderClient.getChunkNames`），**不会**按路由图、组件边界或字节
+ * 阈值做额外拆包。`custom` 目前未接入命名或拆包逻辑。真路由／按组件分割
+ * 为后续能力，本字段保留为扩展点。
  */
 export interface SplittingStrategy {
-  /** 是否启用代码分割 */
+  /** 是否启用代码分割（映射为 esbuild `splitting`；默认视为启用） */
   enabled?: boolean;
-  /** 按路由分割 */
+  /**
+   * 命名提示：chunk 名使用 `[name]-route-[hash]`。
+   * 不实现按路由图拆包。
+   */
   byRoute?: boolean;
-  /** 按组件分割 */
+  /**
+   * 命名提示：chunk 名使用 `[name]-component-[hash]`。
+   * 不实现按组件边界拆包。
+   */
   byComponent?: boolean;
-  /** 按大小分割（字节） */
+  /**
+   * 命名提示：chunk 名使用 `[name]-chunk-[hash]`。
+   * 数值本身不参与拆包阈值；不实现按大小拆包。
+   */
   bySize?: number;
-  /** 自定义分割规则（函数） */
+  /**
+   * 预留自定义规则。当前未接线，传入无效。
+   */
   custom?: (path: string) => boolean;
 }
 

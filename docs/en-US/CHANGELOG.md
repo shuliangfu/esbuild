@@ -8,6 +8,24 @@ and this project adheres to
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Package hygiene (`sideEffects`)**: `package.json` now declares
+  `"sideEffects": ["./src/i18n.ts", "./src/utils/logger.ts"]` so bundlers can
+  tree-shake the rest of the package. `css-injector` stays side-effect free
+  (not listed). Top-level init in `i18n` / `logger` is preserved.
+- **Builder cold-path dynamic imports**: `Builder` no longer statically imports
+  `BuildAnalyzer`, `CacheManager`, `HTMLGenerator`, `CSSOptimizer`, or
+  `AssetsProcessor`. Those modules load via `import()` on first use, so
+  constructing a `Builder` (or importing only client/server/bundle subpaths)
+  stays thinner. Behavior is unchanged.
+- **`SplittingStrategy` docs**: Clarified that `byRoute` / `byComponent` /
+  `bySize` only change chunk **file-name** patterns today; they do not
+  implement real route/component/size splitting. Types, README (en/zh), and
+  `BuilderClient.getChunkNames` comments updated. No runtime change.
+
 ## [1.3.0] - 2026-07-23
 
 ### Added
