@@ -118,14 +118,15 @@ export interface ServerConfig {
  * 代码分割策略
  *
  * 当 `ClientBundleOptions.splitting` 为该对象且开启了 `byRoute` /
- * `byComponent` / `bySize` / `custom` 时：
+ * `byComponent` / `bySize` / `custom` / `include` 时：
  * 1) 仍设置 esbuild `splitting: true`；
- * 2) 从入口出发走本地相对导入图，把匹配模块升为**额外 entryPoints**，
- *    从而把对应模块拆到独立 chunk（esbuild 无 manualChunks，这是支持的杠杆）；
+ * 2) 从入口出发走本地导入图（相对路径；可选 `aliases`／import map 前缀），
+ *    把匹配模块升为**额外 entryPoints**，从而把对应模块拆到独立 chunk
+ *    （esbuild 无 manualChunks，这是支持的杠杆）；
  * 3) 同步调整 `chunkNames` 命名模式。
  *
- * `splitting: true`（布尔）或未设 by*／custom 的对象：行为与历史兼容——仅原生
- * 分割（动态 import／多入口共享）+ 默认命名，不扫描额外入口。
+ * `splitting: true`（布尔）或未设 by*／custom／include 的对象：行为与历史兼容——
+ * 仅原生分割（动态 import／多入口共享）+ 默认命名，不扫描额外入口。
  */
 export interface SplittingStrategy {
   /** 是否启用代码分割（映射为 esbuild `splitting`；默认视为启用） */
@@ -149,6 +150,27 @@ export interface SplittingStrategy {
    * 自定义谓词：对图中每个绝对路径返回 true 则升为额外入口。
    */
   custom?: (path: string) => boolean;
+  /**
+   * 导入图扫描用的路径别名（如 `@/` → `./src/`、deno.json `imports`／
+   * import map 中映射到本地相对路径的条目）。
+   * 键为 import 前缀；值可为绝对路径，或相对 `root`（默认入口所在目录）的路径。
+   * 未配置时仍只跟随 `./`／`../`（兼容）。
+   */
+  aliases?: Record<string, string>;
+  /**
+   * 解析 `aliases` 相对目标时的根目录；默认 `dirname(entryPoint)`。
+   */
+  root?: string;
+  /**
+   * 可配置匹配规则（简易 glob：`*` 单段、`**` 跨段、`?` 单字符）。
+   * 对归一化后的绝对路径匹配；命中则升为额外入口。
+   * 仅配置 `include`（无 by*／custom）也会触发扫描。
+   */
+  include?: string[];
+  /**
+   * 排除规则（同 `include` 的 glob 语义）；在 by*／include／custom 命中后过滤。
+   */
+  exclude?: string[];
 }
 
 /**

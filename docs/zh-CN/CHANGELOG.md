@@ -11,12 +11,16 @@
 
 ### 新增
 
+- **`SplittingStrategy` 路径别名 + include／exclude glob**：分割入口扫描可跟随
+  可配置 `aliases`（如 `@/` → `./src/`，或从 deno.json `imports`／import map／
+  tsconfig `paths` 拷贝的本地映射），并用 `include`／`exclude`（简易 `*`／`**`／
+  `?` glob）提升／过滤模块。未设 `aliases` 时仍只走相对 `./`／`../`。单独配置
+  `aliases` 不会触发扫描。
 - **真 `SplittingStrategy` 入口提升**：`byRoute`／`byComponent`／`bySize`／
   `custom` 现从入口走本地相对导入图，将匹配模块升为额外 esbuild
   `entryPoints`，从而真正拆 chunk（不只改 `chunkNames`）。新增
-  `splitting-strategy.ts` 辅助函数，接入 `BuilderClient.build` 与 context。
-  布尔 `splitting: true` 保持兼容（不扫描额外入口）。
-
+  `splitting-strategy.ts` 辅助函数，接入 `BuilderClient.build` 与 context。 布尔
+  `splitting: true` 保持兼容（不扫描额外入口）。
 
 ### 变更
 
@@ -52,9 +56,8 @@
 ### 变更
 
 - 依赖升级：`@dreamer/i18n` ^1.0.1 → ^1.1.2、`@dreamer/console` ^1.0.12 →
-  ^1.1.0、`@dreamer/logger` ^1.0.3 → ^1.1.0、`@dreamer/runtime-adapter`
-  ^1.0.18 → ^1.2.2、`@dreamer/image` ^1.0.2 → ^1.1.0、`@dreamer/test`
-  ^1.1.7 → ^1.2.3。
+  ^1.1.0、`@dreamer/logger` ^1.0.3 → ^1.1.0、`@dreamer/runtime-adapter` ^1.0.18
+  → ^1.2.2、`@dreamer/image` ^1.0.2 → ^1.1.0、`@dreamer/test` ^1.1.7 → ^1.2.3。
 - `deno.json` 描述更新以提及 Node.js 22+；`minimumDependencyAge` 设为 `0`。
 - `.gitignore` 新增忽略 `package-lock.json`。
 - `publish.yml` 不变（tags 触发，`npx jsr publish`）。
@@ -66,14 +69,14 @@
   （`IS_DENO` 为 `false`），产生 `Could not resolve "@dreamer/socket-io/client"`
   错误。改为 `else if (IS_BUN)` 使 Node（既非 Deno 也非 Bun）跳过运行时专用
   解析器测试。两文件均补充 `IS_BUN` 导入。
-- **Node 测试运行器并行竞争**：Node 原生测试运行器并行执行测试文件，但本包
-  47 个测试文件共享 `tests/data/` 目录存放 fixture。并行执行导致文件创建/清理
+- **Node 测试运行器并行竞争**：Node 原生测试运行器并行执行测试文件，但本包 47
+  个测试文件共享 `tests/data/` 目录存放 fixture。并行执行导致文件创建/清理
   竞争（`Could not resolve` 因另一文件的 `beforeAll` 尚未创建文件）。通过在
   `test:node` 脚本中添加 `--test-concurrency=1` 修复，确保文件串行执行。
-- **构建器（`builder.ts`）`validateBuildResult` 缺少 `await`**：
-  `buildClient()` 调用 async 的 `validateBuildResult()`（产物校验失败时 throw）
-  时未 `await`，使校验变为 fire-and-forget。构建立即返回"成功"，而校验的
-  rejection 漂浮到后续才爆发，误使一个无关的并发测试崩溃（Bun/Linux CI 上
+- **构建器（`builder.ts`）`validateBuildResult` 缺少 `await`**： `buildClient()`
+  调用 async 的 `validateBuildResult()`（产物校验失败时 throw） 时未
+  `await`，使校验变为 fire-and-forget。构建立即返回"成功"，而校验的 rejection
+  漂浮到后续才爆发，误使一个无关的并发测试崩溃（Bun/Linux CI 上
   `应该清理客户端输出目录` 背锅）。补 `await` 使校验在构建同一异步链内完成，
   错误正确归因到构建调用方；同时将校验窗口缩小到"构建后立即"，消除与并发
   `tests/data/` 清理的竞争。
@@ -81,8 +84,8 @@
 ### 兼容性
 
 - Deno 2.9+ / Bun 1.3+ / Node.js 22+
-- Deno 576 / Bun 503 / Node.js 477 测试通过（Node 较少因为
-  `IS_DENO`/`IS_BUN` 门控的解析器集成测试被跳过）。
+- Deno 576 / Bun 503 / Node.js 477 测试通过（Node 较少因为 `IS_DENO`/`IS_BUN`
+  门控的解析器集成测试被跳过）。
 
 ---
 

@@ -12,6 +12,12 @@ and this project adheres to
 
 ### Added
 
+- **`SplittingStrategy` path aliases + include/exclude globs**: Split-entry scan
+  can follow configurable `aliases` (e.g. `@/` → `./src/`, or local entries from
+  deno.json `imports` / import map / tsconfig `paths`) and promote modules via
+  `include` / filter via `exclude` (simple `*` / `**` / `?` globs). Relative
+  `./` / `../` walk stays the default when `aliases` is unset. `aliases` alone
+  do not trigger a scan.
 - **Real `SplittingStrategy` entry promotion**: `byRoute` / `byComponent` /
   `bySize` / `custom` now walk the local relative-import graph and add matching
   modules as extra esbuild `entryPoints`, so chunks actually split (not only
@@ -19,21 +25,20 @@ and this project adheres to
   `BuilderClient.build` and context creation. Boolean `splitting: true` stays
   backward-compatible (no extra scan).
 
-
 ### Changed
 
 - **Package hygiene (`sideEffects`)**: `package.json` now declares
   `"sideEffects": ["./src/i18n.ts", "./src/utils/logger.ts"]` so bundlers can
-  tree-shake the rest of the package. `css-injector` stays side-effect free
-  (not listed). Top-level init in `i18n` / `logger` is preserved.
+  tree-shake the rest of the package. `css-injector` stays side-effect free (not
+  listed). Top-level init in `i18n` / `logger` is preserved.
 - **Builder cold-path dynamic imports**: `Builder` no longer statically imports
   `BuildAnalyzer`, `CacheManager`, `HTMLGenerator`, `CSSOptimizer`, or
   `AssetsProcessor`. Those modules load via `import()` on first use, so
   constructing a `Builder` (or importing only client/server/bundle subpaths)
   stays thinner. Behavior is unchanged.
 - **`SplittingStrategy` docs**: Clarified that `byRoute` / `byComponent` /
-  `bySize` only change chunk **file-name** patterns today; they do not
-  implement real route/component/size splitting. Types, README (en/zh), and
+  `bySize` only change chunk **file-name** patterns today; they do not implement
+  real route/component/size splitting. Types, README (en/zh), and
   `BuilderClient.getChunkNames` comments updated. No runtime change.
 
 ## [1.3.0] - 2026-07-23
@@ -41,8 +46,8 @@ and this project adheres to
 ### Added
 
 - **Node.js 22+ compatibility**: The package now runs on Node.js 22+ via `tsx`
-  for TypeScript transpilation. `package.json` declares `engines.node >= 22`,
-  a `test:node` script, and `npm:@jsr/dreamer__*` dependencies.
+  for TypeScript transpilation. `package.json` declares `engines.node >= 22`, a
+  `test:node` script, and `npm:@jsr/dreamer__*` dependencies.
 - **9-job CI matrix**: Deno 2.9 / Bun 1.3 / Node.js 22 × Linux/macOS/Windows
   (was 6-job: Deno + Bun only).
 - **Locale locking for 5 test files**: `builder-error-handling.test.ts`,
@@ -55,8 +60,8 @@ and this project adheres to
 
 ### Changed
 
-- Dependencies bumped: `@dreamer/i18n` ^1.0.1 → ^1.1.2,
-  `@dreamer/console` ^1.0.12 → ^1.1.0, `@dreamer/logger` ^1.0.3 → ^1.1.0,
+- Dependencies bumped: `@dreamer/i18n` ^1.0.1 → ^1.1.2, `@dreamer/console`
+  ^1.0.12 → ^1.1.0, `@dreamer/logger` ^1.0.3 → ^1.1.0,
   `@dreamer/runtime-adapter` ^1.0.18 → ^1.2.2, `@dreamer/image` ^1.0.2 → ^1.1.0,
   `@dreamer/test` ^1.1.7 → ^1.2.3.
 - `deno.json` description updated to mention Node.js 22+; `minimumDependencyAge`
@@ -67,26 +72,26 @@ and this project adheres to
 ### Fixed
 
 - **`browser-compile-socket-io.test.ts` and `resolver.test.ts`**: The
-  `if (IS_DENO) { ... } else { ... }` pattern caused the Bun-branch tests to
-  run on Node (where `IS_DENO` is `false`), leading to
+  `if (IS_DENO) { ... } else { ... }` pattern caused the Bun-branch tests to run
+  on Node (where `IS_DENO` is `false`), leading to
   `Could not resolve "@dreamer/socket-io/client"` errors. Changed to
-  `else if (IS_BUN)` so Node (neither Deno nor Bun) skips the
-  runtime-specific resolver tests. `IS_BUN` import added to both files.
+  `else if (IS_BUN)` so Node (neither Deno nor Bun) skips the runtime-specific
+  resolver tests. `IS_BUN` import added to both files.
 - **Node test runner parallel race condition**: Node's native test runner
   executes test files in parallel, but this package's 47 test files share a
   `tests/data/` directory for fixtures. Parallel execution caused file-creation
   / cleanup races (`Could not resolve` for files not yet created by another
-  file's `beforeAll`). Fixed by adding `--test-concurrency=1` to the
-  `test:node` script, ensuring serial file execution.
+  file's `beforeAll`). Fixed by adding `--test-concurrency=1` to the `test:node`
+  script, ensuring serial file execution.
 - **Builder (`builder.ts`) missing `await` on `validateBuildResult`**:
   `buildClient()` invoked the async `validateBuildResult()` (which throws on
-  invalid output) without `await`, making validation fire-and-forget. The
-  build returned "success" while the validation rejection floated and later
-  crashed an unrelated concurrent test (Bun/Linux CI failure attributed to
+  invalid output) without `await`, making validation fire-and-forget. The build
+  returned "success" while the validation rejection floated and later crashed an
+  unrelated concurrent test (Bun/Linux CI failure attributed to
   `应该清理客户端输出目录`). Added `await` so validation completes within the
   build's async chain and errors attribute to the correct caller. This also
-  shrinks the validation window to immediately-after-build, eliminating the
-  race with concurrent `tests/data/` cleanup.
+  shrinks the validation window to immediately-after-build, eliminating the race
+  with concurrent `tests/data/` cleanup.
 
 ### Compatibility
 

@@ -24,8 +24,10 @@ export { CSSOptimizer } from "./css-optimizer.ts";
 export { HTMLGenerator } from "./html-generator.ts";
 export {
   collectSplitEntryPoints,
+  globToRegExp,
   isComponentSplitPath,
   isRouteSplitPath,
+  matchSplitGlobs,
   resolveClientEntryPoints,
   strategyRequestsSplitEntries,
 } from "./splitting-strategy.ts";

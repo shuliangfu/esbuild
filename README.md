@@ -857,11 +857,17 @@ const result = await buildBundle({
 and shared chunks across multiple entry points).
 
 When `splitting` is an object with `byRoute` / `byComponent` / `bySize` /
-`custom`, `@dreamer/esbuild` walks the local relative-import graph from the
+`custom` / `include`, `@dreamer/esbuild` walks the local import graph from the
 client entry and promotes matching modules to **additional entry points**.
 With `splitting: true`, esbuild then emits separate chunks for those modules
 (esbuild has no `manualChunks`; extra entries are the supported lever).
 Chunk name patterns still follow the strategy (`[name]-route-[hash]`, etc.).
+
+The walk always follows relative `./` / `../` imports. Optional `aliases`
+(prefix → local directory, e.g. `@/` → `./src/`, or entries copied from a
+deno.json `imports` / import map / tsconfig `paths` that map to local paths)
+lets the scanner follow `@/…` style specs. Relative alias targets resolve
+against `root` (default: directory of the entry file).
 
 Conventions:
 - `byRoute`: paths under `/routes/` or `/pages/`, or `route` / `+page` /
@@ -869,8 +875,10 @@ Conventions:
 - `byComponent`: paths under `/components/`
 - `bySize`: source file byte size ≥ threshold
 - `custom(absPath)`: predicate for extra entries
+- `include` / `exclude`: simple globs (`*`, `**`, `?`) on absolute paths
+- `aliases` / `root`: extend the import walk only (do not alone trigger a scan)
 
-Boolean `splitting: true` (or an object without those fields) stays
+Boolean `splitting: true` (or an object without by* / custom / include) stays
 backward-compatible: no extra entry scan.
 
 ```typescript
@@ -884,6 +892,11 @@ const builder = new BuilderClient({
       byRoute: true, // promote route modules + [name]-route-[hash]
       byComponent: true, // promote /components/ + [name]-component-[hash]
       bySize: 50000, // promote files ≥ 50KB + [name]-chunk-[hash]
+      // Follow @/ imports during the split scan (import-map style):
+      root: ".",
+      aliases: { "@/": "./src/" },
+      include: ["**/heavy/**"], // optional extra promote rules
+      exclude: ["**/heavy/**/test.ts"],
     },
   },
 });

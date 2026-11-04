@@ -825,18 +825,25 @@ const result = await buildBundle({
 
 `splitting: true` 开启 esbuild 原生代码分割（动态 `import()`／多入口共享 chunk）。
 
-当 `splitting` 为对象且设置了 `byRoute`／`byComponent`／`bySize`／`custom` 时，
-本库从客户端入口走本地相对导入图，把匹配模块升为**额外 entryPoints**；配合
-`splitting: true`，esbuild 会为这些模块产出独立 chunk（esbuild 无
+当 `splitting` 为对象且设置了 `byRoute`／`byComponent`／`bySize`／`custom`／
+`include` 时，本库从客户端入口走本地导入图，把匹配模块升为**额外 entryPoints**；
+配合 `splitting: true`，esbuild 会为这些模块产出独立 chunk（esbuild 无
 `manualChunks`，额外入口是支持的杠杆）。chunk 命名模式仍随策略变化。
+
+扫描默认跟随相对路径 `./`／`../`。可选 `aliases`（前缀 → 本地目录，例如
+`@/` → `./src/`，或从 deno.json `imports`／import map／tsconfig `paths` 中
+拷贝映射到本地的条目）可让扫描跟随 `@/…` 风格导入。相对别名目标相对
+`root` 解析（默认：入口文件所在目录）。
 
 约定：
 - `byRoute`：路径含 `/routes/`／`/pages/`，或 `route`／`+page`／`_layout` 等文件名
 - `byComponent`：路径含 `/components/`
 - `bySize`：源文件字节数 ≥ 阈值
 - `custom(absPath)`：自定义谓词
+- `include`／`exclude`：绝对路径上的简易 glob（`*`／`**`／`?`）
+- `aliases`／`root`：仅扩展导入图行走（单独配置不会触发扫描）
 
-布尔 `splitting: true`（或未设上述字段的对象）保持兼容：不扫描额外入口。
+布尔 `splitting: true`（或未设 by*／custom／include 的对象）保持兼容：不扫描额外入口。
 
 ```typescript
 const builder = new BuilderClient({
@@ -849,6 +856,11 @@ const builder = new BuilderClient({
       byRoute: true, // 路由模块升入口 + [name]-route-[hash]
       byComponent: true, // /components/ 升入口 + [name]-component-[hash]
       bySize: 50000, // ≥50KB 升入口 + [name]-chunk-[hash]
+      // 分割扫描跟随 @/（类 import map）：
+      root: ".",
+      aliases: { "@/": "./src/" },
+      include: ["**/heavy/**"], // 可选额外提升规则
+      exclude: ["**/heavy/**/test.ts"],
     },
   },
 });
