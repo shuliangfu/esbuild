@@ -10,20 +10,22 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-04
+
 ### Added
 
-- **`SplittingStrategy` path aliases + include/exclude globs**: Split-entry scan
-  can follow configurable `aliases` (e.g. `@/` → `./src/`, or local entries from
-  deno.json `imports` / import map / tsconfig `paths`) and promote modules via
-  `include` / filter via `exclude` (simple `*` / `**` / `?` globs). Relative
-  `./` / `../` walk stays the default when `aliases` is unset. `aliases` alone
-  do not trigger a scan.
 - **Real `SplittingStrategy` entry promotion**: `byRoute` / `byComponent` /
   `bySize` / `custom` now walk the local relative-import graph and add matching
   modules as extra esbuild `entryPoints`, so chunks actually split (not only
   `chunkNames`). New helpers in `splitting-strategy.ts`; wired into
   `BuilderClient.build` and context creation. Boolean `splitting: true` stays
   backward-compatible (no extra scan).
+- **`SplittingStrategy` path aliases + include/exclude globs**: Split-entry scan
+  can follow configurable `aliases` (e.g. `@/` → `./src/`, or local entries from
+  deno.json `imports` / import map / tsconfig `paths`) and promote modules via
+  `include` / filter via `exclude` (simple `*` / `**` / `?` globs). Relative
+  `./` / `../` walk stays the default when `aliases` is unset. `aliases` alone
+  do not trigger a scan.
 
 ### Changed
 
@@ -36,10 +38,14 @@ and this project adheres to
   `AssetsProcessor`. Those modules load via `import()` on first use, so
   constructing a `Builder` (or importing only client/server/bundle subpaths)
   stays thinner. Behavior is unchanged.
-- **`SplittingStrategy` docs**: Clarified that `byRoute` / `byComponent` /
-  `bySize` only change chunk **file-name** patterns today; they do not implement
-  real route/component/size splitting. Types, README (en/zh), and
-  `BuilderClient.getChunkNames` comments updated. No runtime change.
+
+### Compatibility
+
+- Deno 2.9+ / Bun 1.3+ / Node.js 22+
+- 595 tests pass on Deno, 519 on Bun (CI 9-job matrix green: Deno/Bun/Node ×
+  Linux/macOS/Windows).
+
+---
 
 ## [1.3.0] - 2026-07-23
 

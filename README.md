@@ -1,8 +1,8 @@
 # @dreamer/esbuild
 
-> High-performance build tool library compatible with Deno, Bun, and Node.js 22+,
-> providing full-stack compilation, bundling, resource processing, optimization,
-> and more, with subpath on-demand imports
+> High-performance build tool library compatible with Deno, Bun, and Node.js
+> 22+, providing full-stack compilation, bundling, resource processing,
+> optimization, and more, with subpath on-demand imports
 
 This library is the core build engine of the
 [@dreamer/dweb](https://jsr.io/@dreamer/dweb) framework, and can also be used
@@ -12,23 +12,18 @@ English | [中文 (Chinese)](./docs/zh-CN/README.md)
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-576%20%7C%20503%20%7C%20477%20passed%20(3%20runtimes)-brightgreen)](./docs/en-US/TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-595%20%7C%20519%20%7C%20477%20passed%203-runtimes-brightgreen)](./docs/en-US/TEST_REPORT.md)
 
 **Changelog**: [English](./docs/en-US/CHANGELOG.md) |
 [中文 (Chinese)](./docs/zh-CN/CHANGELOG.md)
 
-### [1.3.0] - 2026-07-23
+### [1.4.0] - 2026-11-04
 
-- **Added**: **Node.js 22+ compatibility** (via `tsx` for TypeScript transpilation);
-  9-job CI matrix (Deno/Bun/Node × Linux/macOS/Windows); `setEsbuildLocale` used
-  for deterministic locale locking in 5 test files with `$tr` assertions.
-- **Fixed**: `browser-compile-socket-io.test.ts` and `resolver.test.ts`
-  `if (IS_DENO) {} else {}` pattern changed to `else if (IS_BUN)` so Node
-  (neither Deno nor Bun) skips the runtime-specific resolver tests instead of
-  falling into the Bun branch; Node test runner uses `--test-concurrency=1` to
-  avoid `tests/data/` shared-directory race conditions across parallel files.
-- **Changed**: Dependencies bumped (i18n ^1.1.2, console ^1.1.0, logger ^1.1.0,
-  runtime-adapter ^1.2.2, image ^1.1.0, test ^1.2.3).
+- **Added**: Real `SplittingStrategy` entry promotion (`byRoute` / `byComponent`
+  / `bySize` / `custom` → extra esbuild `entryPoints`); path `aliases` +
+  `include` / `exclude` globs for the split-entry scan.
+- **Changed**: `package.json` `sideEffects` limited to `i18n` / `logger`;
+  Builder loads Analyzer / Cache / HTML / CSS / Assets via cold-path `import()`.
 - Full history: [Changelog](./docs/en-US/CHANGELOG.md)
 
 ---
@@ -124,20 +119,20 @@ import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
 ## 🌍 Environment Compatibility
 
-| Environment | Version Requirement | Status                                                          |
-| ----------- | ------------------- | --------------------------------------------------------------- |
-| **Deno**    | 2.9+                | ✅ Fully supported                                              |
-| **Bun**     | 1.3+                | ✅ Fully supported                                              |
-| **Node.js** | 22+                 | ✅ Fully supported (via `tsx` for TypeScript transpilation)     |
-| **Server**  | -                   | ✅ Supported (compatible with Deno, Bun, Node.js runtimes)      |
-| **Client**  | -                   | ❌ Not supported (build tool, runs on server only)              |
+| Environment | Version Requirement | Status                                                      |
+| ----------- | ------------------- | ----------------------------------------------------------- |
+| **Deno**    | 2.9+                | ✅ Fully supported                                          |
+| **Bun**     | 1.3+                | ✅ Fully supported                                          |
+| **Node.js** | 22+                 | ✅ Fully supported (via `tsx` for TypeScript transpilation) |
+| **Server**  | -                   | ✅ Supported (compatible with Deno, Bun, Node.js runtimes)  |
+| **Client**  | -                   | ❌ Not supported (build tool, runs on server only)          |
 
 > **Note**: On Node.js, the Deno/Bun-specific resolver plugins
 > (`denoResolverPlugin`, `bunResolverPlugin`) are not activated
 > (`IS_DENO`/`IS_BUN` both `false`). Build paths that depend on these plugins
 > (e.g. resolving `jsr:`/`npm:` specifiers via `deno eval` or `bun build`) will
-> fall back to esbuild's native resolution. Tests that exercise these paths
-> wrap `build()` in try/catch to gracefully handle runtime limitations.
+> fall back to esbuild's native resolution. Tests that exercise these paths wrap
+> `build()` in try/catch to gracefully handle runtime limitations.
 
 ---
 
@@ -858,10 +853,10 @@ and shared chunks across multiple entry points).
 
 When `splitting` is an object with `byRoute` / `byComponent` / `bySize` /
 `custom` / `include`, `@dreamer/esbuild` walks the local import graph from the
-client entry and promotes matching modules to **additional entry points**.
-With `splitting: true`, esbuild then emits separate chunks for those modules
-(esbuild has no `manualChunks`; extra entries are the supported lever).
-Chunk name patterns still follow the strategy (`[name]-route-[hash]`, etc.).
+client entry and promotes matching modules to **additional entry points**. With
+`splitting: true`, esbuild then emits separate chunks for those modules (esbuild
+has no `manualChunks`; extra entries are the supported lever). Chunk name
+patterns still follow the strategy (`[name]-route-[hash]`, etc.).
 
 The walk always follows relative `./` / `../` imports. Optional `aliases`
 (prefix → local directory, e.g. `@/` → `./src/`, or entries copied from a
@@ -870,6 +865,7 @@ lets the scanner follow `@/…` style specs. Relative alias targets resolve
 against `root` (default: directory of the entry file).
 
 Conventions:
+
 - `byRoute`: paths under `/routes/` or `/pages/`, or `route` / `+page` /
   `_layout`-style filenames
 - `byComponent`: paths under `/components/`
@@ -1150,15 +1146,12 @@ View full test report: [TEST_REPORT.md](./docs/en-US/TEST_REPORT.md)
 
 ## 📋 Changelog
 
-**v1.3.0** (2026-07-23)
+**v1.4.0** (2026-11-04)
 
-- **Added**: Node.js 22+ compatibility (via `tsx`); 9-job CI matrix
-  (Deno/Bun/Node × Linux/macOS/Windows); locale locking for 5 test files.
-- **Fixed**: `if (IS_DENO) {} else {}` test pattern changed to
-  `else if (IS_BUN)` to skip Node; `--test-concurrency=1` for shared
-  `tests/data/` isolation.
-- **Changed**: Dependencies bumped (i18n ^1.1.2, console ^1.1.0, logger ^1.1.0,
-  runtime-adapter ^1.2.2, image ^1.1.0, test ^1.2.3).
+- **Added**: Real `SplittingStrategy` entry promotion; path `aliases` +
+  `include` / `exclude` globs for split-entry scan.
+- **Changed**: `sideEffects` for tree-shaking; Builder cold-path dynamic imports
+  for Analyzer / Cache / HTML / CSS / Assets.
 
 Full history in [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
 

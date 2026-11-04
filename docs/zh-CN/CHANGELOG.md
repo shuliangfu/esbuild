@@ -9,18 +9,20 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-04
+
 ### 新增
 
+- **真 `SplittingStrategy` 入口提升**：`byRoute`／`byComponent`／`bySize`／
+  `custom` 现从入口走本地相对导入图，将匹配模块升为额外 esbuild
+  `entryPoints`，从而真正拆 chunk（不只改 `chunkNames`）。新增
+  `splitting-strategy.ts` 辅助函数，接入 `BuilderClient.build` 与 context。布尔
+  `splitting: true` 保持兼容（不扫描额外入口）。
 - **`SplittingStrategy` 路径别名 + include／exclude glob**：分割入口扫描可跟随
   可配置 `aliases`（如 `@/` → `./src/`，或从 deno.json `imports`／import map／
   tsconfig `paths` 拷贝的本地映射），并用 `include`／`exclude`（简易 `*`／`**`／
   `?` glob）提升／过滤模块。未设 `aliases` 时仍只走相对 `./`／`../`。单独配置
   `aliases` 不会触发扫描。
-- **真 `SplittingStrategy` 入口提升**：`byRoute`／`byComponent`／`bySize`／
-  `custom` 现从入口走本地相对导入图，将匹配模块升为额外 esbuild
-  `entryPoints`，从而真正拆 chunk（不只改 `chunkNames`）。新增
-  `splitting-strategy.ts` 辅助函数，接入 `BuilderClient.build` 与 context。 布尔
-  `splitting: true` 保持兼容（不扫描额外入口）。
 
 ### 变更
 
@@ -32,9 +34,14 @@
   `CacheManager`、`HTMLGenerator`、`CSSOptimizer`、`AssetsProcessor`；首次使用时
   再 `import()`，构造 `Builder`（或只导入 client／server／bundle 子路径）更瘦。
   行为不变。
-- **`SplittingStrategy` 文档澄清**：标明 `byRoute`／`byComponent`／`bySize`
-  当前只改 chunk **文件名**模式，不实现真路由／组件／按大小分割。已更新类型、
-  README（中／英）与 `BuilderClient.getChunkNames` 注释。无运行时行为变化。
+
+### 兼容性
+
+- Deno 2.9+ / Bun 1.3+ / Node.js 22+
+- Deno 595／Bun 519 测试通过（CI 九格：Deno／Bun／Node × Linux／macOS／Windows
+  全绿）。
+
+---
 
 ## [1.3.0] - 2026-07-23
 

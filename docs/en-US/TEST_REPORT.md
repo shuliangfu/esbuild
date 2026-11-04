@@ -29,8 +29,8 @@
 
 > **Note**: Test counts differ across runtimes because `IS_DENO`/`IS_BUN`-gated
 > resolver integration tests (e.g. `jsr:`/`npm:` specifier resolution via
-> `deno eval` or `bun build`) only register on their respective runtime.
-> Node.js (neither Deno nor Bun) skips these gated test blocks.
+> `deno eval` or `bun build`) only register on their respective runtime. Node.js
+> (neither Deno nor Bun) skips these gated test blocks.
 
 ### Test File Statistics
 

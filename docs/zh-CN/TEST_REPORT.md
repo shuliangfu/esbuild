@@ -24,11 +24,11 @@
 | **Bun**     | 503      | 503 ✅ | 0    | 100% ✅ |
 | **Node.js** | 477      | 477 ✅ | 0    | 100% ✅ |
 
-- **执行时间**：约 17s（Deno `deno test -A`），约 3s（Bun `bun test`），
-  约 17s（Node `npm run test:node`）
+- **执行时间**：约 17s（Deno `deno test -A`），约 3s（Bun `bun test`）， 约
+  17s（Node `npm run test:node`）
 
 > **说明**：各运行时用例数不同，因 `IS_DENO`/`IS_BUN` 门控的解析器集成测试
->（如通过 `deno eval` 或 `bun build` 解析 `jsr:`/`npm:` 说明符）仅在对应运行时
+> （如通过 `deno eval` 或 `bun build` 解析 `jsr:`/`npm:` 说明符）仅在对应运行时
 > 注册。Node.js（既非 Deno 也非 Bun）跳过这些门控测试块。
 
 ### 测试文件统计

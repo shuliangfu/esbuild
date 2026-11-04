@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/esbuild)](https://jsr.io/@dreamer/esbuild)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-576%20%7C%20503%20%7C%20477%20passed%20(3%20runtimes)-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-595%20%7C%20519%20%7C%20477%20passed%203-runtimes-brightgreen)](./TEST_REPORT.md)
 
 [English](../../README.md) | 中文 (Chinese)
 
@@ -104,20 +104,19 @@ import { injectCSSIntoHTML } from "jsr:@dreamer/esbuild/css-injector";
 
 ## 🌍 环境兼容性
 
-| 环境        | 版本要求 | 状态                                                       |
-| ----------- | -------- | ---------------------------------------------------------- |
-| **Deno**    | 2.9+     | ✅ 完全支持                                                |
-| **Bun**     | 1.3+     | ✅ 完全支持                                                |
-| **Node.js** | 22+      | ✅ 完全支持（通过 `tsx` 进行 TypeScript 转译）             |
-| **服务端**  | -        | ✅ 支持（兼容 Deno、Bun、Node.js 运行时）                  |
-| **客户端**  | -        | ❌ 不支持（构建工具，仅在服务端运行）                      |
+| 环境        | 版本要求 | 状态                                           |
+| ----------- | -------- | ---------------------------------------------- |
+| **Deno**    | 2.9+     | ✅ 完全支持                                    |
+| **Bun**     | 1.3+     | ✅ 完全支持                                    |
+| **Node.js** | 22+      | ✅ 完全支持（通过 `tsx` 进行 TypeScript 转译） |
+| **服务端**  | -        | ✅ 支持（兼容 Deno、Bun、Node.js 运行时）      |
+| **客户端**  | -        | ❌ 不支持（构建工具，仅在服务端运行）          |
 
 > **注意**：在 Node.js 上，Deno/Bun 专用解析器插件
->（`denoResolverPlugin`、`bunResolverPlugin`）不会激活
->（`IS_DENO`/`IS_BUN` 均为 `false`）。依赖这些插件的构建路径
->（如通过 `deno eval` 或 `bun build` 解析 `jsr:`/`npm:` 说明符）将回退到
-> esbuild 原生解析。测试中对这些路径的 `build()` 调用包裹了 try/catch 以
-> 优雅处理运行时限制。
+> （`denoResolverPlugin`、`bunResolverPlugin`）不会激活 （`IS_DENO`/`IS_BUN`
+> 均为 `false`）。依赖这些插件的构建路径 （如通过 `deno eval` 或 `bun build`
+> 解析 `jsr:`/`npm:` 说明符）将回退到 esbuild 原生解析。测试中对这些路径的
+> `build()` 调用包裹了 try/catch 以 优雅处理运行时限制。
 
 ---
 
@@ -823,27 +822,31 @@ const result = await buildBundle({
 
 ### 代码分割策略
 
-`splitting: true` 开启 esbuild 原生代码分割（动态 `import()`／多入口共享 chunk）。
+`splitting: true` 开启 esbuild 原生代码分割（动态 `import()`／多入口共享
+chunk）。
 
 当 `splitting` 为对象且设置了 `byRoute`／`byComponent`／`bySize`／`custom`／
 `include` 时，本库从客户端入口走本地导入图，把匹配模块升为**额外 entryPoints**；
 配合 `splitting: true`，esbuild 会为这些模块产出独立 chunk（esbuild 无
 `manualChunks`，额外入口是支持的杠杆）。chunk 命名模式仍随策略变化。
 
-扫描默认跟随相对路径 `./`／`../`。可选 `aliases`（前缀 → 本地目录，例如
-`@/` → `./src/`，或从 deno.json `imports`／import map／tsconfig `paths` 中
-拷贝映射到本地的条目）可让扫描跟随 `@/…` 风格导入。相对别名目标相对
-`root` 解析（默认：入口文件所在目录）。
+扫描默认跟随相对路径 `./`／`../`。可选 `aliases`（前缀 → 本地目录，例如 `@/` →
+`./src/`，或从 deno.json `imports`／import map／tsconfig `paths` 中
+拷贝映射到本地的条目）可让扫描跟随 `@/…` 风格导入。相对别名目标相对 `root`
+解析（默认：入口文件所在目录）。
 
 约定：
-- `byRoute`：路径含 `/routes/`／`/pages/`，或 `route`／`+page`／`_layout` 等文件名
+
+- `byRoute`：路径含 `/routes/`／`/pages/`，或 `route`／`+page`／`_layout`
+  等文件名
 - `byComponent`：路径含 `/components/`
 - `bySize`：源文件字节数 ≥ 阈值
 - `custom(absPath)`：自定义谓词
 - `include`／`exclude`：绝对路径上的简易 glob（`*`／`**`／`?`）
 - `aliases`／`root`：仅扩展导入图行走（单独配置不会触发扫描）
 
-布尔 `splitting: true`（或未设 by*／custom／include 的对象）保持兼容：不扫描额外入口。
+布尔 `splitting: true`（或未设 by*／custom／include
+的对象）保持兼容：不扫描额外入口。
 
 ```typescript
 const builder = new BuilderClient({
@@ -1100,14 +1103,12 @@ const htmlWithCss = injectCSSIntoHTML(html, cssFiles, {
 
 ## 📋 变更日志
 
-**v1.3.0**（2026-07-23）
+**v1.4.0**（2026-11-04）
 
-- **新增**：Node.js 22+ 兼容（通过 `tsx`）；9 作业 CI 矩阵
-  （Deno/Bun/Node × Linux/macOS/Windows）；5 个测试文件 locale 锁定。
-- **修复**：`if (IS_DENO) {} else {}` 测试模式改为 `else if (IS_BUN)` 以
-  跳过 Node；`--test-concurrency=1` 隔离共享 `tests/data/` 目录。
-- **变更**：依赖升级（i18n ^1.1.2、console ^1.1.0、logger ^1.1.0、
-  runtime-adapter ^1.2.2、image ^1.1.0、test ^1.2.3）。
+- **新增**：真 `SplittingStrategy` 入口提升；分割扫描支持路径 `aliases` 与
+  `include`／`exclude` glob。
+- **变更**：`sideEffects` 便于 tree-shake；Builder 冷路径动态 import
+  Analyzer／Cache／HTML／CSS／Assets。
 
 完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
