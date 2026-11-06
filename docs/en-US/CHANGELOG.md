@@ -10,6 +10,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-06
+
+### Fixed
+
+- **JSON loader**: `getLoaderFromPath` in `resolver-deno` / `resolver-bun` returns `json` for
+  `.json`, so client bundles can import modules like `@dreamer/view/devtools/overlay` that use
+  `import … with { type: "json" }`.
+- Strip trailing `// denoCacheMetadata=…` from Deno HTTP cache files so the JSON loader accepts them.
+
+
 ## [1.4.0] - 2026-11-04
 
 ### Added

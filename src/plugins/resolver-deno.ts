@@ -518,8 +518,20 @@ function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
   }
 }
 
-/** 根据文件路径或 cache key（含扩展名）确定 esbuild loader。.tsx 用 tsx，.jsx 用 jsx，以便视图文件正确解析。 */
-function getLoaderFromPath(filePathOrKey: string): "ts" | "tsx" | "js" | "jsx" {
+
+/** 剥除 Deno HTTP 缓存文件末尾的 `// denoCacheMetadata={...}`（否则 JSON loader 会报 comments）。 */
+function stripDenoCacheMetadata(contents: string): string {
+  const marker = "\n// denoCacheMetadata=";
+  const idx = contents.lastIndexOf(marker);
+  if (idx >= 0) return contents.slice(0, idx);
+  if (contents.startsWith("// denoCacheMetadata=")) return "";
+  return contents;
+}
+
+/** 根据文件路径或 cache key（含扩展名）确定 esbuild loader。.tsx 用 tsx，.jsx 用 jsx，.json 用 json。 */
+function getLoaderFromPath(
+  filePathOrKey: string,
+): "ts" | "tsx" | "js" | "jsx" | "json" {
   if (filePathOrKey.endsWith(".tsx")) return "tsx";
   if (filePathOrKey.endsWith(".jsx")) return "jsx";
   if (filePathOrKey.endsWith(".ts") || filePathOrKey.endsWith(".mts")) {
@@ -528,6 +540,7 @@ function getLoaderFromPath(filePathOrKey: string): "ts" | "tsx" | "js" | "jsx" {
   if (filePathOrKey.endsWith(".js") || filePathOrKey.endsWith(".mjs")) {
     return "js";
   }
+  if (filePathOrKey.endsWith(".json")) return "json";
   return "ts";
 }
 
@@ -1348,8 +1361,8 @@ export function denoResolverPlugin(
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
           if (!result) return undefined;
           const { path: localPath, key } = result;
-          const contents = await readTextFile(localPath);
-          const loader = /\.(tsx?|jsx?|mts|mjs)$/i.test(key)
+          const contents = stripDenoCacheMetadata(await readTextFile(localPath));
+          const loader = /\.(tsx?|jsx?|mts|mjs|json)$/i.test(key)
             ? getLoaderFromPath(key)
             : getLoaderFromPath(localPath);
           const resolveDir = dirname(localPath);

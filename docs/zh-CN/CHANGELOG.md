@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-06
+
+### 修复
+
+- **JSON loader**：`resolver-deno`／`resolver-bun` 的 `getLoaderFromPath` 对 `.json` 返回 `json`，
+  使 `@dreamer/view/devtools/overlay` 等 `import … with { type: "json" }` 可被客户端 bundle。
+- 读取 Deno HTTP 缓存时剥除末尾 `// denoCacheMetadata=…`，避免 JSON loader 报 comments。
+
+
 ## [1.4.0] - 2026-11-04
 
 ### 新增

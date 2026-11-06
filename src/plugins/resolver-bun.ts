@@ -748,13 +748,17 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
  * @param filePath - 文件路径
  * @returns esbuild loader 类型
  */
-function getLoaderFromPath(filePath: string): "ts" | "tsx" | "js" | "jsx" {
+function getLoaderFromPath(
+  filePath: string,
+): "ts" | "tsx" | "js" | "jsx" | "json" {
   if (filePath.endsWith(".tsx") || filePath.endsWith(".jsx")) {
     return "tsx";
   } else if (filePath.endsWith(".ts") || filePath.endsWith(".mts")) {
     return "ts";
   } else if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
     return "js";
+  } else if (filePath.endsWith(".json")) {
+    return "json";
   }
   // 默认返回 ts
   return "ts";
