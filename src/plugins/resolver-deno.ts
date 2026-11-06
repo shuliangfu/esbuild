@@ -519,13 +519,24 @@ function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
 }
 
 
-/** 剥除 Deno HTTP 缓存文件末尾的 `// denoCacheMetadata={...}`（否则 JSON loader 会报 comments）。 */
+/** 剥除 Deno HTTP 缓存文件中的 `// denoCacheMetadata={...}`（否则 JSON loader 会报 comments）。
+ * 常见为文件末尾行；偶发文件开头仅有该元数据行时，跳过首行保留正文，勿整文件清空。
+ */
 function stripDenoCacheMetadata(contents: string): string {
   const marker = "\n// denoCacheMetadata=";
   const idx = contents.lastIndexOf(marker);
   if (idx >= 0) return contents.slice(0, idx);
-  if (contents.startsWith("// denoCacheMetadata=")) return "";
+  if (contents.startsWith("// denoCacheMetadata=")) {
+    const nl = contents.indexOf("\n");
+    if (nl < 0) return ""; // 仅元数据、无正文
+    return contents.slice(nl + 1);
+  }
   return contents;
+}
+
+/** @internal 供单测断言 stripDenoCacheMetadata 行为。 */
+export function stripDenoCacheMetadataForTests(contents: string): string {
+  return stripDenoCacheMetadata(contents);
 }
 
 /** 根据文件路径或 cache key（含扩展名）确定 esbuild loader。.tsx 用 tsx，.jsx 用 jsx，.json 用 json。 */
