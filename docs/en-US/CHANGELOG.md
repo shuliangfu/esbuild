@@ -10,6 +10,14 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-06
+
+### Fixed
+
+- **stripDenoCacheMetadata**: leading `// denoCacheMetadata=…` lines are removed by
+  skipping the first line instead of emptying the whole file when a newline follows
+  the marker (metadata-only files still become empty).
+
 ## [1.4.1] - 2026-11-06
 
 ### Fixed
