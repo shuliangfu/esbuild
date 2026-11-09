@@ -9,6 +9,22 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09
+
+### 新增
+
+- **本地依赖子路径**：`resolver-deno`／`resolver-bun` 在 `deno.json`／`package.json`
+  将包映射到本地目录或 `file:` 时，可解析 `@scope/pkg/subpath`（exports）。
+- **生产 `legalComments: "none"`**：`BuilderClient`／`BuilderServer`／`buildBundle`
+  在 minify／生产默认去掉 `/*! … */` 等 license 注释；可通过选项覆盖。
+
+### 修复
+
+- **Bun `platform: "neutral"`**：`bun build` 忽略 `--legal-comments`；minify 默认
+  `none` 或显式非 `inline` 时改走 esbuild，避免 license 残留。
+- **压测冒烟**：产物动态 import 使用 `pathToFileUrl`，修复 Windows Deno
+  `Unsupported scheme "d"`。
+
 ## [1.4.2] - 2026-11-06
 
 ### 修复

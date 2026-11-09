@@ -10,6 +10,25 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09
+
+### Added
+
+- **Local dependency subpaths**: `resolver-deno` / `resolver-bun` resolve
+  `@scope/pkg/subpath` when packages map to a local directory or `file:` in
+  `deno.json` / `package.json` (via exports).
+- **Prod `legalComments: "none"`**: `BuilderClient` / `BuilderServer` / `buildBundle`
+  drop `/*! … */` license comments by default when minifying / in production;
+  overridable via options.
+
+### Fixed
+
+- **Bun `platform: "neutral"`**: `bun build` ignores `--legal-comments`; when
+  minify defaults to `none` or an explicit non-`inline` value is set, fall back
+  to esbuild so license banners are stripped.
+- **Stress smoke import**: use `pathToFileUrl` for dynamic import so Windows Deno
+  no longer hits `Unsupported scheme "d"`.
+
 ## [1.4.2] - 2026-11-06
 
 ### Fixed
