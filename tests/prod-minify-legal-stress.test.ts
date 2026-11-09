@@ -7,6 +7,7 @@ import {
   mkdir,
   writeTextFile,
   readTextFile,
+  pathToFileUrl,
 } from "@dreamer/runtime-adapter";
 import { describe, expect, it } from "@dreamer/test";
 import { buildBundle } from "../src/builder-bundle.ts";
@@ -210,10 +211,10 @@ describe("生产压缩压测（复杂源 + legalComments none）", () => {
       expect(prod.code).not.toContain("Copyright (c) 2026 Dreamer Stress Fixture");
       expect(prod.code).toContain("prod-minify-legal-stress");
 
-      // 写出产物并动态 import 冒烟
+      // 写出产物并动态 import 冒烟（Windows 需 file://，裸盘符路径会 Unsupported scheme）
       const outFile = join(root, "stress-prod.mjs");
       await writeTextFile(outFile, prod.code + "\n");
-      const mod = await import(outFile);
+      const mod = await import(pathToFileUrl(outFile));
       expect(typeof mod.runStress).toBe("function");
       const result = mod.runStress(11);
       expect(typeof result).toBe("string");

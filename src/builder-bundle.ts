@@ -160,7 +160,14 @@ export class BuilderBundle {
     // Bun + `platform: "node"` 若走子进程 `bun build`，在 Linux CI（临时入口、cwd）
     // 等环境下易失败；与 Deno 一致改走 esbuild + 解析插件。
     // `neutral` 等仍可用 bun build（更快）。
+    // 但 bun build 无 --legal-comments；minify 默认 none／显式非 inline 时改走 esbuild，
+    // 否则 /*! … */ license 注释会残留（与 Client／Server 生产契约不一致）。
     if (IS_BUN && !isBrowserPlatform && resolvedPlatform !== "node") {
+      const legal = options.legalComments ??
+        (options.minify ? "none" : undefined);
+      if (legal && legal !== "inline") {
+        return this.buildWithEsbuild(options);
+      }
       return this.buildWithBun(options);
     }
     return this.buildWithEsbuild(options);
