@@ -23,6 +23,7 @@ import {
   cwd,
   dirname,
   existsSync,
+  statSync,
   join,
   readdirSync,
   readTextFile,
@@ -335,6 +336,109 @@ function getPackageImport(
     return undefined;
   }
 }
+
+
+/** file:／相对路径／绝对路径的本地依赖（非 npm:／jsr:／裸版本号） */
+function isLocalFileDependency(val: string): boolean {
+  return (
+    val.startsWith("file:") ||
+    val.startsWith("./") ||
+    val.startsWith("../") ||
+    val.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(val)
+  );
+}
+
+function fileDepToAbsPath(projectPackageJsonPath: string, baseVal: string): string {
+  if (baseVal.startsWith("file:")) {
+    let path = baseVal.slice(5);
+    // file:../foo or file:///abs
+    if (path.startsWith("//")) {
+      // fileUrl-like — reuse simple strip
+      path = path.replace(/^\/\//, "/");
+      if (path.length >= 3 && /^\/[A-Za-z]:[/\\]/.test(path)) path = path.slice(1);
+      return path;
+    }
+    return resolve(dirname(projectPackageJsonPath), path);
+  }
+  if (baseVal.startsWith("./") || baseVal.startsWith("../")) {
+    return resolve(dirname(projectPackageJsonPath), baseVal);
+  }
+  return baseVal;
+}
+
+function resolveLocalFileDepSubpath(
+  projectPackageJsonPath: string,
+  baseVal: string,
+  subpath: string,
+): string | undefined {
+  const absBase = fileDepToAbsPath(projectPackageJsonPath, baseVal);
+  let pkgRoot = absBase;
+  try {
+    if (existsSync(absBase) && statSync(absBase).isFile) {
+      pkgRoot = dirname(absBase);
+    }
+  } catch { /* keep */ }
+  // walk up for package.json
+  let dir = pkgRoot;
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, "package.json"))) {
+      pkgRoot = dir;
+      break;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  const cleanSub = subpath.replace(/^\/+/, "");
+  const candidates: string[] = [];
+  const pkgJsonPath = join(pkgRoot, "package.json");
+  if (existsSync(pkgJsonPath) && cleanSub) {
+    try {
+      const pkg = JSON.parse(readTextFileSync(pkgJsonPath)) as {
+        exports?: Record<string, unknown>;
+      };
+      const entry = pkg.exports?.[`./${cleanSub}`] ?? pkg.exports?.[cleanSub];
+      let target: string | undefined;
+      if (typeof entry === "string") target = entry;
+      else if (entry && typeof entry === "object") {
+        const obj = entry as { import?: unknown; default?: unknown };
+        if (typeof obj.import === "string") target = obj.import;
+        else if (typeof obj.default === "string") target = obj.default;
+      }
+      if (target) candidates.push(resolve(pkgRoot, target));
+    } catch { /* ignore */ }
+  }
+  if (cleanSub) {
+    for (const mid of ["", "src", "lib", "dist"]) {
+      const base = mid ? join(pkgRoot, mid, cleanSub) : join(pkgRoot, cleanSub);
+      candidates.push(
+        base,
+        `${base}.ts`,
+        `${base}.tsx`,
+        `${base}.js`,
+        `${base}.mjs`,
+        join(base, "index.ts"),
+        join(base, "index.js"),
+        join(base, "mod.ts"),
+      );
+    }
+  } else {
+    candidates.push(
+      absBase,
+      join(pkgRoot, "mod.ts"),
+      join(pkgRoot, "index.ts"),
+      join(pkgRoot, "src", "mod.ts"),
+    );
+  }
+  for (const c of candidates) {
+    try {
+      if (existsSync(c) && statSync(c).isFile) return c;
+    } catch { /* continue */ }
+  }
+  return undefined;
+}
+
 
 /**
  * 解析路径别名（从 package.json imports 或 tsconfig.json paths）
@@ -1095,6 +1199,22 @@ export function bunResolverPlugin(
               projectPackageJsonPath,
               packageName,
             );
+            // 本地 file:／相对路径依赖：按包 exports 解析子路径，勿误转为 npm:@jsr
+            if (
+              packageImport &&
+              isLocalFileDependency(packageImport)
+            ) {
+              const subpath = subpathParts.join("/");
+              const localHit = resolveLocalFileDepSubpath(
+                projectPackageJsonPath,
+                packageImport,
+                subpath,
+              );
+              if (localHit) {
+                return { path: localHit, namespace: "file" };
+              }
+              return undefined;
+            }
             // 裸版本（如 ^1.0.2）规范为 npm: 形式：@scope/name -> npm:@jsr/scope__name，@jsr/xxx 保持
             if (
               packageImport && !packageImport.startsWith("npm:") &&

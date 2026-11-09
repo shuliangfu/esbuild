@@ -16,6 +16,7 @@ import {
   ensureDir,
   existsSync,
   getEnv,
+  statSync,
   join,
   readTextFile,
   readTextFileSync,
@@ -598,6 +599,152 @@ function normalizeProtocolSpecifier(s: string): string {
   return s.replace(/^(npm|jsr):\/+(?!\/)/, "$1:");
 }
 
+/** 是否为本地依赖目标（相对路径／file:／绝对路径），非 jsr:／npm: */
+function isLocalImportMapTarget(val: string): boolean {
+  if (val.startsWith("jsr:") || val.startsWith("npm:")) return false;
+  return (
+    val.startsWith("./") ||
+    val.startsWith("../") ||
+    val.startsWith("file:") ||
+    val.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(val)
+  );
+}
+
+function localTargetToAbsPath(denoJsonDir: string, baseVal: string): string {
+  if (baseVal.startsWith("file:")) return fileUrlToPath(baseVal);
+  if (baseVal.startsWith("./") || baseVal.startsWith("../")) {
+    return resolve(denoJsonDir, baseVal);
+  }
+  return baseVal;
+}
+
+function isExistingDir(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isDirectory;
+  } catch {
+    return false;
+  }
+}
+
+function isExistingFile(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isFile;
+  } catch {
+    return false;
+  }
+}
+
+/** 向上查找含 package.json（或 deno.json）的包根 */
+function findLocalPackageRoot(startPath: string): string {
+  let dir = isExistingFile(startPath) ? dirname(startPath) : startPath;
+  for (let i = 0; i < 8; i++) {
+    if (
+      existsSync(join(dir, "package.json")) ||
+      existsSync(join(dir, "deno.json"))
+    ) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return isExistingDir(startPath) ? startPath : dirname(startPath);
+}
+
+function pickExistingScript(base: string): string | undefined {
+  const candidates = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}.js`,
+    `${base}.mjs`,
+    `${base}.jsx`,
+    join(base, "mod.ts"),
+    join(base, "mod.js"),
+    join(base, "index.ts"),
+    join(base, "index.js"),
+  ];
+  for (const c of candidates) {
+    if (isExistingFile(c)) return c;
+  }
+  return undefined;
+}
+
+function readPackageExportTarget(
+  pkgRoot: string,
+  subpath: string,
+): string | undefined {
+  const pkgJsonPath = join(pkgRoot, "package.json");
+  if (!existsSync(pkgJsonPath)) return undefined;
+  try {
+    const pkg = JSON.parse(readTextFileSync(pkgJsonPath)) as {
+      exports?: Record<string, unknown>;
+    };
+    const entry = pkg.exports?.[`./${subpath}`] ?? pkg.exports?.[subpath];
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object") {
+      const obj = entry as { import?: unknown; default?: unknown; require?: unknown };
+      for (const key of ["import", "default", "require"] as const) {
+        const v = obj[key];
+        if (typeof v === "string") return v;
+        if (v && typeof v === "object") {
+          const nested = v as { default?: unknown };
+          if (typeof nested.default === "string") return nested.default;
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
+/**
+ * 将 deno.json imports 中的本地依赖 + 子路径解析为磁盘文件。
+ * 对齐 jsr／npm 子路径能力：优先 package.json exports，再回落 src／根目录候选。
+ */
+function resolveLocalImportMapSubpath(
+  denoJsonDir: string,
+  baseVal: string,
+  subpath: string,
+): string | undefined {
+  const absBase = localTargetToAbsPath(denoJsonDir, baseVal);
+  const pkgRoot = findLocalPackageRoot(absBase);
+  const cleanSub = subpath.replace(/^\/+/, "");
+  if (!cleanSub) {
+    return pickExistingScript(absBase) ??
+      pickExistingScript(join(pkgRoot, "mod")) ??
+      pickExistingScript(join(pkgRoot, "src", "mod")) ??
+      pickExistingScript(join(pkgRoot, "index"));
+  }
+
+  const exportTarget = readPackageExportTarget(pkgRoot, cleanSub);
+  if (exportTarget) {
+    const abs = resolve(pkgRoot, exportTarget);
+    if (isExistingFile(abs)) return abs;
+    const hit = pickExistingScript(abs);
+    if (hit) return hit;
+  }
+
+  const searchBases = [pkgRoot];
+  if (isExistingDir(absBase) && absBase !== pkgRoot) searchBases.unshift(absBase);
+  if (isExistingFile(absBase)) {
+    const parent = dirname(absBase);
+    if (!searchBases.includes(parent)) searchBases.unshift(parent);
+  }
+
+  for (const root of searchBases) {
+    for (const mid of ["", "src", "lib", "dist"]) {
+      const base = mid ? join(root, mid, cleanSub) : join(root, cleanSub);
+      const hit = pickExistingScript(base);
+      if (hit) return hit;
+    }
+  }
+  return undefined;
+}
+
+
 function convertSpecifierToBrowserUrl(specifier: string): string | null {
   if (specifier.startsWith("npm:")) {
     return `https://esm.sh/${specifier.slice(4)}`;
@@ -946,10 +1093,22 @@ export function denoResolverPlugin(
             if (!args.path.startsWith(alias)) continue;
             const val = config.imports[alias];
             if (!val) continue;
-            const rest = args.path.slice(alias.length);
+            const rest = args.path.slice(alias.length).replace(/^\/+/, "");
+            // 本地依赖（./ ../ file: 绝对路径）：子路径按 exports／磁盘候选解析
+            if (isLocalImportMapTarget(val)) {
+              const localHit = resolveLocalImportMapSubpath(
+                denoJsonDir,
+                val,
+                rest,
+              );
+              if (localHit) {
+                return { path: localHit, namespace: "file" };
+              }
+              continue;
+            }
             const resolved = val.startsWith("./") || val.startsWith("../")
               ? join(denoJsonDir, val, rest)
-              : val + rest;
+              : (rest ? `${val.replace(/\/+$/, "")}/${rest}` : val);
             if (existsSync(resolved)) {
               return { path: resolved, namespace: "file" };
             }
@@ -1111,8 +1270,53 @@ export function denoResolverPlugin(
               : (args.resolveDir ?? cwd()));
           const denoJsonPath = findDenoJson(startDir);
           if (!denoJsonPath) return undefined;
+          const denoJsonDir = dirname(denoJsonPath);
           const pkgImport = getPackageImport(denoJsonPath, args.path);
           if (!pkgImport) return undefined;
+          // 本地依赖子路径：./／file:／绝对路径（getPackageImport 拼出的 base/subpath）
+          if (isLocalImportMapTarget(pkgImport)) {
+            // pkgImport 可能已是 baseVal/subpath 拼接；拆成 base + rest 再走 exports
+            const config = getDenoConfig(denoJsonPath);
+            let localHit: string | undefined;
+            if (config?.imports) {
+              // 从右往左找最长 base 键
+              for (let i = args.path.length - 1; i >= 0; i--) {
+                if (args.path[i] !== "/") continue;
+                const base = args.path.slice(0, i);
+                const sub = args.path.slice(i + 1);
+                const baseVal = config.imports[base];
+                if (typeof baseVal === "string" && isLocalImportMapTarget(baseVal)) {
+                  localHit = resolveLocalImportMapSubpath(
+                    denoJsonDir,
+                    baseVal,
+                    sub,
+                  );
+                  break;
+                }
+              }
+              if (!localHit) {
+                const exact = config.imports[args.path];
+                if (typeof exact === "string" && isLocalImportMapTarget(exact)) {
+                  localHit = resolveLocalImportMapSubpath(
+                    denoJsonDir,
+                    exact,
+                    "",
+                  );
+                }
+              }
+            }
+            if (!localHit) {
+              localHit = resolveLocalImportMapSubpath(
+                denoJsonDir,
+                pkgImport,
+                "",
+              );
+            }
+            if (localHit) {
+              return { path: localHit, namespace: "file" };
+            }
+            return undefined;
+          }
           if (pkgImport.startsWith("jsr:") || pkgImport.startsWith("npm:")) {
             if (isServerBuild && !browserMode) {
               return { path: pkgImport, external: true };

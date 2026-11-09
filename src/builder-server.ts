@@ -167,6 +167,15 @@ export class BuilderServer {
         args.push("--minify");
       }
 
+      // 生产默认砍 license 注释
+      {
+        const legal = this.config.compile?.legalComments ??
+          (isProd ? "none" : undefined);
+        if (legal) {
+          args.push(`--legal-comments=${legal}`);
+        }
+      }
+
       // 外部依赖（Bun 支持 --external 参数）
       for (const ext of externalModules) {
         args.push("--external", ext);
@@ -395,6 +404,9 @@ export class BuilderServer {
       platform: "node", // Node 平台，自动将内置模块标记为 external
       target: "es2022", // 现代 Node.js/Deno/Bun 都支持 ES2022
       minify: compileOptions.minify,
+      // 生产默认砍 license 注释；显式 compile.legalComments 可覆盖
+      legalComments: compileOptions.legalComments ??
+        (isProd || compileOptions.minify ? "none" : undefined),
       sourcemap: !isProd, // 开发模式生成 sourcemap
       treeShaking: true,
       metafile: true,
@@ -580,6 +592,15 @@ export class BuilderServer {
       // 压缩选项
       if (compileOptions.minify) {
         args.push("--minify");
+      }
+
+      // legal comments（生产／minify 默认 none；Bun／esbuild CLI 均认 --legal-comments）
+      {
+        const legal = compileOptions.legalComments ??
+          (isProd || compileOptions.minify ? "none" : undefined);
+        if (legal) {
+          args.push(`--legal-comments=${legal}`);
+        }
       }
 
       // sourcemap 选项（开发模式生成）

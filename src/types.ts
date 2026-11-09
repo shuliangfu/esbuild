@@ -40,12 +40,25 @@ export type OutputFormat = "esm" | "cjs" | "iife";
  */
 export type Platform = "linux" | "darwin" | "windows";
 
+/** esbuild legalComments；生产默认 none（砍 license 注释） */
+export type LegalComments =
+  | "none"
+  | "inline"
+  | "eof"
+  | "linked"
+  | "external";
+
 /**
  * 服务端编译选项
  */
 export interface ServerCompileOptions {
   /** 是否压缩 */
   minify?: boolean;
+  /**
+   * license／legal 注释处理（透传 esbuild legalComments）
+   * 生产默认 "none"；显式传入可覆盖
+   */
+  legalComments?: LegalComments;
   /** 是否生成 source map */
   sourcemap?: boolean;
   /** 目标平台 */
@@ -179,6 +192,11 @@ export interface SplittingStrategy {
 export interface ClientBundleOptions {
   /** 是否压缩 */
   minify?: boolean;
+  /**
+   * license／legal 注释处理（透传 esbuild legalComments）
+   * 生产默认 "none"；显式传入可覆盖
+   */
+  legalComments?: LegalComments;
   /** 是否生成 source map */
   sourcemap?: boolean;
   /** 代码分割 */

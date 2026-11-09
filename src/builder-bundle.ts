@@ -29,7 +29,7 @@ import {
   denoResolverPlugin,
 } from "./plugins/resolver-deno.ts";
 import { logger } from "./utils/logger.ts";
-import type { BuildLogger } from "./types.ts";
+import type { BuildLogger, LegalComments } from "./types.ts";
 import { $tr } from "./i18n.ts";
 
 /**
@@ -47,6 +47,11 @@ export interface BundleOptions {
   target?: string | string[];
   /** 是否压缩（默认：false） */
   minify?: boolean;
+  /**
+   * license／legal 注释处理（透传 esbuild legalComments）
+   * minify／生产场景默认 "none"
+   */
+  legalComments?: LegalComments;
   /** 输出格式（默认：iife） */
   format?: "iife" | "esm" | "cjs";
   /** 是否生成 sourcemap（默认：false） */
@@ -252,6 +257,8 @@ export class BuilderBundle {
       target: options.target || "es2020",
       globalName: format === "iife" ? options.globalName : undefined,
       minify: options.minify || false,
+      legalComments: options.legalComments ??
+        (options.minify ? "none" : undefined),
       sourcemap: options.sourcemap ? "inline" : false,
       external: options.external,
       plugins: plugins.length > 0 ? plugins : undefined,
@@ -382,6 +389,14 @@ export class BuilderBundle {
       // 压缩选项
       if (options.minify) {
         args.push("--minify");
+      }
+
+      {
+        const legal = options.legalComments ??
+          (options.minify ? "none" : undefined);
+        if (legal) {
+          args.push(`--legal-comments=${legal}`);
+        }
       }
 
       // sourcemap 选项

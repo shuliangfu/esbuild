@@ -260,6 +260,8 @@ export class BuilderClient {
       platform: serverSideRouteBundle ? "node" : "browser",
       target: "es2020",
       minify: bundleOptions.minify,
+      legalComments: bundleOptions.legalComments ??
+        (mode === "prod" || bundleOptions.minify ? "none" : undefined),
       sourcemap: sourcemapOption,
       splitting: splittingEnabled, // write: false 时也支持代码分割，产出在 result.outputContents
       external: externalModules,
@@ -451,6 +453,8 @@ export class BuilderClient {
       platform: serverSideRouteBundleCtx ? "node" : "browser",
       target: "es2020",
       minify: bundleOptions.minify,
+      legalComments: bundleOptions.legalComments ??
+        (isProd || bundleOptions.minify ? "none" : undefined),
       sourcemap: bundleOptions.sourcemap,
       splitting: splittingEnabled,
       external: externalModules,
