@@ -10,6 +10,19 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-10
+
+### Fixed
+
+- **JSR subpath resolution uses the lock version**: when `deno.json` has
+  `jsr:@pkg@^1.2.8` but the lock / moduleCache has 1.2.9, `resolver-deno`
+  no longer strips the caret and looks up 1.2.8. Subpaths match any cached
+  version with the same path; loose fallbacks pick the shortest path inside
+  the package so `desktop/mod` is not bound to `desktop/basic/icons/mod.ts`.
+  Relative imports use the exact cached version in protocol paths. This
+  prevents production code-splitting from dropping real exports (`Link`,
+  `Stack`, ...) and causing `ReferenceError`.
+
 ## [1.5.0] - 2026-11-09
 
 ### Added

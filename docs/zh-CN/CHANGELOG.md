@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-10
+
+### 修复
+
+- **JSR 子路径按 lock 精确版本解析**：`deno.json` 写 `jsr:@pkg@^1.2.8`、
+  lock／moduleCache 已是 1.2.9 时，`resolver-deno` 不再剥掉 `^` 按 1.2.8
+  查找。子路径按「任意已缓存版本 + 相同路径」匹配；宽松回退有多处命中时
+  取包内路径最短者，避免 `desktop/mod` 落到 `desktop/basic/icons/mod.ts`。
+  相对导入的协议路径改用 cache 命中的精确版本。避免生产拆包压缩丢掉
+  `Link`、`Stack` 等导出并导致 `ReferenceError`。
+
 ## [1.5.0] - 2026-11-09
 
 ### 新增
