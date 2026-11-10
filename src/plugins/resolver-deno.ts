@@ -16,13 +16,13 @@ import {
   ensureDir,
   existsSync,
   getEnv,
-  statSync,
   join,
   readTextFile,
   readTextFileSync,
   relative,
   remove,
   resolve,
+  statSync,
   walk,
   writeTextFile,
 } from "@dreamer/runtime-adapter";
@@ -519,7 +519,6 @@ function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
   }
 }
 
-
 /** 剥除 Deno HTTP 缓存文件中的 `// denoCacheMetadata={...}`（否则 JSON loader 会报 comments）。
  * 常见为文件末尾行；偶发文件开头仅有该元数据行时，跳过首行保留正文，勿整文件清空。
  */
@@ -684,7 +683,11 @@ function readPackageExportTarget(
     const entry = pkg.exports?.[`./${subpath}`] ?? pkg.exports?.[subpath];
     if (typeof entry === "string") return entry;
     if (entry && typeof entry === "object") {
-      const obj = entry as { import?: unknown; default?: unknown; require?: unknown };
+      const obj = entry as {
+        import?: unknown;
+        default?: unknown;
+        require?: unknown;
+      };
       for (const key of ["import", "default", "require"] as const) {
         const v = obj[key];
         if (typeof v === "string") return v;
@@ -728,7 +731,9 @@ function resolveLocalImportMapSubpath(
   }
 
   const searchBases = [pkgRoot];
-  if (isExistingDir(absBase) && absBase !== pkgRoot) searchBases.unshift(absBase);
+  if (isExistingDir(absBase) && absBase !== pkgRoot) {
+    searchBases.unshift(absBase);
+  }
   if (isExistingFile(absBase)) {
     const parent = dirname(absBase);
     if (!searchBases.includes(parent)) searchBases.unshift(parent);
@@ -743,7 +748,6 @@ function resolveLocalImportMapSubpath(
   }
   return undefined;
 }
-
 
 function convertSpecifierToBrowserUrl(specifier: string): string | null {
   if (specifier.startsWith("npm:")) {
@@ -874,6 +878,24 @@ function cacheLookup(
     const slashIdx = versionAndPath.indexOf("/");
     const subpath = slashIdx === -1 ? "" : versionAndPath.slice(slashIdx + 1);
     const scopeEscaped = escapeRegex(scopeAndName);
+    // 版本范围（deno.json 的 ^1.2.8）被剥掉 ^ 后会变成 1.2.8，而 lock / moduleCache
+    // 可能已解析到 1.2.9。同版本精确+扩展名匹配会全部落空。先按「任意版本 +
+    // 相同子路径」匹配，避免宽松正则把 src/desktop/mod 误判为
+    // src/desktop/basic/icons/mod.ts（第一处命中），进而把 Link 等导出丢掉。
+    if (subpath !== "") {
+      const ext = /\.(tsx?|jsx?|mts|mjs)$/i.test(subpath)
+        ? ""
+        : "(\\.(tsx?|jsx?|mts|mjs))?";
+      const exactSubpathRe = new RegExp(
+        `^jsr:${scopeEscaped}@[^/]+/${escapeRegex(subpath)}${ext}$`,
+        "i",
+      );
+      for (const [key, localPath] of moduleCache) {
+        if (exactSubpathRe.test(key) && existsCheck(localPath)) {
+          return { path: localPath, key };
+        }
+      }
+    }
     const segments = subpath
       ? subpath.split("/").map((s) => escapeRegex(s))
       : ["mod"];
@@ -891,12 +913,21 @@ function cacheLookup(
       `^jsr:${scopeEscaped}@[^/]+/${pathPart}(\\.(tsx?|jsx?|mts|mjs))?$`,
       "i",
     );
+    // 宽松回退若有多个命中，取包内路径最短者，避免 desktop/mod 落到 desktop/**/mod.ts
+    let best: CacheLookupResult | undefined;
+    let bestSegments = Infinity;
     for (const [key, localPath] of moduleCache) {
       if (!key.startsWith("jsr:")) continue;
       if (pattern.test(key) && existsCheck(localPath)) {
-        return { path: localPath, key };
+        const segs = pathWithinPackageFromKey(key).split("/").filter(Boolean)
+          .length;
+        if (segs < bestSegments) {
+          bestSegments = segs;
+          best = { path: localPath, key };
+        }
       }
     }
+    if (best) return best;
   }
 
   // npm 子路径通用回退：用 baseSpec 或包名匹配 cache 中的主包，再拼接子路径（不写死包名、不起子进程）
@@ -991,7 +1022,14 @@ function resolveRelative(
   const pathForProtocol = /\.(tsx?|jsx?|mts|mjs)$/i.test(resolvedWithin)
     ? resolvedWithin.replace(/\.(tsx?|jsx?|mts|mjs)$/i, "")
     : resolvedWithin;
-  const baseForProtocol = parsed.packageBase.replace(/@([\^~])([^/]+)/, "@$2");
+  // 协议路径必须用 cache 命中的精确版本（1.2.9），不能把 ^1.2.8 只剥掉 ^ 变成 1.2.8。
+  const resolvedBase = importerResolvedKey
+    ? parseProtocolPackageBaseAndPath(importerResolvedKey)?.packageBase
+    : undefined;
+  const baseForProtocol = (resolvedBase ?? parsed.packageBase).replace(
+    /@([\^~])([^/]+)/,
+    "@$2",
+  );
   const targetSpecifier = pathForProtocol
     ? `${baseForProtocol}/${pathForProtocol}`
     : baseForProtocol;
@@ -1285,7 +1323,9 @@ export function denoResolverPlugin(
                 const base = args.path.slice(0, i);
                 const sub = args.path.slice(i + 1);
                 const baseVal = config.imports[base];
-                if (typeof baseVal === "string" && isLocalImportMapTarget(baseVal)) {
+                if (
+                  typeof baseVal === "string" && isLocalImportMapTarget(baseVal)
+                ) {
                   localHit = resolveLocalImportMapSubpath(
                     denoJsonDir,
                     baseVal,
@@ -1296,7 +1336,9 @@ export function denoResolverPlugin(
               }
               if (!localHit) {
                 const exact = config.imports[args.path];
-                if (typeof exact === "string" && isLocalImportMapTarget(exact)) {
+                if (
+                  typeof exact === "string" && isLocalImportMapTarget(exact)
+                ) {
                   localHit = resolveLocalImportMapSubpath(
                     denoJsonDir,
                     exact,
@@ -1576,7 +1618,9 @@ export function denoResolverPlugin(
           const result = cacheLookup(protocolPath, moduleCache, existsSync);
           if (!result) return undefined;
           const { path: localPath, key } = result;
-          const contents = stripDenoCacheMetadata(await readTextFile(localPath));
+          const contents = stripDenoCacheMetadata(
+            await readTextFile(localPath),
+          );
           const loader = /\.(tsx?|jsx?|mts|mjs|json)$/i.test(key)
             ? getLoaderFromPath(key)
             : getLoaderFromPath(localPath);

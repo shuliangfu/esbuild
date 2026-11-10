@@ -27,4 +27,39 @@ describe("JSR 子路径 cacheLookup 精确匹配", () => {
     expect(hit!.key).toBe(routerKey);
     expect(hit!.path).toBe(routerPath);
   });
+  it("版本范围剥 ^ 后不得把 desktop/mod 误判为 icons/mod（lock 已升到更高补丁版本）", () => {
+    const desktopKey = "jsr:@dreamer/ui-view@1.2.9/src/desktop/mod.ts";
+    const iconsKey =
+      "jsr:@dreamer/ui-view@1.2.9/src/desktop/basic/icons/mod.ts";
+    const rootKey = "jsr:@dreamer/ui-view@1.2.9/src/mod.ts";
+    const desktopPath = "/fake/desktop-mod.ts";
+    const iconsPath = "/fake/icons-mod.ts";
+    const rootPath = "/fake/root-mod.ts";
+    // icons 故意放在 Map 前面，复现「第一处宽松命中」的旧行为
+    const cache: ModuleCache = new Map([
+      [iconsKey, iconsPath],
+      [desktopKey, desktopPath],
+      [rootKey, rootPath],
+    ]);
+    const exists = (p: string) =>
+      p === desktopPath || p === iconsPath || p === rootPath || existsSync(p);
+
+    const desktopHit = cacheLookupForTests(
+      "jsr:@dreamer/ui-view@1.2.8/src/desktop/mod",
+      cache,
+      exists,
+    );
+    expect(desktopHit).toBeDefined();
+    expect(desktopHit!.key).toBe(desktopKey);
+    expect(desktopHit!.path).toBe(desktopPath);
+
+    const rootHit = cacheLookupForTests(
+      "jsr:@dreamer/ui-view@^1.2.8",
+      cache,
+      exists,
+    );
+    expect(rootHit).toBeDefined();
+    expect(rootHit!.key).toBe(rootKey);
+    expect(rootHit!.path).toBe(rootPath);
+  });
 });
