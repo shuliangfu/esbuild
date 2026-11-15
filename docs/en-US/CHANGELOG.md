@@ -10,6 +10,23 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-15
+
+### Performance
+
+- **Faster official builds**: source scans follow the current entry's end
+  (backend does not pull in sibling `api` / `frontend` / `mobile`); a warm
+  on-disk module map skips `deno info`; `moduleCache` lookups are O(1); already
+  synchronous plugin hooks stay synchronous. The timing report splits resolve,
+  client bundle, and server build.
+
+### Fixed
+
+- **Extensionless Deno remote-cache files**: on cache miss, hashed files are
+  loaded through `deno-protocol` as TypeScript or TSX (from content), so
+  `import type` and JSX in modules such as `@dreamer/view/devtools/overlay`
+  no longer fail as JavaScript.
+
 ## [1.5.1] - 2026-11-10
 
 ### Fixed

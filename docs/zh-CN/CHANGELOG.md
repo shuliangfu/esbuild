@@ -9,6 +9,21 @@
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-15
+
+### 优化
+
+- **官方构建加速**：源文件扫描跟随本次入口所在端（后台不会把同仓
+  `api`／`frontend`／`mobile` 一并纳入）；磁盘模块缓存命中时跳过 `deno info`；
+  `moduleCache` 查找改为 O(1)；已经是同步的插件钩子不再包成 Promise。耗时报告
+  拆成依赖解析、客户端打包、服务端构建。
+
+### 修复
+
+- **无扩展名的 Deno 远程缓存**：cache miss 后哈希文件改走 `deno-protocol`，按内容
+  用 TypeScript 或 TSX 加载，避免把 `import type` 和 JSX（如
+  `@dreamer/view/devtools/overlay`）当成 JavaScript 解析失败。
+
 ## [1.5.1] - 2026-11-10
 
 ### 修复
