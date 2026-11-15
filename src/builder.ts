@@ -346,7 +346,20 @@ export class Builder implements IBuilder {
     );
     const buildStart = Date.now();
     const result = await this.clientBuilder.build(mode);
-    performance.stages.build = Date.now() - buildStart;
+    const clientStages = result.performance?.stages;
+    if (
+      clientStages &&
+      (clientStages.moduleCache != null || clientStages.bundle != null)
+    ) {
+      if (clientStages.moduleCache != null) {
+        performance.stages.moduleCache = clientStages.moduleCache;
+      }
+      if (clientStages.bundle != null) {
+        performance.stages.bundle = clientStages.bundle;
+      }
+    } else {
+      performance.stages.build = Date.now() - buildStart;
+    }
 
     // 保存缓存（如果启用了缓存）
     // 优化：使用 metafile 生成包含依赖文件的缓存键
@@ -705,6 +718,8 @@ export class Builder implements IBuilder {
       clean: $tr("log.esbuild.builder.stageNameClean"),
       cacheCheck: $tr("log.esbuild.builder.stageNameCacheCheck"),
       build: $tr("log.esbuild.builder.stageNameBuild"),
+      moduleCache: $tr("log.esbuild.builder.stageNameModuleCache"),
+      bundle: $tr("log.esbuild.builder.stageNameBundle"),
       assets: $tr("log.esbuild.builder.stageNameAssets"),
       html: $tr("log.esbuild.builder.stageNameHtml"),
       css: $tr("log.esbuild.builder.stageNameCss"),

@@ -11,7 +11,7 @@
  * 3. 服务端模块会被 server-module-detector 插件自动标记为 external
  */
 
-import { readTextFile } from "@dreamer/runtime-adapter";
+import { readTextFileSync } from "@dreamer/runtime-adapter";
 import type { BuildPlugin, OnLoadArgs, OnLoadResult } from "../plugin.ts";
 import { logger } from "../utils/logger.ts";
 import { $tr } from "../i18n.ts";
@@ -76,17 +76,19 @@ export function createConditionalCompilePlugin(
         {
           filter: /\.(ts|tsx|js|jsx|mjs|cjs)$/,
         },
-        async (args: OnLoadArgs): Promise<OnLoadResult | null | undefined> => {
-          // 读取文件内容
+        (args: OnLoadArgs): OnLoadResult | null | undefined => {
+          // 依赖包不会写本仓库的 #ifdef CLIENT/SERVER，交给 esbuild 原生加载。
+          if (shouldSkipConditionalCompilePath(args.path)) {
+            return undefined;
+          }
           let contents: string;
           try {
-            contents = await readTextFile(args.path);
+            contents = readTextFileSync(args.path);
           } catch {
             // 如果读取失败，返回 undefined 让其他插件处理
             return undefined;
           }
 
-          // 处理条件编译指令
           const processedContents = processConditionalCompile(
             contents,
             target,
@@ -97,7 +99,6 @@ export function createConditionalCompilePlugin(
             return undefined;
           }
 
-          // 返回处理后的内容
           return {
             contents: processedContents,
             loader: args.path.endsWith(".tsx") || args.path.endsWith(".jsx")
@@ -127,10 +128,21 @@ export function createConditionalCompilePlugin(
  * @param target 目标平台
  * @returns 处理后的文件内容
  */
+function shouldSkipConditionalCompilePath(path: string): boolean {
+  return path.includes("node_modules") ||
+    path.includes("/.deno/") ||
+    path.includes("\\.deno\\") ||
+    path.includes("/Caches/deno/") ||
+    path.includes("/deno/npm/") ||
+    path.includes("/deno/remote/");
+}
+
 function processConditionalCompile(
   content: string,
   target: "CLIENT" | "SERVER",
 ): string {
+  // 绝大多数文件没有条件编译指令，避免按行拆分。
+  if (!content.includes("#ifdef")) return content;
   const lines = content.split("\n");
   const result: string[] = [];
   let inConditionalBlock = false;
@@ -246,4 +258,19 @@ function processConditionalCompile(
   }
 
   return result.join("\n");
+}
+
+/** @internal */
+export function processConditionalCompileForTests(
+  content: string,
+  target: "CLIENT" | "SERVER" = "CLIENT",
+): string {
+  return processConditionalCompile(content, target);
+}
+
+/** @internal */
+export function shouldSkipConditionalCompilePathForTests(
+  path: string,
+): boolean {
+  return shouldSkipConditionalCompilePath(path);
 }

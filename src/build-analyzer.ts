@@ -838,6 +838,8 @@ export class BuildAnalyzer {
       clean: $tr("log.esbuild.builder.stageNameClean"),
       cacheCheck: $tr("log.esbuild.builder.stageNameCacheCheck"),
       build: $tr("log.esbuild.builder.stageNameBuild"),
+      moduleCache: $tr("log.esbuild.builder.stageNameModuleCache"),
+      bundle: $tr("log.esbuild.builder.stageNameBundle"),
       assets: $tr("log.esbuild.builder.stageNameAssets"),
       html: $tr("log.esbuild.builder.stageNameHtml"),
       css: $tr("log.esbuild.builder.stageNameCss"),

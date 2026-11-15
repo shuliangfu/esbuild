@@ -31,6 +31,8 @@
         "stageNameAssets": "Assets",
         "stageNameHtml": "HTML generation",
         "stageNameCss": "CSS optimization",
+        "stageNameModuleCache": "Dependency resolve",
+        "stageNameBundle": "Client bundle",
         "validateServerMissingEntry": "Server config missing entry file (entry)",
         "validateServerEntryNotExists": "Server entry file does not exist",
         "validateServerEntryNotFile": "Server entry path is not a file",

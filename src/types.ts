@@ -505,8 +505,12 @@ export interface BuildPerformance {
     clean?: number;
     /** 缓存检查耗时 */
     cacheCheck?: number;
-    /** 构建阶段耗时 */
+    /** 构建阶段耗时（服务端打包，或未拆分时的笼统构建） */
     build?: number;
+    /** 客户端依赖解析（deno 模块缓存 / deno info） */
+    moduleCache?: number;
+    /** 客户端 esbuild 打包 */
+    bundle?: number;
     /** 资源处理耗时 */
     assets?: number;
     /** HTML 生成耗时 */

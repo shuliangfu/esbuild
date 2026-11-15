@@ -31,6 +31,8 @@
         "stageNameAssets": "资源处理",
         "stageNameHtml": "HTML 生成",
         "stageNameCss": "CSS 优化",
+        "stageNameModuleCache": "依赖解析",
+        "stageNameBundle": "客户端打包",
         "validateServerMissingEntry": "服务端配置缺少入口文件 (entry)",
         "validateServerEntryNotExists": "服务端入口文件不存在",
         "validateServerEntryNotFile": "服务端入口路径不是文件",

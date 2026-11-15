@@ -157,6 +157,20 @@ export interface BuildPlugin {
 /**
  * 插件管理器
  */
+
+function isPromise<T>(value: unknown): value is Promise<T> {
+  return value instanceof Promise;
+}
+
+/** 回调若是同步的，就把同步结果直接回给 esbuild，避免一律 async 造成的微任务开销。 */
+function settlePluginResult<T, R>(
+  value: T | Promise<T>,
+  map: (value: T) => R,
+): R | Promise<R> {
+  if (isPromise<T>(value)) return value.then(map);
+  return map(value);
+}
+
 export class PluginManager {
   private plugins: BuildPlugin[] = [];
   private nativePlugins: esbuild.Plugin[] = [];
@@ -229,30 +243,31 @@ export class PluginManager {
                   filter,
                   namespace: options.namespace,
                 },
-                async (args) => {
-                  const result = await callback({
-                    path: args.path,
-                    importer: args.importer,
-                    namespace: args.namespace,
-                    resolveDir: args.resolveDir,
-                    kind: args.kind,
-                    pluginData: args.pluginData,
-                  });
-                  if (!result) {
-                    return undefined;
-                  }
-                  return {
-                    path: result.path,
-                    namespace: result.namespace,
-                    external: result.external,
-                    sideEffects: result.sideEffects,
-                    pluginData: result.pluginData,
-                    warnings: result.warnings,
-                    errors: result.errors,
-                    watchFiles: result.watchFiles,
-                    watchDirs: result.watchDirs,
-                  };
-                },
+                (args) =>
+                  settlePluginResult(
+                    callback({
+                      path: args.path,
+                      importer: args.importer,
+                      namespace: args.namespace,
+                      resolveDir: args.resolveDir,
+                      kind: args.kind,
+                      pluginData: args.pluginData,
+                    }),
+                    (result) => {
+                      if (!result) return undefined;
+                      return {
+                        path: result.path,
+                        namespace: result.namespace,
+                        external: result.external,
+                        sideEffects: result.sideEffects,
+                        pluginData: result.pluginData,
+                        warnings: result.warnings,
+                        errors: result.errors,
+                        watchFiles: result.watchFiles,
+                        watchDirs: result.watchDirs,
+                      };
+                    },
+                  ),
               );
             },
             onLoad(options, callback) {
@@ -266,7 +281,7 @@ export class PluginManager {
                   filter,
                   namespace: options.namespace,
                 },
-                async (args) => {
+                (args) => {
                   // 如果 filter 是函数，在这里进行额外过滤
                   if (
                     typeof options.filter === "function" &&
@@ -274,25 +289,27 @@ export class PluginManager {
                   ) {
                     return undefined;
                   }
-                  const result = await callback({
-                    path: args.path,
-                    namespace: args.namespace,
-                    suffix: args.suffix,
-                    pluginData: args.pluginData,
-                  });
-                  if (!result) {
-                    return undefined;
-                  }
-                  return {
-                    contents: result.contents,
-                    loader: result.loader,
-                    resolveDir: result.resolveDir,
-                    pluginData: result.pluginData,
-                    warnings: result.warnings,
-                    errors: result.errors,
-                    watchFiles: result.watchFiles,
-                    watchDirs: result.watchDirs,
-                  };
+                  return settlePluginResult(
+                    callback({
+                      path: args.path,
+                      namespace: args.namespace,
+                      suffix: args.suffix,
+                      pluginData: args.pluginData,
+                    }),
+                    (result) => {
+                      if (!result) return undefined;
+                      return {
+                        contents: result.contents,
+                        loader: result.loader,
+                        resolveDir: result.resolveDir,
+                        pluginData: result.pluginData,
+                        warnings: result.warnings,
+                        errors: result.errors,
+                        watchFiles: result.watchFiles,
+                        watchDirs: result.watchDirs,
+                      };
+                    },
+                  );
                 },
               );
             },

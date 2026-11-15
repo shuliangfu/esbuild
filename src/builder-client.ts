@@ -23,6 +23,7 @@ import { bunResolverPlugin } from "./plugins/resolver-bun.ts";
 import {
   buildModuleCache,
   denoResolverPlugin,
+  flushModuleCacheToDisk,
 } from "./plugins/resolver-deno.ts";
 import { createServerModuleDetectorPlugin } from "./plugins/server-module-detector.ts";
 import type {
@@ -35,6 +36,10 @@ import type {
 } from "./types.ts";
 import { $tr, setEsbuildLocale } from "./i18n.ts";
 import { resolveClientEntryPoints } from "./splitting-strategy.ts";
+import {
+  isEsbuildProfileEnabled,
+  wrapPluginsForProfile,
+} from "./utils/plugin-profiler.ts";
 import { logger } from "./utils/logger.ts";
 
 /**
@@ -83,6 +88,7 @@ export class BuilderClient {
   private buildContext?: esbuild.BuildContext;
   /** 创建 context 时传入的 write 选项，rebuild 时用于判断是否返回 outputContents */
   private contextWrite?: boolean;
+  private moduleCache?: import("./plugins/resolver-deno.ts").ModuleCache;
   private pluginManager: PluginManager;
 
   constructor(config: ClientConfig) {
@@ -308,6 +314,7 @@ export class BuilderClient {
         this.config.debug,
         log,
       );
+      this.moduleCache = moduleCache;
       plugins.unshift(denoResolverPlugin({
         isServerBuild: serverSideRouteBundle,
         moduleCache,
@@ -318,10 +325,15 @@ export class BuilderClient {
         resolveOverrides: bundleOptions.alias,
       }));
     }
-    buildOptions.plugins = plugins;
+    buildOptions.plugins = isEsbuildProfileEnabled()
+      ? wrapPluginsForProfile(plugins, (message) => log.info(message))
+      : plugins;
 
     // 执行构建
+    const bundleStart = Date.now();
     const result = await esbuild.build(buildOptions);
+    const bundleMs = Date.now() - bundleStart;
+    if (this.moduleCache) await flushModuleCacheToDisk(this.moduleCache);
 
     // 获取输出文件列表
     const outputFiles: string[] = [];
@@ -332,6 +344,11 @@ export class BuilderClient {
     }
 
     const duration = Date.now() - startTime;
+    const moduleCacheMs = Math.max(0, duration - bundleMs);
+    const performance = {
+      stages: { moduleCache: moduleCacheMs, bundle: bundleMs },
+      total: duration,
+    };
 
     // 如果不写入文件，返回编译后的代码内容
     if (!write && result.outputFiles) {
@@ -348,6 +365,7 @@ export class BuilderClient {
         outputContents,
         metafile: result.metafile,
         duration,
+        performance,
       };
     }
 
@@ -355,6 +373,7 @@ export class BuilderClient {
       outputFiles,
       metafile: result.metafile,
       duration,
+      performance,
     };
   }
 
@@ -494,6 +513,7 @@ export class BuilderClient {
         this.config.debug,
         log,
       );
+      this.moduleCache = moduleCache;
       plugins.unshift(denoResolverPlugin({
         isServerBuild: serverSideRouteBundleCtx,
         moduleCache,
@@ -504,7 +524,9 @@ export class BuilderClient {
         resolveOverrides: bundleOptions.alias,
       }));
     }
-    buildOptions.plugins = plugins;
+    buildOptions.plugins = isEsbuildProfileEnabled()
+      ? wrapPluginsForProfile(plugins, (message) => log.info(message))
+      : plugins;
 
     // 创建构建上下文
     this.contextWrite = writeToDisk;
@@ -527,6 +549,7 @@ export class BuilderClient {
 
     // 增量重新构建
     const result = await this.buildContext.rebuild();
+    if (this.moduleCache) await flushModuleCacheToDisk(this.moduleCache);
 
     // 获取输出文件列表
     const outputFiles: string[] = [];
@@ -573,6 +596,7 @@ export class BuilderClient {
       await this.buildContext.dispose();
       this.buildContext = undefined;
       this.contextWrite = undefined;
+      this.moduleCache = undefined;
     }
   }
 
