@@ -202,6 +202,7 @@ interface PackageJsonConfig {
   imports?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  exports?: Record<string, unknown>;
 }
 
 /**
@@ -214,6 +215,110 @@ interface TsconfigConfig {
   };
 }
 
+const packageJsonCache = new Map<string, PackageJsonConfig | undefined>();
+const tsconfigCache = new Map<string, TsconfigConfig | undefined>();
+const projectPackageJsonByDir = new Map<string, string | undefined>();
+const projectTsconfigByDir = new Map<string, string | undefined>();
+const localPackageRootCache = new Map<string, string>();
+const dirEntriesCache = new Map<string, Array<{ isFile: boolean; name: string }>>();
+const npmIdentityKeyIndex = new WeakMap<PackageJsonConfig, Map<string, string>>();
+
+/**
+ * 按路径段向上查 imports 最长前缀（含 `foo/` 前缀键），O(段数) 次对象键访问。
+ */
+function matchImportMapEntry(
+  imports: Record<string, string>,
+  specifier: string,
+): { key: string; value: string } | undefined {
+  let cur = specifier;
+  while (cur) {
+    const exact = imports[cur];
+    if (typeof exact === "string") return { key: cur, value: exact };
+    const slashKey = `${cur}/`;
+    if (slashKey !== cur) {
+      const prefix = imports[slashKey];
+      if (typeof prefix === "string") return { key: slashKey, value: prefix };
+    }
+    const i = cur.lastIndexOf("/");
+    if (i <= 0) return undefined;
+    cur = cur.slice(0, i);
+  }
+  return undefined;
+}
+
+function findUpFile(
+  cache: Map<string, string | undefined>,
+  startDir: string,
+  fileName: string,
+  maxDepth = 10,
+): string | undefined {
+  const start = resolve(startDir);
+  if (cache.has(start)) return cache.get(start);
+  const trail: string[] = [];
+  let currentDir = start;
+  let found: string | undefined;
+  for (let i = 0; i < maxDepth; i++) {
+    if (cache.has(currentDir)) {
+      found = cache.get(currentDir);
+      break;
+    }
+    trail.push(currentDir);
+    const candidate = join(currentDir, fileName);
+    if (existsSync(candidate)) {
+      found = candidate;
+      break;
+    }
+    const parent = dirname(currentDir);
+    if (parent === currentDir) break;
+    currentDir = parent;
+  }
+  for (const d of trail) cache.set(d, found);
+  if (!cache.has(start)) cache.set(start, found);
+  return found;
+}
+
+function getPackageJsonConfig(
+  packageJsonPath: string,
+): PackageJsonConfig | undefined {
+  if (packageJsonCache.has(packageJsonPath)) {
+    return packageJsonCache.get(packageJsonPath);
+  }
+  let cfg: PackageJsonConfig | undefined;
+  try {
+    if (existsSync(packageJsonPath)) {
+      cfg = JSON.parse(readTextFileSync(packageJsonPath)) as PackageJsonConfig;
+    }
+  } catch {
+    cfg = undefined;
+  }
+  packageJsonCache.set(packageJsonPath, cfg);
+  return cfg;
+}
+
+function getTsconfigConfig(tsconfigPath: string): TsconfigConfig | undefined {
+  if (tsconfigCache.has(tsconfigPath)) return tsconfigCache.get(tsconfigPath);
+  let cfg: TsconfigConfig | undefined;
+  try {
+    if (existsSync(tsconfigPath)) {
+      cfg = JSON.parse(readTextFileSync(tsconfigPath)) as TsconfigConfig;
+    }
+  } catch {
+    cfg = undefined;
+  }
+  tsconfigCache.set(tsconfigPath, cfg);
+  return cfg;
+}
+
+function readDirCached(
+  dir: string,
+): Array<{ isFile: boolean; name: string }> {
+  const hit = dirEntriesCache.get(dir);
+  if (hit) return hit;
+  const entries = readdirSync(dir) as Array<{ isFile: boolean; name: string }>;
+  dirEntriesCache.set(dir, entries);
+  return entries;
+}
+
 /**
  * 查找项目的 package.json 文件
  *
@@ -221,25 +326,7 @@ interface TsconfigConfig {
  * @returns package.json 文件路径，如果未找到返回 undefined
  */
 function findProjectPackageJson(startDir: string): string | undefined {
-  let currentDir = startDir;
-  const maxDepth = 10;
-  let depth = 0;
-
-  while (depth < maxDepth) {
-    const packageJsonPath = join(currentDir, "package.json");
-    if (existsSync(packageJsonPath)) {
-      return packageJsonPath;
-    }
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-    depth++;
-  }
-
-  return undefined;
+  return findUpFile(projectPackageJsonByDir, startDir, "package.json");
 }
 
 /**
@@ -285,25 +372,7 @@ function findPackageJsonWithPackage(
  * @returns tsconfig.json 文件路径，如果未找到返回 undefined
  */
 function findProjectTsconfig(startDir: string): string | undefined {
-  let currentDir = startDir;
-  const maxDepth = 10;
-  let depth = 0;
-
-  while (depth < maxDepth) {
-    const tsconfigPath = join(currentDir, "tsconfig.json");
-    if (existsSync(tsconfigPath)) {
-      return tsconfigPath;
-    }
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-    depth++;
-  }
-
-  return undefined;
+  return findUpFile(projectTsconfigByDir, startDir, "tsconfig.json");
 }
 
 /**
@@ -318,23 +387,11 @@ function getPackageImport(
   projectPackageJsonPath: string,
   packageName: string,
 ): string | undefined {
-  try {
-    const content = readTextFileSync(projectPackageJsonPath);
-    const config: PackageJsonConfig = JSON.parse(content);
-
-    if (config.imports && config.imports[packageName]) {
-      return config.imports[packageName];
-    }
-    if (config.dependencies && config.dependencies[packageName]) {
-      return config.dependencies[packageName];
-    }
-    if (config.devDependencies && config.devDependencies[packageName]) {
-      return config.devDependencies[packageName];
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
+  const config = getPackageJsonConfig(projectPackageJsonPath);
+  if (!config) return undefined;
+  return config.imports?.[packageName] ??
+    config.dependencies?.[packageName] ??
+    config.devDependencies?.[packageName];
 }
 
 
@@ -379,35 +436,36 @@ function resolveLocalFileDepSubpath(
       pkgRoot = dirname(absBase);
     }
   } catch { /* keep */ }
-  // walk up for package.json
-  let dir = pkgRoot;
-  for (let i = 0; i < 8; i++) {
-    if (existsSync(join(dir, "package.json"))) {
-      pkgRoot = dir;
-      break;
+  const rootKey = resolve(pkgRoot);
+  const cachedRoot = localPackageRootCache.get(rootKey);
+  if (cachedRoot) {
+    pkgRoot = cachedRoot;
+  } else {
+    let dir = pkgRoot;
+    for (let i = 0; i < 8; i++) {
+      if (existsSync(join(dir, "package.json"))) {
+        pkgRoot = dir;
+        break;
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
     }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+    localPackageRootCache.set(rootKey, pkgRoot);
   }
   const cleanSub = subpath.replace(/^\/+/, "");
   const candidates: string[] = [];
-  const pkgJsonPath = join(pkgRoot, "package.json");
-  if (existsSync(pkgJsonPath) && cleanSub) {
-    try {
-      const pkg = JSON.parse(readTextFileSync(pkgJsonPath)) as {
-        exports?: Record<string, unknown>;
-      };
-      const entry = pkg.exports?.[`./${cleanSub}`] ?? pkg.exports?.[cleanSub];
-      let target: string | undefined;
-      if (typeof entry === "string") target = entry;
-      else if (entry && typeof entry === "object") {
-        const obj = entry as { import?: unknown; default?: unknown };
-        if (typeof obj.import === "string") target = obj.import;
-        else if (typeof obj.default === "string") target = obj.default;
-      }
-      if (target) candidates.push(resolve(pkgRoot, target));
-    } catch { /* ignore */ }
+  if (cleanSub) {
+    const pkg = getPackageJsonConfig(join(pkgRoot, "package.json"));
+    const entry = pkg?.exports?.[`./${cleanSub}`] ?? pkg?.exports?.[cleanSub];
+    let target: string | undefined;
+    if (typeof entry === "string") target = entry;
+    else if (entry && typeof entry === "object") {
+      const obj = entry as { import?: unknown; default?: unknown };
+      if (typeof obj.import === "string") target = obj.import;
+      else if (typeof obj.default === "string") target = obj.default;
+    }
+    if (target) candidates.push(resolve(pkgRoot, target));
   }
   if (cleanSub) {
     for (const mid of ["", "src", "lib", "dist"]) {
@@ -455,45 +513,21 @@ function resolvePathAlias(
   const packageJsonPath = findProjectPackageJson(startDir);
   if (packageJsonPath) {
     try {
-      const content = readTextFileSync(packageJsonPath);
-      const config: PackageJsonConfig = JSON.parse(content);
+      const config = getPackageJsonConfig(packageJsonPath);
 
-      if (config.imports) {
-        // 查找匹配的别名，优先匹配最长的前缀
-        const sortedKeys = Object.keys(config.imports).sort((a, b) =>
-          b.length - a.length
-        );
-
-        for (const alias of sortedKeys) {
-          if (path.startsWith(alias)) {
-            const aliasValue = config.imports[alias];
-            if (aliasValue) {
-              const remainingPath = path.slice(alias.length);
-              let resolvedPath: string;
-
-              // 如果别名值以 ./ 或 ../ 开头，是相对路径
-              if (
-                aliasValue.startsWith("./") || aliasValue.startsWith("../")
-              ) {
-                const packageJsonDir = dirname(packageJsonPath);
-                resolvedPath = join(packageJsonDir, aliasValue, remainingPath);
-              } else {
-                // 如果别名值是绝对路径或其他格式
-                resolvedPath = aliasValue + remainingPath;
-              }
-
-              // 检查文件是否存在
-              if (existsSync(resolvedPath)) {
-                return resolvedPath;
-              } else {
-                // 尝试添加 .ts 扩展名
-                const withExt = resolvedPath + ".ts";
-                if (existsSync(withExt)) {
-                  return withExt;
-                }
-              }
-            }
+      if (config?.imports) {
+        const hit = matchImportMapEntry(config.imports, path);
+        if (hit) {
+          const remainingPath = path.slice(hit.key.length);
+          let resolvedPath: string;
+          if (hit.value.startsWith("./") || hit.value.startsWith("../")) {
+            resolvedPath = join(dirname(packageJsonPath), hit.value, remainingPath);
+          } else {
+            resolvedPath = hit.value + remainingPath;
           }
+          if (existsSync(resolvedPath)) return resolvedPath;
+          const withExt = resolvedPath + ".ts";
+          if (existsSync(withExt)) return withExt;
         }
       }
     } catch {
@@ -505,10 +539,9 @@ function resolvePathAlias(
   const tsconfigPath = findProjectTsconfig(startDir);
   if (tsconfigPath) {
     try {
-      const content = readTextFileSync(tsconfigPath);
-      const config: TsconfigConfig = JSON.parse(content);
+      const config = getTsconfigConfig(tsconfigPath);
 
-      if (config.compilerOptions?.paths) {
+      if (config?.compilerOptions?.paths) {
         const baseUrl = config.compilerOptions.baseUrl
           ? join(dirname(tsconfigPath), config.compilerOptions.baseUrl)
           : dirname(tsconfigPath);
@@ -597,39 +630,31 @@ function npmBaseToPackageIdentity(base: string): string {
  * @param npmBase - 协议 base，如 npm:@jsr/dreamer__plugins@^1.0.6
  * @returns 映射到该包的 import 键（如 @dreamer/plugins），未找到返回 undefined
  */
+function npmIdentityKeyMap(config: PackageJsonConfig): Map<string, string> {
+  let idx = npmIdentityKeyIndex.get(config);
+  if (idx) return idx;
+  idx = new Map();
+  for (const map of [config.imports, config.dependencies, config.devDependencies]) {
+    if (!map) continue;
+    for (const [key, value] of Object.entries(map)) {
+      if (!value || typeof value !== "string") continue;
+      const val = value.trim().replace(/^npm:\/+/, "npm:");
+      if (!val.startsWith("npm:")) continue;
+      const id = npmBaseToPackageIdentity(val);
+      if (!idx.has(id)) idx.set(id, key);
+    }
+  }
+  npmIdentityKeyIndex.set(config, idx);
+  return idx;
+}
+
 function findImportKeyForNpmBase(
   projectDir: string,
   npmBase: string,
 ): string | undefined {
-  const pkgPath = join(projectDir, "package.json");
-  if (!existsSync(pkgPath)) return undefined;
-  try {
-    const raw = readTextFileSync(pkgPath);
-    const config = JSON.parse(raw) as {
-      imports?: Record<string, string>;
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const targetId = npmBaseToPackageIdentity(npmBase);
-    const sources = [
-      config.imports as Record<string, string> | undefined,
-      config.dependencies as Record<string, string> | undefined,
-      config.devDependencies as Record<string, string> | undefined,
-    ].filter(Boolean) as Record<string, string>[];
-    for (const map of sources) {
-      for (const [key, value] of Object.entries(map)) {
-        if (!value || typeof value !== "string") continue;
-        const val = value.trim().replace(/^npm:\/+/, "npm:");
-        if (!val.startsWith("npm:")) continue;
-        if (npmBaseToPackageIdentity(val) === targetId) {
-          return key;
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return undefined;
+  const config = getPackageJsonConfig(join(projectDir, "package.json"));
+  if (!config) return undefined;
+  return npmIdentityKeyMap(config).get(npmBaseToPackageIdentity(npmBase));
 }
 
 /**
@@ -742,7 +767,7 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
     const scopeDir = join(dir, "node_modules", scope);
     if (existsSync(scopeDir)) {
       try {
-        const entries = readdirSync(scopeDir);
+        const entries = readDirCached(scopeDir);
         const pkgDir = entries.find(
           (e: { isFile: boolean; name: string }) =>
             !e.isFile && e.name.startsWith(namePrefix),
@@ -750,15 +775,9 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
         if (pkgDir) {
           const pkgRoot = join(scopeDir, pkgDir.name);
           const pkgJsonPath = join(pkgRoot, "package.json");
-          if (existsSync(pkgJsonPath)) {
-            const raw = readTextFileSync(pkgJsonPath);
-            const pkg = JSON.parse(raw) as {
-              exports?: Record<
-                string,
-                string | { import?: string; default?: string }
-              >;
-            };
-            const exportEntry = pkg.exports?.["./" + subpath];
+          {
+            const pkg = getPackageJsonConfig(pkgJsonPath);
+            const exportEntry = pkg?.exports?.["./" + subpath];
             let target: string | undefined;
             if (typeof exportEntry === "string") {
               target = exportEntry;
@@ -794,7 +813,7 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
         const keyScopeDir = join(dir, "node_modules", keyScope);
         if (existsSync(keyScopeDir)) {
           try {
-            const keyEntries = readdirSync(keyScopeDir);
+            const keyEntries = readDirCached(keyScopeDir);
             const keyPkgDir = keyEntries.find(
               (e: { isFile: boolean; name: string }) =>
                 !e.isFile && e.name.startsWith(keyName),
@@ -802,15 +821,9 @@ function getProtocolPathResolveDir(protocolPath: string): string | null {
             if (keyPkgDir) {
               const keyPkgRoot = join(keyScopeDir, keyPkgDir.name);
               const keyPkgJsonPath = join(keyPkgRoot, "package.json");
-              if (existsSync(keyPkgJsonPath)) {
-                const keyRaw = readTextFileSync(keyPkgJsonPath);
-                const keyPkg = JSON.parse(keyRaw) as {
-                  exports?: Record<
-                    string,
-                    string | { import?: string; default?: string }
-                  >;
-                };
-                const keyExportEntry = keyPkg.exports?.["./" + subpath];
+              {
+                const keyPkg = getPackageJsonConfig(keyPkgJsonPath);
+                const keyExportEntry = keyPkg?.exports?.["./" + subpath];
                 let keyTarget: string | undefined;
                 if (typeof keyExportEntry === "string") {
                   keyTarget = keyExportEntry;
@@ -1630,7 +1643,7 @@ export function bunResolverPlugin(
                         const scopeDir = join(dir, "node_modules", scope);
                         if (existsSync(scopeDir)) {
                           try {
-                            const entries = readdirSync(scopeDir);
+                            const entries = readDirCached(scopeDir);
                             const pkgDir = entries.find(
                               (e: { isFile: boolean; name: string }) =>
                                 !e.isFile &&
@@ -1642,18 +1655,9 @@ export function bunResolverPlugin(
                                 pkgRoot,
                                 "package.json",
                               );
-                              if (existsSync(pkgJsonPath)) {
-                                const raw = readTextFileSync(pkgJsonPath);
-                                const pkg = JSON.parse(raw) as {
-                                  exports?: Record<
-                                    string,
-                                    string | {
-                                      import?: string;
-                                      default?: string;
-                                    }
-                                  >;
-                                };
-                                const exportEntry = pkg.exports
+                              {
+                                const pkg = getPackageJsonConfig(pkgJsonPath);
+                                const exportEntry = pkg?.exports
                                   ?.["./" + subpath];
                                 let target: string | undefined;
                                 if (typeof exportEntry === "string") {
@@ -1720,7 +1724,7 @@ export function bunResolverPlugin(
                             );
                             if (existsSync(keyScopeDir)) {
                               try {
-                                const keyEntries = readdirSync(keyScopeDir);
+                                const keyEntries = readDirCached(keyScopeDir);
                                 const keyPkgDir = keyEntries.find(
                                   (e: { isFile: boolean; name: string }) =>
                                     !e.isFile &&
@@ -1735,20 +1739,11 @@ export function bunResolverPlugin(
                                     keyPkgRoot,
                                     "package.json",
                                   );
-                                  if (existsSync(keyPkgJsonPath)) {
-                                    const keyRaw = readTextFileSync(
+                                  {
+                                    const keyPkg = getPackageJsonConfig(
                                       keyPkgJsonPath,
                                     );
-                                    const keyPkg = JSON.parse(keyRaw) as {
-                                      exports?: Record<
-                                        string,
-                                        string | {
-                                          import?: string;
-                                          default?: string;
-                                        }
-                                      >;
-                                    };
-                                    const keyExportEntry = keyPkg.exports
+                                    const keyExportEntry = keyPkg?.exports
                                       ?.["./" + subpath];
                                     let keyTarget: string | undefined;
                                     if (

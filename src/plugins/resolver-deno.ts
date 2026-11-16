@@ -529,23 +529,8 @@ function resolveImportMapLocalDir(
   config: DenoConfig | undefined,
 ): string | undefined {
   if (!config?.imports) return undefined;
-  const keys = Object.keys(config.imports).sort((a, b) => b.length - a.length);
-  let baseVal: string | undefined;
-  for (const key of keys) {
-    const val = config.imports[key];
-    if (typeof val !== "string") continue;
-    if (specifier === key || (key.endsWith("/") && specifier.startsWith(key))) {
-      baseVal = val;
-      break;
-    }
-    if (
-      !key.endsWith("/") &&
-      (specifier === key || specifier.startsWith(`${key}/`))
-    ) {
-      baseVal = val;
-      break;
-    }
-  }
+  const hit = matchImportMapEntry(config.imports, specifier);
+  const baseVal = hit?.value;
   if (!baseVal || !isLocalImportMapTarget(baseVal)) return undefined;
   const abs = localTargetToAbsPath(denoJsonDir, baseVal);
   const dir = isExistingFile(abs) ? dirname(abs) : abs;
@@ -953,13 +938,42 @@ function isClientRuntimeSpec(specifier: string): boolean {
   );
 }
 
-function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
-  try {
-    const content = readTextFileSync(denoJsonPath);
-    return JSON.parse(content) as DenoConfig;
-  } catch {
-    return undefined;
+const denoConfigCache = new Map<string, DenoConfig | undefined>();
+const projectDenoJsonCache = new Map<string, string | undefined>();
+
+/**
+ * 按路径段向上查 imports 最长前缀（含 `foo/` 前缀键），O(段数) 次对象键访问。
+ */
+function matchImportMapEntry(
+  imports: Record<string, string>,
+  specifier: string,
+): { key: string; value: string } | undefined {
+  let cur = specifier;
+  while (cur) {
+    const exact = imports[cur];
+    if (typeof exact === "string") return { key: cur, value: exact };
+    const slashKey = `${cur}/`;
+    if (slashKey !== cur) {
+      const prefix = imports[slashKey];
+      if (typeof prefix === "string") return { key: slashKey, value: prefix };
+    }
+    const i = cur.lastIndexOf("/");
+    if (i <= 0) return undefined;
+    cur = cur.slice(0, i);
   }
+  return undefined;
+}
+
+function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
+  if (denoConfigCache.has(denoJsonPath)) return denoConfigCache.get(denoJsonPath);
+  let cfg: DenoConfig | undefined;
+  try {
+    cfg = JSON.parse(readTextFileSync(denoJsonPath)) as DenoConfig;
+  } catch {
+    cfg = undefined;
+  }
+  denoConfigCache.set(denoJsonPath, cfg);
+  return cfg;
 }
 
 /** 剥除 Deno HTTP 缓存文件中的 `// denoCacheMetadata={...}`（否则 JSON loader 会报 comments）。
@@ -999,15 +1013,29 @@ function getLoaderFromPath(
 }
 
 function findProjectDenoJson(startDir: string): string | undefined {
-  let currentDir = resolve(startDir);
+  const start = resolve(startDir);
+  if (projectDenoJsonCache.has(start)) return projectDenoJsonCache.get(start);
+  const trail: string[] = [];
+  let currentDir = start;
+  let found: string | undefined;
   for (let i = 0; i < 10; i++) {
+    if (projectDenoJsonCache.has(currentDir)) {
+      found = projectDenoJsonCache.get(currentDir);
+      break;
+    }
+    trail.push(currentDir);
     const p = join(currentDir, "deno.json");
-    if (existsSync(p)) return p;
+    if (existsSync(p)) {
+      found = p;
+      break;
+    }
     const parent = dirname(currentDir);
     if (parent === currentDir) break;
     currentDir = parent;
   }
-  return undefined;
+  for (const d of trail) projectDenoJsonCache.set(d, found);
+  if (!projectDenoJsonCache.has(start)) projectDenoJsonCache.set(start, found);
+  return found;
 }
 
 /**
@@ -1022,18 +1050,15 @@ function getPackageImport(
 ): string | undefined {
   const c = config ?? getDenoConfig(projectDenoJsonPath);
   if (!c?.imports) return undefined;
-  const val = c.imports[packageName];
-  if (typeof val === "string") return normalizeProtocolSpecifier(val);
-  for (let i = packageName.length - 1; i >= 0; i--) {
-    if (packageName[i] !== "/") continue;
-    const base = packageName.slice(0, i);
-    const subpath = packageName.slice(i + 1);
-    const baseVal = c.imports[base];
-    if (typeof baseVal === "string") {
-      return normalizeProtocolSpecifier(`${baseVal}/${subpath}`);
-    }
-  }
-  return undefined;
+  const hit = matchImportMapEntry(c.imports, packageName);
+  if (!hit) return undefined;
+  if (packageName === hit.key) return normalizeProtocolSpecifier(hit.value);
+  const rest = hit.key.endsWith("/")
+    ? packageName.slice(hit.key.length)
+    : packageName.slice(hit.key.length).replace(/^\/+/, "");
+  return normalizeProtocolSpecifier(
+    hit.key.endsWith("/") ? `${hit.value}${rest}` : `${hit.value}/${rest}`,
+  );
 }
 
 /** 规范 jsr:/npm: 后的多余前导斜杠，避免出现 npm:/react-dom@x/client 这种非法格式 */
@@ -1112,21 +1137,34 @@ function isExistingFile(path: string): boolean {
   }
 }
 
+const localPackageRootCache = new Map<string, string>();
+const packageJsonByRoot = new Map<
+  string,
+  { exports?: Record<string, unknown> } | undefined
+>();
+
 /** 向上查找含 package.json（或 deno.json）的包根 */
 function findLocalPackageRoot(startPath: string): string {
-  let dir = isExistingFile(startPath) ? dirname(startPath) : startPath;
+  const start = resolve(startPath);
+  const cached = localPackageRootCache.get(start);
+  if (cached) return cached;
+  let dir = isExistingFile(start) ? dirname(start) : start;
+  let found: string | undefined;
   for (let i = 0; i < 8; i++) {
     if (
       existsSync(join(dir, "package.json")) ||
       existsSync(join(dir, "deno.json"))
     ) {
-      return dir;
+      found = dir;
+      break;
     }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  return isExistingDir(startPath) ? startPath : dirname(startPath);
+  if (!found) found = isExistingDir(start) ? start : dirname(start);
+  localPackageRootCache.set(start, found);
+  return found;
 }
 
 function pickExistingScript(base: string): string | undefined {
@@ -1148,16 +1186,32 @@ function pickExistingScript(base: string): string | undefined {
   return undefined;
 }
 
+function readPackageJson(
+  pkgRoot: string,
+): { exports?: Record<string, unknown> } | undefined {
+  if (packageJsonByRoot.has(pkgRoot)) return packageJsonByRoot.get(pkgRoot);
+  const pkgJsonPath = join(pkgRoot, "package.json");
+  let pkg: { exports?: Record<string, unknown> } | undefined;
+  if (existsSync(pkgJsonPath)) {
+    try {
+      pkg = JSON.parse(readTextFileSync(pkgJsonPath)) as {
+        exports?: Record<string, unknown>;
+      };
+    } catch {
+      pkg = undefined;
+    }
+  }
+  packageJsonByRoot.set(pkgRoot, pkg);
+  return pkg;
+}
+
 function readPackageExportTarget(
   pkgRoot: string,
   subpath: string,
 ): string | undefined {
-  const pkgJsonPath = join(pkgRoot, "package.json");
-  if (!existsSync(pkgJsonPath)) return undefined;
   try {
-    const pkg = JSON.parse(readTextFileSync(pkgJsonPath)) as {
-      exports?: Record<string, unknown>;
-    };
+    const pkg = readPackageJson(pkgRoot);
+    if (!pkg) return undefined;
     const entry = pkg.exports?.[`./${subpath}`] ?? pkg.exports?.[subpath];
     if (typeof entry === "string") return entry;
     if (entry && typeof entry === "object") {
@@ -1329,12 +1383,21 @@ interface ModuleCacheIndex {
   canonicalByPath: Map<string, string>;
   /** `@scope/name/subpath`（不含版本）-> 条目；同 path 优先带扩展名、更短的 key */
   jsrByPkgSubpath: Map<string, { key: string; path: string }>;
+  /** 同一 jsr 包（不含版本）下的全部条目，模糊回退只扫本包 */
+  jsrByScopeName: Map<string, Array<{ key: string; path: string; subpath: string }>>;
+  /** npm 包根（无子路径）按包名索引 */
+  npmRootByName: Map<string, { key: string; path: string }>;
 }
 
 const moduleCacheIndex = new WeakMap<ModuleCache, ModuleCacheIndex>();
 
 function createCacheIndex(): ModuleCacheIndex {
-  return { canonicalByPath: new Map(), jsrByPkgSubpath: new Map() };
+  return {
+    canonicalByPath: new Map(),
+    jsrByPkgSubpath: new Map(),
+    jsrByScopeName: new Map(),
+    npmRootByName: new Map(),
+  };
 }
 
 function preferJsrKey(a: string, b: string): boolean {
@@ -1369,8 +1432,23 @@ function indexCacheEntry(
     const prev = idx.canonicalByPath.get(localPath);
     if (!prev || k.length < prev.length) idx.canonicalByPath.set(localPath, k);
   }
+  if (k.startsWith("npm:")) {
+    const after = k.slice(4).replace(/^\/+/, "");
+    if (!after.includes("/")) {
+      const pkgName = after.split("@")[0];
+      if (pkgName && !idx.npmRootByName.has(pkgName)) {
+        idx.npmRootByName.set(pkgName, { key: k, path: localPath });
+      }
+    }
+  }
   const parsed = jsrPkgSubpathId(k);
   if (!parsed) return;
+  let list = idx.jsrByScopeName.get(parsed.scopeAndName);
+  if (!list) {
+    list = [];
+    idx.jsrByScopeName.set(parsed.scopeAndName, list);
+  }
+  list.push({ key: k, path: localPath, subpath: parsed.subpath });
   const storedKey = idx.canonicalByPath.get(localPath) ?? k;
   const prev = idx.jsrByPkgSubpath.get(parsed.id);
   if (!prev || preferJsrKey(storedKey, prev.key)) {
@@ -1443,23 +1521,22 @@ function cacheLookup(
     }
   }
 
-  // 无扩展名的 jsr specifier：用正则匹配 cache 中 specifier + .ts/.tsx/.jsx/.js 的 key，保证 onLoad 拿到带扩展名的 key 以选对 loader。
+  // 无扩展名的 jsr specifier：O(1) 试 specifier + 脚本扩展名，保证 onLoad 拿到带扩展名的 key 以选对 loader。
   if (
     specifier.startsWith("jsr:") &&
     !/\.(tsx?|jsx?|mts|mjs)$/i.test(specifier)
   ) {
-    const extRe = new RegExp(
-      `^${escapeRegex(specifier)}\\.(tsx?|jsx?|mts|mjs)$`,
-      "i",
-    );
-    for (const [key, localPath] of moduleCache) {
-      if (
-        (extRe.test(key) || extRe.test(normalizeProtocolSpecifier(key))) &&
-        existsCheck(localPath)
-      ) {
+    for (const ext of [".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"]) {
+      const localPath = cacheGet(moduleCache, specifier + ext);
+      if (localPath && existsCheck(localPath)) {
         return {
           path: localPath,
-          key: canonicalJsrCacheKey(moduleCache, key, localPath, existsCheck),
+          key: canonicalJsrCacheKey(
+            moduleCache,
+            specifier + ext,
+            localPath,
+            existsCheck,
+          ),
         };
       }
     }
@@ -1486,15 +1563,18 @@ function cacheLookup(
         `^jsr:${scopeEscaped}@[^/]+/${escapeRegex(subpath)}${ext}$`,
         "i",
       );
-      for (const [key, localPath] of moduleCache) {
-        const keyN = normalizeProtocolSpecifier(key);
-        if (exactSubpathRe.test(keyN) && existsCheck(localPath)) {
+      const pkgEntries = getCacheIndex(moduleCache).jsrByScopeName.get(
+        scopeAndName,
+      ) ?? [];
+      for (const entry of pkgEntries) {
+        const keyN = normalizeProtocolSpecifier(entry.key);
+        if (exactSubpathRe.test(keyN) && existsCheck(entry.path)) {
           return {
-            path: localPath,
+            path: entry.path,
             key: canonicalJsrCacheKey(
               moduleCache,
               keyN,
-              localPath,
+              entry.path,
               existsCheck,
             ),
           };
@@ -1521,14 +1601,17 @@ function cacheLookup(
     // 宽松回退若有多个命中，取包内路径最短者，避免 desktop/mod 落到 desktop/**/mod.ts
     let best: CacheLookupResult | undefined;
     let bestSegments = Infinity;
-    for (const [key, localPath] of moduleCache) {
-      if (!key.startsWith("jsr:")) continue;
-      if (pattern.test(key) && existsCheck(localPath)) {
-        const segs = pathWithinPackageFromKey(key).split("/").filter(Boolean)
-          .length;
+    const pkgEntries = getCacheIndex(moduleCache).jsrByScopeName.get(
+      scopeAndName,
+    ) ?? [];
+    for (const entry of pkgEntries) {
+      if (pattern.test(entry.key) && existsCheck(entry.path)) {
+        const segs = pathWithinPackageFromKey(entry.key).split("/").filter(
+          Boolean,
+        ).length;
         if (segs < bestSegments) {
           bestSegments = segs;
-          best = { path: localPath, key };
+          best = { path: entry.path, key: entry.key };
         }
       }
     }
@@ -1555,19 +1638,8 @@ function cacheLookup(
       let baseLocal = moduleCache.get(baseSpec);
       if (!baseLocal) {
         const pkgName = after.slice(0, slashIdx).split("@")[0];
-        const npmPrefix = `npm:${pkgName}@`;
-        for (const [key, local] of moduleCache) {
-          if (
-            key.startsWith("npm:") &&
-            key.startsWith(npmPrefix) &&
-            !key.slice(npmPrefix.length).includes("/")
-          ) {
-            if (existsCheck(local)) {
-              baseLocal = local;
-              break;
-            }
-          }
-        }
+        const root = getCacheIndex(moduleCache).npmRootByName.get(pkgName);
+        if (root && existsCheck(root.path)) baseLocal = root.path;
       }
       if (baseLocal && existsCheck(baseLocal)) {
         const baseDir = dirname(baseLocal);
@@ -1746,39 +1818,36 @@ export function denoResolverPlugin(
           if (!denoJsonPath) return undefined;
           const config = getConfig(denoJsonPath);
           if (!config?.imports) return undefined;
-          const sortedKeys = Object.keys(config.imports).sort((a, b) =>
-            b.length - a.length
-          );
+          const hit = matchImportMapEntry(config.imports, args.path);
+          if (!hit) return undefined;
           const denoJsonDir = dirname(denoJsonPath);
-          for (const alias of sortedKeys) {
-            if (!args.path.startsWith(alias)) continue;
-            const val = config.imports[alias];
-            if (!val) continue;
-            const rest = args.path.slice(alias.length).replace(/^\/+/, "");
-            // 本地依赖（./ ../ file: 绝对路径）：子路径按 exports／磁盘候选解析
-            if (isLocalImportMapTarget(val)) {
-              const localHit = resolveLocalImportMapSubpath(
-                denoJsonDir,
-                val,
-                rest,
-              );
-              if (localHit) {
-                return { path: localHit, namespace: "file" };
-              }
-              continue;
+          const val = hit.value;
+          const rest = hit.key.endsWith("/")
+            ? args.path.slice(hit.key.length)
+            : args.path.slice(hit.key.length).replace(/^\/+/, "");
+          // 本地依赖（./ ../ file: 绝对路径）：子路径按 exports／磁盘候选解析
+          if (isLocalImportMapTarget(val)) {
+            const localHit = resolveLocalImportMapSubpath(
+              denoJsonDir,
+              val,
+              rest,
+            );
+            if (localHit) {
+              return { path: localHit, namespace: "file" };
             }
-            const resolved = val.startsWith("./") || val.startsWith("../")
-              ? join(denoJsonDir, val, rest)
-              : (rest ? `${val.replace(/\/+$/, "")}/${rest}` : val);
-            if (existsSyncMemo(resolved)) {
-              return { path: resolved, namespace: "file" };
-            }
-            if (!resolved.includes(".")) {
-              for (const ext of [".ts", ".tsx", ".js", ".jsx", ".css"]) {
-                const withExt = resolved + ext;
-                if (existsSyncMemo(withExt)) {
-                  return { path: withExt, namespace: "file" };
-                }
+            return undefined;
+          }
+          const resolved = val.startsWith("./") || val.startsWith("../")
+            ? join(denoJsonDir, val, rest)
+            : (rest ? `${val.replace(/\/+$/, "")}/${rest}` : val);
+          if (existsSyncMemo(resolved)) {
+            return { path: resolved, namespace: "file" };
+          }
+          if (!resolved.includes(".")) {
+            for (const ext of [".ts", ".tsx", ".js", ".jsx", ".css"]) {
+              const withExt = resolved + ext;
+              if (existsSyncMemo(withExt)) {
+                return { path: withExt, namespace: "file" };
               }
             }
           }
@@ -1949,34 +2018,16 @@ export function denoResolverPlugin(
             const config = getDenoConfig(denoJsonPath);
             let localHit: string | undefined;
             if (config?.imports) {
-              // 从右往左找最长 base 键
-              for (let i = args.path.length - 1; i >= 0; i--) {
-                if (args.path[i] !== "/") continue;
-                const base = args.path.slice(0, i);
-                const sub = args.path.slice(i + 1);
-                const baseVal = config.imports[base];
-                if (
-                  typeof baseVal === "string" && isLocalImportMapTarget(baseVal)
-                ) {
-                  localHit = resolveLocalImportMapSubpath(
-                    denoJsonDir,
-                    baseVal,
-                    sub,
-                  );
-                  break;
-                }
-              }
-              if (!localHit) {
-                const exact = config.imports[args.path];
-                if (
-                  typeof exact === "string" && isLocalImportMapTarget(exact)
-                ) {
-                  localHit = resolveLocalImportMapSubpath(
-                    denoJsonDir,
-                    exact,
-                    "",
-                  );
-                }
+              const mapHit = matchImportMapEntry(config.imports, args.path);
+              if (mapHit && isLocalImportMapTarget(mapHit.value)) {
+                const sub = mapHit.key.endsWith("/")
+                  ? args.path.slice(mapHit.key.length)
+                  : args.path.slice(mapHit.key.length).replace(/^\/+/, "");
+                localHit = resolveLocalImportMapSubpath(
+                  denoJsonDir,
+                  mapHit.value,
+                  sub,
+                );
               }
             }
             if (!localHit) {
