@@ -2,7 +2,7 @@
  * Deno `deno info` 模块映射磁盘缓存：写入 `~/.dreamer/<项目目录名>/esbuild-deno-cache/`，
  * 避免每次 esbuild 构建重复起子进程解析依赖图。
  *
- * **指纹**：`deno.json` 与 `deno.lock` 全文拼接后哈希（任一侧变更即失效）；无 `deno.json` 时为 `no-deno-json`。
+ * **指纹**：同目录 `deno.json` 与 `package.json` 的文件哈希（任一文件变更即失效）；无 `deno.json` 时为 `no-deno-json`。不读取 `deno.lock`，也无过期时间。
  * **单文件**：同一指纹下整仓共用一个 `deno-module-map-<指纹>.json`，与具体构建入口无关；
  * 新入口解析后写入时会与盘上已有条目 **合并**（同一 specifier 后写覆盖先写）。
  * **写盘**：先写临时文件再 `rename` 替换，避免崩溃留下半截 JSON；尽量用目录锁序列化写并 **写前再读** 合并，减轻并发构建丢条目。
@@ -18,6 +18,7 @@ import {
   existsSync,
   getEnv,
   hash,
+  hashFile,
   join,
   mkdir,
   readTextFile,
@@ -73,10 +74,10 @@ export function getDreamerEsbuildDenoCacheDir(
 }
 
 /**
- * 根据 `deno.json` + `deno.lock` 内容生成磁盘缓存指纹（与入口、workDir 无关）。
- * 仅改 imports 未更新 lock 时也会使指纹变化，避免沿用陈旧映射。
+ * 根据同目录 `deno.json` 与 `package.json` 的文件哈希生成磁盘缓存指纹（与入口无关）。
+ * 两个文件都没变则沿用旧缓存；任一侧变更即失效。不读取 `deno.lock`。
  *
- * @param projectDenoJsonPath - 项目 `deno.json` 绝对路径，用于读取配置与同目录下 `deno.lock`；undefined 时返回固定串
+ * @param projectDenoJsonPath - 项目 `deno.json` 绝对路径，用于定位同目录下的 `package.json`；undefined 时返回固定串
  * @returns 哈希十六进制串，或 `no-deno-json`
  */
 export async function computeDenoLockFingerprint(
@@ -84,27 +85,24 @@ export async function computeDenoLockFingerprint(
 ): Promise<string> {
   if (!projectDenoJsonPath) return "no-deno-json";
   const root = dirname(projectDenoJsonPath);
-  const lockPath = join(root, "deno.lock");
-  let denoJsonText = "";
-  try {
-    denoJsonText = await readTextFile(projectDenoJsonPath);
-  } catch {
-    /* 读失败时按空串参与哈希，仍与「可读」时区分度由 lock 等补足 */
-  }
-  let lockText = "";
-  try {
-    if (existsSync(lockPath)) {
-      lockText = await readTextFile(lockPath);
+  const parts: string[] = [];
+  for (const name of ["deno.json", "package.json"] as const) {
+    const filePath = join(root, name);
+    try {
+      if (existsSync(filePath)) {
+        parts.push(`${name}:${await hashFile(filePath)}`);
+        continue;
+      }
+    } catch {
+      /* 读失败视为缺失，避免沿用错误指纹 */
     }
-  } catch {
-    /* 读 lock 失败视为无 lock 内容 */
+    parts.push(`${name}:missing`);
   }
-  const combined = `deno.json\n${denoJsonText}\ndeno.lock\n${lockText}`;
-  return await hash(combined);
+  return await hash(parts.join("\n"));
 }
 
 /**
- * @deprecated 请使用 {@link computeDenoLockFingerprint}（现为 deno.json + deno.lock 联合指纹）
+ * @deprecated 请使用 {@link computeDenoLockFingerprint}（现为 deno.json + package.json 文件哈希）
  */
 export async function computeDenoConfigFingerprint(
   projectDenoJsonPath: string | undefined,
@@ -115,7 +113,7 @@ export async function computeDenoConfigFingerprint(
 /** 聚合磁盘 JSON（v3）：单项目、单缓存指纹一份文件 */
 export interface DenoModuleDiskCachePayloadV3 {
   v: 3;
-  /** 与 {@link computeDenoLockFingerprint} 一致（字段名历史沿用，实为 deno.json+lock 联合指纹） */
+  /** 与 {@link computeDenoLockFingerprint} 一致（字段名历史沿用，实为 deno.json + package.json 文件哈希） */
   lockFingerprint: string;
   entries: [string, string][];
 }

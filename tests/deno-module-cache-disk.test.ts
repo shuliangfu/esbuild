@@ -58,21 +58,31 @@ if (!IS_BUN) {
       }
     });
 
-    it("computeDenoLockFingerprint：deno.json 变更后指纹应变（lock 不变）", async () => {
+    it("computeDenoLockFingerprint：deno.json 或 package.json 变更后指纹应变，改 lock 不变", async () => {
       const dir = await makeTempDir({ prefix: "dreamer-deno-fp-" });
       const dj = join(dir, "deno.json");
+      const pkg = join(dir, "package.json");
       try {
         await writeTextFile(dj, '{"name":"t","version":"1.0.0"}\n');
+        await writeTextFile(pkg, '{"name":"t","version":"1.0.0"}\n');
         await writeTextFile(join(dir, "deno.lock"), "lock-v1\n");
         const fp1 = await computeDenoLockFingerprint(dj);
+        await writeTextFile(join(dir, "deno.lock"), "lock-v2\n");
+        const fpLock = await computeDenoLockFingerprint(dj);
+        expect(fpLock).toBe(fp1);
         await writeTextFile(
           dj,
           '{"name":"t","version":"1.0.0","imports":{"x":"npm:foo"}}\n',
         );
         const fp2 = await computeDenoLockFingerprint(dj);
         expect(fp1).not.toBe(fp2);
+        await writeTextFile(
+          pkg,
+          '{"name":"t","version":"1.0.1"}\n',
+        );
+        const fp3 = await computeDenoLockFingerprint(dj);
+        expect(fp2).not.toBe(fp3);
         expect(fp1.length).toBeGreaterThan(8);
-        expect(fp2.length).toBeGreaterThan(8);
       } finally {
         try {
           await remove(dir, { recursive: true });

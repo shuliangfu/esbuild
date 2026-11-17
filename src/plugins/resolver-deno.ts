@@ -710,7 +710,7 @@ async function runDenoInfoOnAggregate(
  * 在项目目录、项目 deno.json 下执行 deno info，仅将本依赖图内的模块写入 cache。
  * 不扫全局缓存；npm 无 local 时仅在此时用子进程 import.meta.resolve 补全。
  *
- * **性能**：按 `deno.json`+`deno.lock` 联合指纹从 `~/.dreamer/<项目名>/esbuild-deno-cache/deno-module-map-<指纹>.json`
+ * **性能**：按 `deno.json` 与 `package.json` 文件哈希从 `~/.dreamer/<项目名>/esbuild-deno-cache/deno-module-map-<指纹>.json`
  * 预载。磁盘缓存已有条目时**跳过** `deno info`（含聚合扫描），由解析期 miss 回退补洞并在构建后写回；
  * 缓存未命中时只对本次入口所在端做一次聚合 `deno info`（不再先对入口再对聚合跑两遍）。
  * 同仓其它端（api／frontend／mobile 等）不进入聚合。临时文件写入
@@ -965,7 +965,9 @@ function matchImportMapEntry(
 }
 
 function getDenoConfig(denoJsonPath: string): DenoConfig | undefined {
-  if (denoConfigCache.has(denoJsonPath)) return denoConfigCache.get(denoJsonPath);
+  if (denoConfigCache.has(denoJsonPath)) {
+    return denoConfigCache.get(denoJsonPath);
+  }
   let cfg: DenoConfig | undefined;
   try {
     cfg = JSON.parse(readTextFileSync(denoJsonPath)) as DenoConfig;
@@ -1384,7 +1386,10 @@ interface ModuleCacheIndex {
   /** `@scope/name/subpath`（不含版本）-> 条目；同 path 优先带扩展名、更短的 key */
   jsrByPkgSubpath: Map<string, { key: string; path: string }>;
   /** 同一 jsr 包（不含版本）下的全部条目，模糊回退只扫本包 */
-  jsrByScopeName: Map<string, Array<{ key: string; path: string; subpath: string }>>;
+  jsrByScopeName: Map<
+    string,
+    Array<{ key: string; path: string; subpath: string }>
+  >;
   /** npm 包根（无子路径）按包名索引 */
   npmRootByName: Map<string, { key: string; path: string }>;
 }
