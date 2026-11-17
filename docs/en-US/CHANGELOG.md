@@ -10,6 +10,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-17
+
+### Performance
+
+- **O(1) lookups in the Deno and Bun module resolvers**: stop sorting and
+  scanning the whole import map on every resolve. Index import-map prefixes,
+  cache `deno.json` / `package.json` / `tsconfig` reads, and look up
+  module-cache fallbacks by package instead of scanning the full table.
+
 ## [1.5.2] - 2026-11-15
 
 ### Performance

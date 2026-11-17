@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-17
+
+### 优化
+
+- **Deno / Bun 模块解析改为 O(1) 查找**：不再每次解析都排序并扫描整份 import
+  map。改为给 import map 前缀建索引，缓存 `deno.json` / `package.json` /
+  `tsconfig` 读取，并按包名查找 module-cache 回退项。
+
 ## [1.5.2] - 2026-11-15
 
 ### 优化
