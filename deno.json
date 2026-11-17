@@ -1,6 +1,6 @@
 {
   "name": "@dreamer/esbuild",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "license": "Apache-2.0",
   "description": "High-performance build tool library compatible with Deno, Bun, and Node.js 22+, providing full-stack compilation, bundling, resource processing, optimization, and more, with subpath on-demand imports.",
   "repository": {
@@ -45,15 +45,15 @@
   },
   "imports": {
     "@dreamer/i18n": "jsr:@dreamer/i18n@^1.1.2",
-    "@dreamer/console": "jsr:@dreamer/console@^1.1.0",
-    "@dreamer/logger": "jsr:@dreamer/logger@^1.1.0",
+    "@dreamer/console": "jsr:@dreamer/console@^1.1.1",
+    "@dreamer/logger": "jsr:@dreamer/logger@^1.1.1",
     "@dreamer/runtime-adapter": "jsr:@dreamer/runtime-adapter@^1.2.2",
     "@dreamer/image": "jsr:@dreamer/image@^1.1.0",
-    "@dreamer/test": "jsr:@dreamer/test@^1.2.3",
+    "@dreamer/test": "jsr:@dreamer/test@^1.2.4",
     "esbuild": "npm:esbuild@^0.27.7",
-    "postcss": "npm:postcss@^8.5.10",
-    "autoprefixer": "npm:autoprefixer@^10.5.0",
-    "cssnano": "npm:cssnano@^7.1.7"
+    "postcss": "npm:postcss@^8.5.33",
+    "autoprefixer": "npm:autoprefixer@^10.6.2",
+    "cssnano": "npm:cssnano@^7.1.9"
   },
   "minimumDependencyAge": 0,
   "nodeModulesDir": "auto",

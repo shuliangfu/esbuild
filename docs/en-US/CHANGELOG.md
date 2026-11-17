@@ -10,6 +10,14 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-11-17
+
+### Performance
+
+- **Module disk cache fingerprint uses file hashes**: invalidate only when
+  `deno.json` or `package.json` at the project root changes. `deno.lock` is no
+  longer part of the fingerprint, and the cache has no time-to-live.
+
 ## [1.5.3] - 2026-11-17
 
 ### Performance
@@ -33,21 +41,21 @@ and this project adheres to
 
 - **Extensionless Deno remote-cache files**: on cache miss, hashed files are
   loaded through `deno-protocol` as TypeScript or TSX (from content), so
-  `import type` and JSX in modules such as `@dreamer/view/devtools/overlay`
-  no longer fail as JavaScript.
+  `import type` and JSX in modules such as `@dreamer/view/devtools/overlay` no
+  longer fail as JavaScript.
 
 ## [1.5.1] - 2026-11-10
 
 ### Fixed
 
 - **JSR subpath resolution uses the lock version**: when `deno.json` has
-  `jsr:@pkg@^1.2.8` but the lock / moduleCache has 1.2.9, `resolver-deno`
-  no longer strips the caret and looks up 1.2.8. Subpaths match any cached
-  version with the same path; loose fallbacks pick the shortest path inside
-  the package so `desktop/mod` is not bound to `desktop/basic/icons/mod.ts`.
-  Relative imports use the exact cached version in protocol paths. This
-  prevents production code-splitting from dropping real exports (`Link`,
-  `Stack`, ...) and causing `ReferenceError`.
+  `jsr:@pkg@^1.2.8` but the lock / moduleCache has 1.2.9, `resolver-deno` no
+  longer strips the caret and looks up 1.2.8. Subpaths match any cached version
+  with the same path; loose fallbacks pick the shortest path inside the package
+  so `desktop/mod` is not bound to `desktop/basic/icons/mod.ts`. Relative
+  imports use the exact cached version in protocol paths. This prevents
+  production code-splitting from dropping real exports (`Link`, `Stack`, ...)
+  and causing `ReferenceError`.
 
 ## [1.5.0] - 2026-11-09
 
@@ -56,35 +64,35 @@ and this project adheres to
 - **Local dependency subpaths**: `resolver-deno` / `resolver-bun` resolve
   `@scope/pkg/subpath` when packages map to a local directory or `file:` in
   `deno.json` / `package.json` (via exports).
-- **Prod `legalComments: "none"`**: `BuilderClient` / `BuilderServer` / `buildBundle`
-  drop `/*! … */` license comments by default when minifying / in production;
-  overridable via options.
+- **Prod `legalComments: "none"`**: `BuilderClient` / `BuilderServer` /
+  `buildBundle` drop `/*! … */` license comments by default when minifying / in
+  production; overridable via options.
 
 ### Fixed
 
 - **Bun `platform: "neutral"`**: `bun build` ignores `--legal-comments`; when
   minify defaults to `none` or an explicit non-`inline` value is set, fall back
   to esbuild so license banners are stripped.
-- **Stress smoke import**: use `pathToFileUrl` for dynamic import so Windows Deno
-  no longer hits `Unsupported scheme "d"`.
+- **Stress smoke import**: use `pathToFileUrl` for dynamic import so Windows
+  Deno no longer hits `Unsupported scheme "d"`.
 
 ## [1.4.2] - 2026-11-06
 
 ### Fixed
 
-- **stripDenoCacheMetadata**: leading `// denoCacheMetadata=…` lines are removed by
-  skipping the first line instead of emptying the whole file when a newline follows
-  the marker (metadata-only files still become empty).
+- **stripDenoCacheMetadata**: leading `// denoCacheMetadata=…` lines are removed
+  by skipping the first line instead of emptying the whole file when a newline
+  follows the marker (metadata-only files still become empty).
 
 ## [1.4.1] - 2026-11-06
 
 ### Fixed
 
-- **JSON loader**: `getLoaderFromPath` in `resolver-deno` / `resolver-bun` returns `json` for
-  `.json`, so client bundles can import modules like `@dreamer/view/devtools/overlay` that use
-  `import … with { type: "json" }`.
-- Strip trailing `// denoCacheMetadata=…` from Deno HTTP cache files so the JSON loader accepts them.
-
+- **JSON loader**: `getLoaderFromPath` in `resolver-deno` / `resolver-bun`
+  returns `json` for `.json`, so client bundles can import modules like
+  `@dreamer/view/devtools/overlay` that use `import … with { type: "json" }`.
+- Strip trailing `// denoCacheMetadata=…` from Deno HTTP cache files so the JSON
+  loader accepts them.
 
 ## [1.4.0] - 2026-11-04
 

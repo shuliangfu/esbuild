@@ -1,6 +1,6 @@
 {
   "name": "@dreamer/esbuild",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "High-performance build tool library compatible with Deno, Bun, and Node.js 22+, providing full-stack compilation, bundling, resource processing, optimization, and more, with subpath on-demand imports.",
   "type": "module",
   "license": "Apache-2.0",
@@ -22,10 +22,10 @@
     "check": "deno check src/mod.ts"
   },
   "dependencies": {
-    "@dreamer/console": "npm:@jsr/dreamer__console@^1.1.0",
+    "@dreamer/console": "npm:@jsr/dreamer__console@^1.1.1",
     "@dreamer/i18n": "npm:@jsr/dreamer__i18n@^1.1.2",
     "@dreamer/image": "npm:@jsr/dreamer__image@^1.1.0",
-    "@dreamer/logger": "npm:@jsr/dreamer__logger@^1.1.0",
+    "@dreamer/logger": "npm:@jsr/dreamer__logger@^1.1.1",
     "@dreamer/runtime-adapter": "npm:@jsr/dreamer__runtime-adapter@^1.2.2",
     "autoprefixer": "npm:autoprefixer@10.5.0",
     "cssnano": "npm:cssnano@7.1.7",
@@ -33,8 +33,8 @@
     "postcss": "npm:postcss@8.5.10"
   },
   "devDependencies": {
-    "@dreamer/test": "npm:@jsr/dreamer__test@^1.2.3",
-    "tsx": "^4.19.2"
+    "@dreamer/test": "npm:@jsr/dreamer__test@^1.2.4",
+    "tsx": "^4.23.15"
   },
   "engines": {
     "bun": ">=1.3",

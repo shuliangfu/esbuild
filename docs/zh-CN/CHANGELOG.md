@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-11-17
+
+### 优化
+
+- **磁盘模块缓存指纹改为文件哈希**：只看项目根下 `deno.json` 与 `package.json`
+  的文件哈希，两个文件都没变就一直沿用旧缓存；不再把 `deno.lock`
+  计入指纹，也没有过期时间。
+
 ## [1.5.3] - 2026-11-17
 
 ### 优化
@@ -28,9 +36,9 @@
 
 ### 修复
 
-- **无扩展名的 Deno 远程缓存**：cache miss 后哈希文件改走 `deno-protocol`，按内容
-  用 TypeScript 或 TSX 加载，避免把 `import type` 和 JSX（如
-  `@dreamer/view/devtools/overlay`）当成 JavaScript 解析失败。
+- **无扩展名的 Deno 远程缓存**：cache miss 后哈希文件改走
+  `deno-protocol`，按内容 用 TypeScript 或 TSX 加载，避免把 `import type` 和
+  JSX（如 `@dreamer/view/devtools/overlay`）当成 JavaScript 解析失败。
 
 ## [1.5.1] - 2026-11-10
 
@@ -47,15 +55,17 @@
 
 ### 新增
 
-- **本地依赖子路径**：`resolver-deno`／`resolver-bun` 在 `deno.json`／`package.json`
-  将包映射到本地目录或 `file:` 时，可解析 `@scope/pkg/subpath`（exports）。
-- **生产 `legalComments: "none"`**：`BuilderClient`／`BuilderServer`／`buildBundle`
-  在 minify／生产默认去掉 `/*! … */` 等 license 注释；可通过选项覆盖。
+- **本地依赖子路径**：`resolver-deno`／`resolver-bun` 在
+  `deno.json`／`package.json` 将包映射到本地目录或 `file:` 时，可解析
+  `@scope/pkg/subpath`（exports）。
+- **生产
+  `legalComments: "none"`**：`BuilderClient`／`BuilderServer`／`buildBundle` 在
+  minify／生产默认去掉 `/*! … */` 等 license 注释；可通过选项覆盖。
 
 ### 修复
 
-- **Bun `platform: "neutral"`**：`bun build` 忽略 `--legal-comments`；minify 默认
-  `none` 或显式非 `inline` 时改走 esbuild，避免 license 残留。
+- **Bun `platform: "neutral"`**：`bun build` 忽略 `--legal-comments`；minify
+  默认 `none` 或显式非 `inline` 时改走 esbuild，避免 license 残留。
 - **压测冒烟**：产物动态 import 使用 `pathToFileUrl`，修复 Windows Deno
   `Unsupported scheme "d"`。
 
@@ -63,17 +73,19 @@
 
 ### 修复
 
-- **stripDenoCacheMetadata**：文件以 `// denoCacheMetadata=…` 开头时改为跳过首行，
+- **stripDenoCacheMetadata**：文件以 `// denoCacheMetadata=…`
+  开头时改为跳过首行，
   不再在标记后仍有正文时把整文件清空（仅元数据、无换行时仍为空）。
 
 ## [1.4.1] - 2026-11-06
 
 ### 修复
 
-- **JSON loader**：`resolver-deno`／`resolver-bun` 的 `getLoaderFromPath` 对 `.json` 返回 `json`，
-  使 `@dreamer/view/devtools/overlay` 等 `import … with { type: "json" }` 可被客户端 bundle。
-- 读取 Deno HTTP 缓存时剥除末尾 `// denoCacheMetadata=…`，避免 JSON loader 报 comments。
-
+- **JSON loader**：`resolver-deno`／`resolver-bun` 的 `getLoaderFromPath` 对
+  `.json` 返回 `json`， 使 `@dreamer/view/devtools/overlay` 等
+  `import … with { type: "json" }` 可被客户端 bundle。
+- 读取 Deno HTTP 缓存时剥除末尾 `// denoCacheMetadata=…`，避免 JSON loader 报
+  comments。
 
 ## [1.4.0] - 2026-11-04
 
